@@ -354,7 +354,7 @@ export function reportFooterTemplate(issuer: DocumentIssuer, qrDataUri?: string)
   </div>`
     : '';
   return `
-<div style="${base};width:100%;box-sizing:border-box;position:relative;top:14.8pt;">
+<div style="${base};width:100%;box-sizing:border-box;position:relative;top:7pt;">
   <div style="padding:0 15.8pt;min-height:64pt;display:flex;align-items:flex-end;">
     <div style="flex:0 0 auto;margin-left:26pt;">${lockup}</div>
     ${verify ? `<div style="flex:0 0 auto;margin-left:17pt;">${verify}</div>` : ''}
