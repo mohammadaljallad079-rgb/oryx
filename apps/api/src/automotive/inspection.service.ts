@@ -1014,7 +1014,9 @@ export function buildProgress(selectedAreas: string[], sections: SectionShape[])
         : spec.kind === 'DIAGRAM_CHASSIS'
           ? (section?.chassisRegions.filter((r) => r.condition !== 'UNSET').length ?? 0)
           : spec.kind === 'DIAGNOSTIC'
-            ? section?.diagnostics.length ?? 0
+            // Computer-unit inspection now uses a single notes field rather
+            // than requiring a diagnostic row to be created for approval.
+            ? (section?.remarks?.trim() ? 1 : (section?.diagnostics.length ?? 0))
             : 0;
 
     const itemsComplete = spec.items.length === 0 || completedItems === spec.items.length;
