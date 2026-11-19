@@ -126,7 +126,7 @@ test.describe('Point of sale — card terminal', () => {
     await expect(page.getByTestId(`pos-cart-line-${setup.product.sku}`)).toBeVisible();
     await expect(page.getByTestId('pos-premium-workstation')).toBeVisible();
     await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toBeVisible();
-    await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toHaveCSS('max-height', '70px');
+    await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toHaveCSS('max-height', '42px');
     const closeButton = page.getByRole('dialog').getByRole('button', { name: /close/i }).first();
     const closeBox = await closeButton.boundingBox();
     expect(closeBox).not.toBeNull();
@@ -169,6 +169,37 @@ test.describe('Point of sale — card terminal', () => {
     expect(layout!.cartScroll).toBe('auto');
     expect(layout!.cartCount).toBeGreaterThan(0);
 
+    // Reported regression: on a short 720px cashier screen the large headers
+    // squeezed the basket to one item, and newly selected items stayed below
+    // the fold until somebody manually scrolled the cart. Verify the second
+    // and third distinct products become visible inside the cart automatically.
+    await page.setViewportSize({ width: 1265, height: 720 });
+    const basket = page.getByTestId('pos-cart-lines');
+    const availableTiles = page.locator('[data-testid^="pos-product-"]:not([disabled])');
+    const extraSkus: string[] = [];
+    for (let index = 0; index < await availableTiles.count() && extraSkus.length < 2; index++) {
+      const next = availableTiles.nth(index);
+      const name = await next.getAttribute('data-testid');
+      const sku = name?.replace(/^pos-product-/, '') ?? '';
+      if (!sku || sku === setup.product.sku || extraSkus.includes(sku)) continue;
+      await next.click();
+      extraSkus.push(sku);
+      await expect(page.getByTestId(`pos-cart-line-${sku}`)).toBeVisible();
+      const lastIsInCartViewport = await page.getByTestId(`pos-cart-line-${sku}`).evaluate((element) => {
+        const viewport = element.closest('[data-testid="pos-cart-lines"]')?.getBoundingClientRect();
+        const item = element.getBoundingClientRect();
+        return !!viewport && item.top >= viewport.top - 1 && item.bottom <= viewport.bottom + 1;
+      });
+      expect(lastIsInCartViewport).toBe(true);
+    }
+    expect(extraSkus.length).toBe(2);
+    const basketHeight = await basket.evaluate((element) => element.getBoundingClientRect().height);
+    expect(basketHeight).toBeGreaterThan(115);
+    for (const sku of extraSkus) {
+      await page.getByTestId(`pos-remove-${sku}`).click();
+    }
+    await page.setViewportSize({ width: 1280, height: 720 });
+
     await expect(tile.locator('.oryx-pos-tile__selected')).toHaveText('1');
     // The approved cart design adjusts quantity without opening the detail editor.
     await page.getByTestId(`pos-increment-${setup.product.sku}`).click();
@@ -193,6 +224,19 @@ test.describe('Point of sale — card terminal', () => {
     const exactPrice = page.getByTestId(`pos-price-${setup.product.sku}`);
     await exactPrice.fill('28.000');
     await exactPrice.blur();
+
+    // Cart Amount is QTY × UNIT PRICE. A discount must never reduce this
+    // displayed amount; tax belongs exclusively in the totals calculation.
+    const lineAmount = page.getByTestId(`pos-line-amount-${setup.product.sku}`);
+    await expect(lineAmount).toContainText('28.000 BHD');
+    const lineDiscount = page.getByTestId(`pos-discount-${setup.product.sku}`);
+    await lineDiscount.fill('1.000');
+    await expect(lineAmount).toContainText('28.000 BHD');
+    await expect(page.getByTestId(`pos-line-total-${setup.product.sku}`)).toContainText('28.000 BHD');
+    await page.getByTestId(`pos-increment-${setup.product.sku}`).click();
+    await expect(lineAmount).toContainText('56.000 BHD');
+    await page.getByTestId(`pos-decrement-${setup.product.sku}`).click();
+    await lineDiscount.fill('0');
     await expect(page.locator('.oryx-pos__totals')).toContainText('28.000 BHD');
     const total = page.getByTestId('pos-total');
     await expect(total).toBeVisible();
