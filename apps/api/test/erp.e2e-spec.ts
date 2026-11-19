@@ -603,6 +603,77 @@ describe('ORYX ERP core (e2e)', () => {
       expect(order.body.status).toBe('CONFIRMED');
     });
 
+    it('converts a quotation into a linked draft and posts stock/payment only on approval', async () => {
+      const quotation = await erp<{ id: string; quoteNumber: string }>('/sales/quotations', {
+        method: 'POST',
+        body: {
+          customerId,
+          issueDate: '2026-05-01',
+          paymentMethod: 'CASH',
+          lines: [{
+            productId, description: 'Draft-conversion widget', quantity: 10000,
+            unitPriceMinor: 10000, discountAmountMinor: 500, taxPercentBp: 1000,
+          }],
+        },
+      });
+      expect(quotation.status).toBe(201);
+      const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      const converted = await erp<{
+        id: string; invoiceNumber: string; status: string; orderId: string; amountPaidMinor: number;
+      }>(`/sales/quotations/${quotation.body.id}/convert-to-invoice`, {
+        method: 'POST', body: { warehouseId },
+      });
+      expect(converted.status).toBe(201);
+      expect(converted.body.status).toBe('DRAFT');
+      expect(converted.body.orderId).toBeTruthy();
+      expect(converted.body.amountPaidMinor).toBe(0);
+
+      const duplicate = await erp<{ code: string }>(
+        `/sales/quotations/${quotation.body.id}/convert-to-invoice`,
+        { method: 'POST', body: { warehouseId } },
+      );
+      expect(duplicate.status).toBe(400);
+
+      const created = await ctx.prisma.salesInvoice.findUniqueOrThrow({
+        where: { id: converted.body.id }, include: { order: true },
+      });
+      expect(created.order?.quotationId).toBe(quotation.body.id);
+      expect(created.journalEntryId).toBeNull();
+      const quotationAfter = await ctx.prisma.quotation.findUniqueOrThrow({ where: { id: quotation.body.id } });
+      expect(quotationAfter.status).toBe('CONVERTED');
+
+      const beforeApproval = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      expect(beforeApproval.quantity).toBe(before.quantity);
+
+      const approved = await erp<{ id: string; status: string; amountPaidMinor: number; totalMinor: number }>(
+        `/sales/invoices/${converted.body.id}`, {
+          method: 'POST',
+          body: {
+            customerId, warehouseId, documentDate: '2026-05-02',
+            paymentMethod: 'CASH', post: true,
+            lines: [{
+              productId, description: 'Draft-conversion widget', quantity: 10000,
+              unitPriceMinor: 10000, discountAmountMinor: 500, taxPercentBp: 1000,
+            }],
+          },
+        },
+      );
+      expect(approved.status).toBe(201);
+      expect(approved.body.status).toBe('PAID');
+      expect(approved.body.amountPaidMinor).toBe(approved.body.totalMinor);
+      const afterApproval = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      expect(beforeApproval.quantity - afterApproval.quantity).toBe(10000);
+      expect(await ctx.prisma.journalEntry.count({
+        where: { companyId: tenantId, sourceType: 'SALES_INVOICE', sourceId: converted.body.id },
+      })).toBe(1);
+    });
+
     it('issues and posts a sales invoice, drawing down stock and posting VAT', async () => {
       const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
         where: { warehouseId_productId: { warehouseId, productId } },
@@ -734,6 +805,45 @@ describe('ORYX ERP core (e2e)', () => {
         where: { warehouseId_productId: { warehouseId, productId } },
       });
       expect(after.quantity - before.quantity).toBe(10000);
+    });
+
+    it('prevents a second full return of items already credited against the invoice', async () => {
+      const duplicate = await erp<{ code: string }>('/sales/credit-notes', {
+        method: 'POST',
+        body: {
+          customerId, invoiceId, issueDate: '2026-05-06',
+          reason: 'Repeated return', warehouseId, restockInventory: true,
+          lines: [{
+            productId, description: 'Widget', quantity: 10000,
+            unitPriceMinor: 10000, taxPercentBp: 1500,
+          }],
+        },
+      });
+      expect(duplicate.status).toBe(400);
+      const alreadyCredited = await ctx.prisma.creditNote.count({
+        where: { companyId: tenantId, invoiceId },
+      });
+      expect(alreadyCredited).toBe(1);
+    });
+
+    it('refuses returns that reference a different customer’s invoice', async () => {
+      const other = await erp<{ id: string }>('/sales/customers', {
+        method: 'POST',
+        body: { code: 'C-WRONG-RETURN', nameEn: 'Unrelated Customer' },
+      });
+      expect(other.status).toBe(201);
+      const rejected = await erp('/sales/credit-notes', {
+        method: 'POST',
+        body: {
+          customerId: other.body.id, invoiceId, issueDate: '2026-05-06',
+          warehouseId, restockInventory: true,
+          lines: [{
+            productId, description: 'Widget', quantity: 10000,
+            unitPriceMinor: 10000, taxPercentBp: 1500,
+          }],
+        },
+      });
+      expect(rejected.status).toBe(400);
     });
 
     it('enforces the customer credit limit', async () => {

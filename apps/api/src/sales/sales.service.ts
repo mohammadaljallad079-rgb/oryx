@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromQuantity, sumMinor, withDefaults, type RoundingMode } from '@oryx/shared';
+import { fromQuantity, lineAmountMinor, sumMinor, withDefaults, type RoundingMode } from '@oryx/shared';
 import type { PaymentMethod } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -750,7 +750,27 @@ export class SalesService {
       }),
       this.prisma.quotation.count({ where }),
     ]);
-    return { items: rows.map(toQuotationDto), total, page, pageSize };
+    // Expose the resulting invoice number on converted quotations, without
+    // rewriting the old sales-order conversion workflow or adding columns.
+    const convertedOrders = rows
+      .map((quote) => quote.convertedOrderId)
+      .filter((id): id is string => Boolean(id));
+    const relatedInvoices = convertedOrders.length
+      ? await this.prisma.salesInvoice.findMany({
+          where: { companyId, orderId: { in: convertedOrders } },
+          select: { id: true, orderId: true, invoiceNumber: true, status: true },
+        })
+      : [];
+    const byOrder = new Map(relatedInvoices.map((invoice) => [invoice.orderId, invoice]));
+    return {
+      items: rows.map((quote) => ({
+        ...toQuotationDto(quote),
+        convertedInvoiceId: byOrder.get(quote.convertedOrderId)?.id ?? null,
+        convertedInvoiceNumber: byOrder.get(quote.convertedOrderId)?.invoiceNumber ?? null,
+        convertedInvoiceStatus: byOrder.get(quote.convertedOrderId)?.status ?? null,
+      })),
+      total, page, pageSize,
+    };
   }
 
   async createQuotation(dto: CreateQuotationDto, principal: RequestPrincipal, actor: ActorContext) {
@@ -859,6 +879,134 @@ export class SalesService {
     return toSalesOrderDto(result);
   }
 
+  /**
+   * Convert a quotation directly into an unposted invoice for admin approval.
+   *
+   * An internal order preserves the existing quotation -> order -> invoice
+   * relationship without a schema migration. All three records are created in
+   * one transaction; no invoice journal, stock issue, or payment is produced
+   * until the normal draft approval/posting path executes.
+   */
+  async convertQuotationToDraftInvoice(
+    id: string, dto: ConvertQuotationDto, principal: RequestPrincipal, actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const invoice = await this.posting.withTransaction(async (tx) => {
+      const quote = await tx.quotation.findFirst({
+        where: { id, companyId }, include: { lines: true },
+      });
+      if (!quote) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Quotation not found.');
+      if (quote.convertedOrderId || quote.status === 'CONVERTED') {
+        throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'Quotation was already converted.');
+      }
+      const orderNumber = await this.sequences.next(tx, companyId, 'salesOrder');
+      const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
+      const order = await tx.salesOrder.create({
+        data: {
+          companyId,
+          branchId: quote.branchId,
+          orderNumber,
+          customerId: quote.customerId,
+          quotationId: quote.id,
+          warehouseId: dto.warehouseId ?? null,
+          status: 'CONFIRMED',
+          orderDate: new Date(),
+          subtotalMinor: quote.subtotalMinor,
+          discountMinor: quote.discountMinor,
+          taxMinor: quote.taxMinor,
+          roundingMinor: quote.roundingMinor,
+          totalMinor: quote.totalMinor,
+          currency: quote.currency,
+          paymentMethod: quote.paymentMethod,
+          salespersonName: quote.salespersonName,
+          notes: quote.notes,
+          createdById: actor.userId,
+          lines: {
+            create: quote.lines.map((line) => ({
+              productId: line.productId,
+              description: line.description,
+              quantity: line.quantity,
+              unitPriceMinor: line.unitPriceMinor,
+              discountPercentBp: line.discountPercentBp,
+              discountMinor: line.discountMinor,
+              taxPercentBp: line.taxPercentBp,
+              lineTotalMinor: line.lineTotalMinor,
+              sortOrder: line.sortOrder,
+            })),
+          },
+        },
+      });
+      // The invoice is intentionally DRAFT even when the quote was CASH.
+      // Posting it later uses the standard stock/AR/payment processing, once.
+      const created = await tx.salesInvoice.create({
+        data: {
+          companyId,
+          branchId: quote.branchId,
+          invoiceNumber,
+          customerId: quote.customerId,
+          orderId: order.id,
+          warehouseId: dto.warehouseId ?? null,
+          status: 'DRAFT',
+          invoiceDate: new Date(),
+          dueDate: null,
+          subtotalMinor: quote.subtotalMinor,
+          discountMinor: quote.discountMinor,
+          taxMinor: quote.taxMinor,
+          roundingMinor: quote.roundingMinor,
+          totalMinor: quote.totalMinor,
+          currency: quote.currency,
+          paymentMethod: quote.paymentMethod,
+          paymentMethodCode: quote.paymentMethodCode,
+          paymentMethodLabelEn: quote.paymentMethodLabelEn,
+          paymentMethodLabelAr: quote.paymentMethodLabelAr,
+          salespersonName: quote.salespersonName,
+          paymentReference: quote.paymentReference,
+          notes: quote.notes,
+          createdById: actor.userId,
+          lines: {
+            create: quote.lines.map((line) => {
+              const subtotal = lineAmountMinor(line.quantity, line.unitPriceMinor);
+              const net = subtotal - line.discountMinor;
+              return {
+                productId: line.productId,
+                description: line.description,
+                quantity: line.quantity,
+                unitPriceMinor: line.unitPriceMinor,
+                discountPercentBp: line.discountPercentBp,
+                taxPercentBp: line.taxPercentBp,
+                lineSubtotalMinor: subtotal,
+                discountMinor: line.discountMinor,
+                taxMinor: line.lineTotalMinor - net,
+                lineTotalMinor: line.lineTotalMinor,
+                sortOrder: line.sortOrder,
+              };
+            }),
+          },
+        },
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      });
+      // Compare-and-set prevents concurrent conversion requests from both
+      // succeeding even when they read the original quote simultaneously.
+      const claimed = await tx.quotation.updateMany({
+        where: { id, companyId, convertedOrderId: null, status: { not: 'CONVERTED' } },
+        data: { status: 'CONVERTED', convertedOrderId: order.id },
+      });
+      if (claimed.count !== 1) {
+        throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'Quotation was already converted.');
+      }
+      return created;
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.quotation_converted_to_draft_invoice',
+      targetType: 'SALES_INVOICE',
+      targetId: invoice.id,
+      summary: `Converted quotation into draft sales invoice ${invoice.invoiceNumber}`,
+    });
+    return toInvoiceDto(invoice);
+  }
+
   // ------------------------------------------------------------ sales orders
 
   async listOrders(query: ListQueryDto, principal: RequestPrincipal) {
@@ -963,7 +1111,31 @@ export class SalesService {
       }),
       this.prisma.salesInvoice.count({ where }),
     ]);
-    return { items: rows.map(toInvoiceDto), total, page, pageSize };
+    const orderIds = rows.map((invoice) => invoice.orderId).filter((id): id is string => Boolean(id));
+    const orders = orderIds.length
+      ? await this.prisma.salesOrder.findMany({
+          where: { companyId, id: { in: orderIds } },
+          select: { id: true, quotationId: true },
+        })
+      : [];
+    const quoteIds = orders.map((order) => order.quotationId).filter((id): id is string => Boolean(id));
+    const sources = quoteIds.length
+      ? await this.prisma.quotation.findMany({
+          where: { companyId, id: { in: quoteIds } },
+          select: { id: true, quoteNumber: true },
+        })
+      : [];
+    const orderQuote = new Map(orders.map((order) => [order.id, order.quotationId]));
+    const quoteNumber = new Map(sources.map((quote) => [quote.id, quote.quoteNumber]));
+    return {
+      items: rows.map((invoice) => ({
+        ...toInvoiceDto(invoice),
+        sourceQuotationNumber: invoice.orderId
+          ? quoteNumber.get(orderQuote.get(invoice.orderId) ?? '') ?? null
+          : null,
+      })),
+      total, page, pageSize,
+    };
   }
 
   async getInvoice(id: string, principal: RequestPrincipal) {
@@ -1544,14 +1716,81 @@ export class SalesService {
       await this.assertCustomerTx(tx, companyId, dto.customerId);
       let invoiceId: string | null = dto.invoiceId ?? null;
       let warehouseId = dto.warehouseId ?? null;
+      // Invoice-linked returns must inherit the original monetary discount.
+      // The client is not trusted to choose a smaller discount and over-refund.
+      const originalPricing = new Map<string, { quantity: number; discountMinor: number }>();
+      let invoiceCurrency: string | null = null;
       if (invoiceId) {
-        const invoice = await tx.salesInvoice.findFirst({ where: { id: invoiceId, companyId } });
+        const invoice = await tx.salesInvoice.findFirst({
+          where: { id: invoiceId, companyId }, include: { lines: true },
+        });
         if (!invoice) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
-        warehouseId = warehouseId ?? invoice.warehouseId;
+        if (invoice.customerId !== dto.customerId || invoice.status === 'DRAFT') {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select a posted invoice belonging to the selected customer.');
+        }
+        if (dto.currency && dto.currency !== invoice.currency) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Return currency must match the original invoice.');
+        }
+        // Acquire a row lock by updating the parent invoice within the same
+        // transaction. Concurrent returns for one invoice then serialize before
+        // checking historical quantities, preventing double refunds.
+        await tx.salesInvoice.update({ where: { id: invoice.id }, data: { updatedAt: new Date() } });
+        const priorReturns = await tx.creditNote.findMany({
+          where: { companyId, invoiceId, status: 'POSTED' },
+          include: { lines: true },
+        });
+        const key = (line: { productId: string | null; description: string; unitPriceMinor: number; taxPercentBp?: number | null }) =>
+          JSON.stringify([line.productId, line.description, line.unitPriceMinor, line.taxPercentBp ?? 0]);
+        const available = new Map<string, number>();
+        for (const line of invoice.lines) {
+          const k = key(line);
+          available.set(k, (available.get(k) ?? 0) + line.quantity);
+        }
+        for (const previous of priorReturns) {
+          for (const line of previous.lines) {
+            const k = key(line);
+            available.set(k, (available.get(k) ?? 0) - line.quantity);
+          }
+        }
+        for (const line of dto.lines) {
+          const k = key({ ...line, productId: line.productId ?? null });
+          const remaining = available.get(k) ?? 0;
+          if (remaining < line.quantity || line.quantity <= 0) {
+            throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Return exceeds the remaining quantity or differs from the original invoice price/tax.');
+          }
+          available.set(k, remaining - line.quantity);
+        }
+        for (const original of invoice.lines) {
+          const k = key(original);
+          const current = originalPricing.get(k) ?? { quantity: 0, discountMinor: 0 };
+          originalPricing.set(k, {
+            quantity: current.quantity + original.quantity,
+            discountMinor: current.discountMinor + original.discountMinor,
+          });
+        }
+        invoiceCurrency = invoice.currency;
+        warehouseId = invoice.warehouseId;
       }
 
       const rounding = await this.context.companyRoundingMode(companyId, tx);
-      const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
+      const returnInputs = dto.lines.map((line) => {
+        if (!invoiceId) return { ...line };
+        const k = JSON.stringify([
+          line.productId ?? null, line.description, line.unitPriceMinor, line.taxPercentBp ?? 0,
+        ]);
+        const original = originalPricing.get(k);
+        if (!original || original.quantity <= 0) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Return line is not part of the original invoice.');
+        }
+        // Preserve discounts as currency, prorated to returned quantity.
+        // Ignore caller-supplied discount values for linked invoices.
+        return {
+          ...line,
+          discountPercentBp: 0,
+          discountAmountMinor: Math.round(original.discountMinor * line.quantity / original.quantity),
+        };
+      });
+      const totals = computeDocumentTotals(returnInputs, rounding.mode, rounding.scale);
       const creditNoteNumber = await this.sequences.next(tx, companyId, 'creditNote');
       const issueDate = new Date(resolveDocumentDate(dto)!);
 
@@ -1571,7 +1810,7 @@ export class SalesService {
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
           refundMethod: dto.refundMethod ?? 'CREDIT_ACCOUNT',
-          currency: dto.currency ?? companyCurrency,
+          currency: invoiceCurrency ?? dto.currency ?? companyCurrency,
           restockInventory: dto.restockInventory ?? false,
           createdById: actor.userId,
           postedAt: new Date(),
@@ -1607,7 +1846,8 @@ export class SalesService {
           ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.ROUNDING_GAIN_LOSS)
           : null;
       const journalLines = [
-        { accountId: revenueAccount, debit: totals.subtotalMinor },
+        // A fixed discount reduces the revenue being reversed, not VAT or AR.
+        { accountId: revenueAccount, debit: totals.subtotalMinor - totals.discountMinor },
         ...(totals.taxMinor > 0
           ? [{ accountId: await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.VAT_OUTPUT), debit: totals.taxMinor }]
           : []),

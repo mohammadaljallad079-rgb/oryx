@@ -158,11 +158,13 @@ function useTaxOptions(companyId: string | null | undefined): {
     [companyId],
   );
   return {
-    options: (taxes.data?.items ?? []).map((tax) => ({
-      value: String(tax.rateBp),
-      label: `${tax.rateBp / 100}%`,
-      hint: tax.nameEn,
-    })),
+    options: (taxes.data?.items ?? [])
+      .filter((tax) => tax.scope === 'SALES' || tax.scope === 'BOTH')
+      .map((tax) => ({
+        value: String(tax.rateBp),
+        label: `${tax.rateBp / 100}%`,
+        hint: tax.nameEn || tax.nameAr,
+      })),
     reload: taxes.reload,
   };
 }
@@ -231,7 +233,7 @@ function SalesInner() {
 
       {tab === 'dashboard' ? <ModuleDashboard moduleKey="sales_pos" /> : null}
       {tab === 'invoices' ? <InvoicesTab canManage={can('erp.sales.invoice.manage')} /> : null}
-      {tab === 'quotations' ? <QuotationsTab canManage={can('erp.sales.order.manage')} /> : null}
+      {tab === 'quotations' ? <QuotationsTab canManage={can('erp.sales.order.manage')} canConvertToInvoice={can('erp.sales.invoice.manage')} onConverted={() => setTab('invoices')} /> : null}
       {tab === 'returns' ? <CreditNotesTab canManage={can('erp.sales.credit_note.manage')} /> : null}
       {tab === 'pos' ? <PosTab canOperate={can('erp.sales.pos.operate')} canManage={can('erp.sales.pos.manage')} /> : null}
     </div>
@@ -357,7 +359,14 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
           <tbody>
             {list.data!.items.map((inv: SalesDocumentDto) => (
               <tr key={inv.id} data-testid={`invoice-row-${inv.invoiceNumber}`}>
-                <td className="font-mono text-[12px]">{inv.invoiceNumber}</td>
+                <td className="font-mono text-[12px]">
+                  <div>{inv.invoiceNumber}</div>
+                  {(inv as SalesDocumentDto & { sourceQuotationNumber?: string | null }).sourceQuotationNumber ? (
+                    <div className="text-[11px] text-[var(--muted)]" data-testid={`invoice-source-quote-${inv.invoiceNumber}`}>
+                      {t('erp.sales.quoteNumber')}: {(inv as SalesDocumentDto & { sourceQuotationNumber?: string | null }).sourceQuotationNumber}
+                    </div>
+                  ) : null}
+                </td>
                 <td className="text-[12.5px]">{inv.invoiceDate?.slice(0, 10)}</td>
                 <td className="text-[12.5px]">{inv.customerNameEn}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(inv.totalMinor, inv.currency)}</td>
@@ -454,8 +463,8 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
 
 // ---------------------------------------------------------------- quotations
 
-function QuotationsTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
+function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canManage: boolean; canConvertToInvoice: boolean; onConverted: () => void }) {
+  const { t, locale } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
@@ -495,7 +504,17 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
           <tbody>
             {list.data!.items.map((q: SalesDocumentDto) => (
               <tr key={q.id} data-testid={`quotation-row-${q.quoteNumber}`}>
-                <td className="font-mono text-[12px]">{q.quoteNumber}</td>
+                <td className="font-mono text-[12px]">
+                  <div>{q.quoteNumber}</div>
+                  {(q as SalesDocumentDto & { convertedInvoiceNumber?: string | null }).convertedInvoiceNumber ? (
+                    <button type="button" className="text-[11px] text-[var(--accent)] underline"
+                      onClick={onConverted}
+                      data-testid={`quotation-invoice-link-${q.quoteNumber}`}>
+                      {locale === 'ar' ? 'الفاتورة: ' : 'Invoice: '}
+                      {(q as SalesDocumentDto & { convertedInvoiceNumber?: string | null }).convertedInvoiceNumber}
+                    </button>
+                  ) : null}
+                </td>
                 <td className="text-[12.5px]">{q.issueDate?.slice(0, 10)}</td>
                 <td className="text-[12.5px]">{q.customerNameEn}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(q.totalMinor, q.currency)}</td>
@@ -508,12 +527,13 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
                       type="QUOTATION"
                       permissions={['erp.sales.read', 'erp.accounting.read']}
                     />
-                    {canManage && q.status !== 'CONVERTED' ? (
+                    {canManage && canConvertToInvoice && q.status !== 'CONVERTED' ? (
                       <Button
                         size="sm"
                         onClick={async () => {
-                          await api.convertQuotation(q.id, warehouses.data?.items[0]?.id);
+                          await api.convertQuotationToDraftInvoice(q.id, warehouses.data?.items[0]?.id);
                           await list.reload();
+                          onConverted();
                         }}
                         data-testid={`convert-quotation-${q.quoteNumber}`}
                       >
@@ -558,20 +578,23 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string | null>(null);
+  const [returnCustomerId, setReturnCustomerId] = useState('');
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
   const list = useAsync(() => api.creditNotes({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const invoices = useAsync(() => api.salesInvoices({ page: 1 }), []);
+  const invoices = useAsync(() => api.salesInvoices({ page: 1, pageSize: 100, customerId: returnCustomerId || undefined }), [returnCustomerId]);
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   // A return is normally raised against the invoice it reverses. Picking the
   // invoice here pre-fills the customer, branch, currency and lines, so the
   // operator does not retype what the original document already carries.
   const selectedInvoice = (invoices.data?.items ?? []).find((inv) => inv.id === relatedInvoiceId) ?? null;
-  const invoiceOptions: SearchableOption[] = (invoices.data?.items ?? []).map((inv) => ({
+  const invoiceOptions: SearchableOption[] = (invoices.data?.items ?? [])
+    .filter((inv) => returnCustomerId && inv.customerId === returnCustomerId && inv.status !== 'DRAFT')
+    .map((inv) => ({
     value: inv.id,
     label: `${inv.invoiceNumber} — ${inv.customerNameEn}`,
     hint: money(inv.totalMinor, inv.currency),
@@ -580,23 +603,12 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const closeModal = () => {
     setOpen(false);
     setRelatedInvoiceId(null);
+    setReturnCustomerId('');
   };
 
   return (
     <Card>
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--border)] p-4">
-        <div className="min-w-[260px] flex-1">
-          <span className="oryx-label">{t('erp.sales.invoiceNumber')}</span>
-          <SearchableSelect
-            value={relatedInvoiceId}
-            options={invoiceOptions}
-            onChange={setRelatedInvoiceId}
-            placeholder={t('erp.sales.invoiceNumber')}
-            emptyLabel={t('common.none')}
-            loading={invoices.loading}
-            testId="return-invoice-picker"
-          />
-        </div>
         <p className="oryx-panel-title m-0">{t('erp.sales.returns')}</p>
         {canManage ? (
           <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-credit-note">
@@ -675,6 +687,13 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         title={t('erp.sales.newCreditNote')}
         initialDocument={selectedInvoice}
         relatedInvoiceId={relatedInvoiceId ?? undefined}
+        returnInvoiceOptions={invoiceOptions}
+        returnInvoiceLoading={invoices.loading}
+        onReturnInvoiceChange={(id) => setRelatedInvoiceId(id)}
+        onReturnCustomerChange={(id) => {
+          setReturnCustomerId(id);
+          setRelatedInvoiceId(null);
+        }}
         customers={customers.data?.items ?? []}
         onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
@@ -1837,7 +1856,7 @@ function LineEditor({
   /** Reload the tax list after one is created from a line's picker. */
   onTaxCreated?: () => Promise<void> | void;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const scale = currencyScaleOf(currency ?? 'BHD');
 
   const applyProduct = (i: number, productId: string) => {
@@ -1879,7 +1898,7 @@ function LineEditor({
         <span>{t('erp.sales.form.description')}</span>
         <span className="text-center">{t('erp.sales.form.quantity')}</span>
         <span className="text-end">{t('erp.sales.form.unitPrice')}</span>
-        <span className="text-center">{t('erp.sales.discount')}</span>
+        <span className="text-center">{t('erp.sales.discount')} ({currency ?? 'BHD'})</span>
         <span className="text-center">{t('erp.sales.form.taxes')}</span>
         <span className="text-end">{t('erp.sales.form.amount')}</span>
         <span />
@@ -1921,36 +1940,53 @@ function LineEditor({
             data-testid={`${testIdPrefix}-quantity-${i}`}
           />
           <input
-            className="oryx-input text-end"
+            className="oryx-input text-end min-w-0 w-full tabular-nums"
+            dir="ltr"
+            inputMode="decimal"
             placeholder="0.000"
             value={line.unitPrice}
             onChange={(e) => update(i, { unitPrice: e.target.value })}
             data-testid={`${testIdPrefix}-price-${i}`}
           />
           <input
-            className="oryx-input text-center"
+            className="oryx-input text-end min-w-0 w-full tabular-nums"
+            dir="ltr"
+            inputMode="decimal"
             placeholder="0.000"
             value={line.discountAmount}
             onChange={(e) => update(i, { discountAmount: e.target.value })}
             data-testid={`${testIdPrefix}-discount-${i}`}
           />
           <TaxPicker
-            value={line.taxId || null}
-            options={taxOptions}
+            value={line.taxId || (Number(line.taxPercent) > 0
+              ? String(Math.round(Number(line.taxPercent) * 100))
+              : null)}
+            options={[
+              ...taxOptions,
+              ...(Number(line.taxPercent) > 0 && !taxOptions.some((option) =>
+                option.value === String(Math.round(Number(line.taxPercent) * 100)))
+                ? [{
+                    value: String(Math.round(Number(line.taxPercent) * 100)),
+                    label: `${line.taxPercent}%`,
+                    hint: locale === 'ar' ? 'ضريبة الصنف' : 'Product tax rate',
+                  }]
+                : []),
+            ]}
             onChange={(v) => {
               const chosen = taxOptions.find((o) => o.value === v);
+              const chosenRate = chosen ? chosen.label.replace(/[^\d.]/g, '') : v ? String(Number(v) / 100) : '0';
               // Choosing "None" must zero the line's rate, not leave the
               // previous one in place: the picker's empty option means "without
               // tax", and keeping the old percentage silently charged VAT on a
               // line the operator had just exempted.
               update(i, {
                 taxId: v ?? '',
-                taxPercent: v == null ? '0' : chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent,
+                taxPercent: chosenRate,
               });
             }}
             scope="SALES"
-            placeholder="%"
-            emptyLabel={t('common.none')}
+            placeholder={t('erp.sales.form.taxes')}
+            emptyLabel={locale === 'ar' ? 'بدون ضريبة' : 'No tax'}
             testId={`${testIdPrefix}-tax-${i}`}
             onCreated={onTaxCreated}
           />
@@ -2024,6 +2060,10 @@ function DocumentModal({
   title,
   initialDocument,
   relatedInvoiceId,
+  returnInvoiceOptions,
+  returnInvoiceLoading,
+  onReturnInvoiceChange,
+  onReturnCustomerChange,
   allowDraft,
   customers,
   products,
@@ -2046,6 +2086,10 @@ function DocumentModal({
   title: string;
   initialDocument?: SalesDocumentDto | null;
   relatedInvoiceId?: string;
+  returnInvoiceOptions?: SearchableOption[];
+  returnInvoiceLoading?: boolean;
+  onReturnInvoiceChange?: (id: string | null) => void;
+  onReturnCustomerChange?: (id: string) => void;
   allowDraft?: boolean;
   customers: CustomerDto[];
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
@@ -2191,6 +2235,10 @@ function DocumentModal({
   }));
 
   const submit = async (post = true) => {
+    if (reasonField && onReturnInvoiceChange && !relatedInvoiceId) {
+      setError(locale === 'ar' ? 'يجب اختيار فاتورة العميل الأصلية قبل الإرجاع.' : 'Select the original customer invoice before returning items.');
+      return;
+    }
     if (dueDateField === 'dueDate' && paymentMethod === 'CREDIT' && !dueDate) {
       setError(locale === 'ar' ? 'تاريخ الاستحقاق مطلوب للبيع الآجل.' : 'A due date is required for credit sales.');
       return;
@@ -2254,7 +2302,7 @@ function DocumentModal({
     <Modal
       open={open}
       title={title}
-      size="document"
+      size="full"
       onClose={onClose}
       footer={
         <>
@@ -2355,7 +2403,10 @@ function DocumentModal({
                 <EntityPicker
                   value={customerId || null}
                   options={customerOptions}
-                  onChange={(v) => setCustomerId(v ?? '')}
+                  onChange={(v) => {
+                    setCustomerId(v ?? '');
+                    onReturnCustomerChange?.(v ?? '');
+                  }}
                   placeholder={t('common.select')}
                   testId={`${testIdPrefix}-customer`}
                   createLabel={t('erp.sales.newCustomer')}
@@ -2374,6 +2425,21 @@ function DocumentModal({
                 />
               </Field>
             </div>
+            {reasonField && onReturnInvoiceChange ? (
+              <div className="sm:col-span-2">
+                <Field label={t('erp.sales.invoiceNumber')} required>
+                  <SearchableSelect
+                    value={relatedInvoiceId ?? null}
+                    options={returnInvoiceOptions ?? []}
+                    onChange={onReturnInvoiceChange}
+                    placeholder={locale === 'ar' ? 'اختر فاتورة العميل للإرجاع' : 'Select this customer’s invoice'}
+                    emptyLabel={t('common.none')}
+                    loading={returnInvoiceLoading}
+                    testId="return-invoice-picker"
+                  />
+                </Field>
+              </div>
+            ) : null}
             <MirrorField label={t('erp.sales.form.contactNo')} value={selected?.phone ?? null} />
             <MirrorField label={t('erp.sales.form.trn')} value={selected?.taxNumber ?? null} />
             <div className="sm:col-span-2">

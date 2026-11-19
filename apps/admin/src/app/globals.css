@@ -513,8 +513,32 @@ body::before {
 /* ------------------------------------------------------------- point of sale */
 
 /* A POS workspace is wider than a form dialog: the grid and the cart share it. */
+/* Full-screen editing workspaces keep their header/X and save bar visible. */
+.oryx-modal-backdrop:has(.oryx-modal--full) {
+  padding: 0;
+  place-items: stretch;
+}
 .oryx-modal--full {
-  width: min(1180px, 100%);
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.oryx-modal--full > div:first-child {
+  flex: 0 0 auto;
+}
+.oryx-modal--full > div:nth-child(2) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.oryx-modal--full > div:nth-child(3) {
+  flex: 0 0 auto;
 }
 
 /*
@@ -659,7 +683,7 @@ body::before {
    the numeric columns stay close to equal, exactly as the document lays them out. */
 .oryx-doc-form__grid {
   display: grid;
-  grid-template-columns: 3.2fr 0.7fr 1fr 0.9fr 0.8fr 1fr 32px;
+  grid-template-columns: minmax(180px, 3.2fr) minmax(70px, .7fr) minmax(115px, 1fr) minmax(115px, .9fr) minmax(112px, .8fr) minmax(115px, 1fr) 32px;
   gap: 8px;
   align-items: center;
 }
@@ -3473,7 +3497,9 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
 .oryx-modal--pos .oryx-pos--premium {
   display: grid;
   direction: rtl;
-  grid-template-columns: 172px minmax(0, 1fr) minmax(320px, 33%);
+  /* Keep the approved three-panel layout, but reserve more screen width for
+     the actual product catalogue instead of limiting it to three tiles. */
+  grid-template-columns: clamp(122px, 10vw, 160px) minmax(0, 1fr) minmax(310px, 30%);
   grid-template-areas: "categories catalog cart";
   align-items: stretch;
   gap: 12px;
@@ -3594,8 +3620,8 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
-  grid-template-columns: repeat(auto-fill, minmax(146px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 9px;
   padding: 2px 3px 12px;
   align-content: start;
   overflow-y: auto;
@@ -3736,7 +3762,7 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
 .oryx-pos--premium input,
 .oryx-pos--premium button { font-family: inherit; }
 @media (min-width: 901px) {
-  .oryx-modal--pos .oryx-pos--premium { grid-template-columns: 170px minmax(0,1fr) minmax(310px,32%); }
+  .oryx-modal--pos .oryx-pos--premium { grid-template-columns: clamp(122px,10vw,160px) minmax(0,1fr) minmax(310px,30%); }
 }
 @media (max-width: 1100px) and (min-width: 901px) {
   .oryx-modal--pos .oryx-pos--premium { grid-template-columns: 140px minmax(0,1fr) minmax(305px,34%); gap: 8px; padding: 9px; }

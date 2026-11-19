@@ -250,7 +250,7 @@ export function officialFooterTemplate(issuer: DocumentIssuer, signatureWatermar
     '-webkit-print-color-adjust:exact',
   ].join(';');
   return `
-<div style="${base};width:100%;box-sizing:border-box;position:relative;top:14.8pt;">
+<div style="${base};width:100%;box-sizing:border-box;position:relative;top:0;">
   ${brandBand(issuer, signatureWatermark)}
   ${contactRow(issuer)}
 </div>`;
@@ -283,6 +283,9 @@ function contactRow(issuer: DocumentIssuer): string {
   const address = [issuer.addressLine, issuer.city].filter(Boolean).join(' - ');
   const registration = issuer.crNumber ? `CR ${esc(issuer.crNumber)}` : '';
   const addressLine = [address, registration].filter(Boolean).join(' | ');
+  // Fit the contact row beneath the 51.8pt signature band inside the 28mm
+  // Chromium footer margin. The previous 14.8pt offset + 20px separator
+  // pushed phone and address off the printed page even though HTML contained them.
   const contact = 'font-size:7.2pt;font-weight:700;color:#475569;white-space:nowrap;';
   // The approved sheet prints the phone, email and website as three separate
   // figures on one line (measured x 294 / 380 / 483 of a 595pt page), not the
@@ -292,7 +295,7 @@ function contactRow(issuer: DocumentIssuer): string {
   const item = (html: string, gap: string) =>
     html ? `<span style="${contact}${gap}">${html}</span>` : '';
   return `
-  <div style="border-top:0.75px solid #94a3b8;margin:20px 15.8pt 0 13.7pt;"></div>
+  <div style="border-top:0.75px solid #94a3b8;margin:3px 15.8pt 0 13.7pt;"></div>
   <div style="padding:2pt 13.3mm 0 15mm;display:flex;align-items:baseline;font-size:6.5pt;font-weight:700;">
     <span lang="en" dir="ltr" style="flex:0 0 auto;position:relative;top:2pt;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
     <span style="flex:1 1 auto;"></span>
