@@ -319,6 +319,11 @@ export class CreateGoodsReceiptDto {
 }
 
 export class CreateSupplierInvoiceDto {
+  /** Omitted by legacy clients means existing credit/terms workflow. */
+  @IsOptional()
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER', 'CREDIT'])
+  paymentMethod?: 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'CHEQUE' | 'WALLET' | 'OTHER' | 'CREDIT';
+
   @IsString()
   supplierId!: string;
 
