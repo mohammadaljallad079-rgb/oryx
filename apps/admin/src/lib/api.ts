@@ -651,6 +651,9 @@ export const api = {
   deleteRole: (id: string) => request<{ ok: boolean }>(`/roles/${id}`, { method: 'DELETE' }),
 
   // ------------------------------------------------------------------- users
+  availableCompanyManagers: (search = '') =>
+    request<{ items: Array<{ id: string; email: string; fullNameEn: string; fullNameAr: string }> }>(
+      `/companies/available-managers?${toQuery({ search })}`),
   listUsers: (companyId: string, params: { page?: number; pageSize?: number; search?: string; status?: string } = {}) =>
     request<Paginated<UserDto>>(`/companies/${companyId}/users?${toQuery(params)}`),
   inviteUser: (companyId: string, body: Record<string, unknown>) =>
