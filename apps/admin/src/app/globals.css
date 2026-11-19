@@ -3473,7 +3473,9 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
 .oryx-modal--pos .oryx-pos--premium {
   display: grid;
   direction: rtl;
-  grid-template-columns: 172px minmax(0, 1fr) minmax(320px, 33%);
+  /* Keep the approved three-panel layout, but reserve more screen width for
+     the actual product catalogue instead of limiting it to three tiles. */
+  grid-template-columns: clamp(122px, 10vw, 160px) minmax(0, 1fr) minmax(310px, 30%);
   grid-template-areas: "categories catalog cart";
   align-items: stretch;
   gap: 12px;
@@ -3594,8 +3596,8 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
-  grid-template-columns: repeat(auto-fill, minmax(146px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 9px;
   padding: 2px 3px 12px;
   align-content: start;
   overflow-y: auto;
@@ -3736,7 +3738,7 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
 .oryx-pos--premium input,
 .oryx-pos--premium button { font-family: inherit; }
 @media (min-width: 901px) {
-  .oryx-modal--pos .oryx-pos--premium { grid-template-columns: 170px minmax(0,1fr) minmax(310px,32%); }
+  .oryx-modal--pos .oryx-pos--premium { grid-template-columns: clamp(122px,10vw,160px) minmax(0,1fr) minmax(310px,30%); }
 }
 @media (max-width: 1100px) and (min-width: 901px) {
   .oryx-modal--pos .oryx-pos--premium { grid-template-columns: 140px minmax(0,1fr) minmax(305px,34%); gap: 8px; padding: 9px; }
