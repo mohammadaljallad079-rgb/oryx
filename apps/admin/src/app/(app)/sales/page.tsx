@@ -1958,8 +1958,6 @@ function LineEditor({
             data-testid={`${testIdPrefix}-discount-${i}`}
           />
           <TaxPicker
-            // A persisted invoice stores the tax rate, not a tax-row ID.
-            // Resolve the saved rate back to the company's visible dropdown.
             value={line.taxId || taxOptions.find((option) =>
               option.value === String(Math.round((Number(line.taxPercent) || 0) * 100)))?.value || null}
             options={taxOptions}
