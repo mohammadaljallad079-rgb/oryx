@@ -1,4 +1,5 @@
 import { esc, docDateTime } from './html.util';
+import { oryxLogoMark } from './oryx-logo.asset';
 import type { DocumentIssuer, DocumentVerification } from '../document-payload';
 
 /**
@@ -192,7 +193,7 @@ export const CONTACT_ICON_GLOBE =
  * there, so the Arabic closing line relies on the host's fallback face and the
  * logo is a data URI rather than an embedded file.
  */
-function brandBand(issuer: DocumentIssuer, signatureWatermark = false): string {
+function brandBand(issuer: DocumentIssuer, signatureWatermark = true): string {
   // The reference prints two bordered signature boxes on the outer edges with a
   // compact ORYX lockup and the closing line centred between them (measured
   // boxes x14-254 and x341-581, y755-807; the centre lockup at x257-337). The
@@ -204,11 +205,10 @@ function brandBand(issuer: DocumentIssuer, signatureWatermark = false): string {
   const box =
     'flex:0 0 auto;width:239.8pt;height:51.8pt;box-sizing:border-box;' +
     'border:0.75px solid #a3b1c2;border-radius:6pt;padding:5pt 9pt;white-space:nowrap;';
-  // The faint brand mark laid inside the ORYX authorisation box is opt-in: only
-  // the vehicle-inspection cover asks for it, so the financial documents keep
-  // their approved signature boxes untouched.
-  const seal = signatureWatermark && issuer.logoDataUri
-    ? `<img class="issuer-signature-watermark" src="${esc(issuer.logoDataUri)}" alt="" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:112pt;max-height:39pt;object-fit:contain;opacity:0.11;pointer-events:none;">`
+  // Watermark only the ORYX authorisation box, never the customer's signature.
+  // Use the approved ORYX vector when a company logo has not been uploaded.
+  const seal = signatureWatermark
+    ? `<div class="issuer-signature-watermark" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:112pt;max-height:39pt;opacity:0.11;pointer-events:none;display:flex;align-items:center;justify-content:center;">${issuer.logoDataUri ? `<img src="${esc(issuer.logoDataUri)}" alt="" style="max-width:112pt;max-height:39pt;object-fit:contain;">` : oryxLogoMark('39pt')}</div>`
     : '';
   const label = 'font-size:7.5pt;font-weight:700;color:#0f2b48;';
   const labelAr = 'font-size:7.5pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;';
@@ -243,7 +243,7 @@ function brandBand(issuer: DocumentIssuer, signatureWatermark = false): string {
  * template, so it lives inside the bottom margin and cannot push content onto a
  * blank page.
  */
-export function officialFooterTemplate(issuer: DocumentIssuer, signatureWatermark = false): string {
+export function officialFooterTemplate(issuer: DocumentIssuer, signatureWatermark = true): string {
   const base = [
     "font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif",
     'color:#64748b',
@@ -335,22 +335,22 @@ export function reportFooterTemplate(issuer: DocumentIssuer, qrDataUri?: string)
   // page rather than riding up when the band is short.
   const lockup = `
   <div style="line-height:1.15;">
+    <div style="height:20pt;display:flex;align-items:center;">${issuer.logoDataUri ? `<img src="${esc(issuer.logoDataUri)}" alt="" style="max-height:20pt;max-width:100pt;object-fit:contain;">` : oryxLogoMark('20pt')}</div>
     <div style="font-size:8.3pt;font-weight:700;letter-spacing:.5px;color:#0f2b48;">AUTO SERVICES</div>
     <div style="font-size:5.6pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;margin-top:3pt;">شكراً لثقتكم بنا.</div>
     <div style="font-size:5.6pt;color:#64748b;">Thank you for your trust.</div>
   </div>`;
-  // The reference prints the verify caption above a 33pt QR at x137-170, y774-807
-  // (measured), i.e. to the right of the lockup and a step lower.
+  // A larger printed QR and compact caption preserve a scan-friendly quiet zone.
   const verify = qrDataUri
     ? `
   <div style="text-align:center;line-height:1;">
-    <div style="font-size:4.9pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;margin-bottom:8pt;">للتأكد من صحة التقرير</div>
-    <img src="${esc(qrDataUri)}" alt="" style="width:33pt;height:33pt;display:block;">
+    <div style="font-size:4.9pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;margin-bottom:4pt;">للتأكد من صحة التقرير</div>
+    <img src="${esc(qrDataUri)}" alt="" style="width:46pt;height:46pt;display:block;background:#fff;padding:2pt;box-sizing:content-box;">
   </div>`
     : '';
   return `
 <div style="${base};width:100%;box-sizing:border-box;position:relative;top:14.8pt;">
-  <div style="padding:0 15.8pt;min-height:52pt;display:flex;align-items:flex-end;">
+  <div style="padding:0 15.8pt;min-height:64pt;display:flex;align-items:flex-end;">
     <div style="flex:0 0 auto;margin-left:26pt;">${lockup}</div>
     ${verify ? `<div style="flex:0 0 auto;margin-left:17pt;">${verify}</div>` : ''}
   </div>
