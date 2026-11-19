@@ -48,6 +48,17 @@ describe('print-format', () => {
     expect(line.unitPrice).toBe('10.000');
   });
 
+  it('prints a legacy percent-based discount as a fixed currency amount', () => {
+    const [line] = toPrintLines(
+      [{ description: 'Legacy invoice', quantity: 10000, unitPriceMinor: 10000,
+         discountPercentBp: 1000, taxPercentBp: 1000 }],
+      'BHD',
+    );
+    expect(line.discountPercent).toBe('1.000 BD');
+    expect(line.amount).toBe('9.000 BD');
+    expect(line.taxLabel).toBe('VAT 10%');
+  });
+
   it('prints the totals block with the currency symbol and a plain tax label', () => {
     const totals = toPrintTotals({
       subtotalMinor: 9500,
