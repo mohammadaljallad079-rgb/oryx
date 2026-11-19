@@ -2049,14 +2049,6 @@ export class SalesService {
 
 // ---------------------------------------------------------------- helpers
 
-async function computeDueDate(tx: Tx, companyId: string, customerId: string, invoiceDate: Date): Promise<Date> {
-  const customer = await tx.customer.findFirst({ where: { id: customerId, companyId } });
-  const days = customer?.paymentTermsDays ?? 0;
-  const due = new Date(invoiceDate);
-  due.setDate(due.getDate() + days);
-  return due;
-}
-
 /** Line rows for documents that store only totals (quotation, order, credit note). */
 function buildSimpleLineRows(
   totals: ReturnType<typeof computeDocumentTotals>,
