@@ -23,7 +23,7 @@ describe('official print layout regressions', () => {
     const footer = officialFooterTemplate(issuer);
     expect(footer).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
     expect(footer).not.toContain('صفحة <span class="pageNumber">');
-    expect(footer).toContain('top:2pt;direction:ltr');
+    expect(footer).toContain('direction:ltr;unicode-bidi:isolate');
   });
 
   it('keeps English-only page numbers for generic and inspection document footers', () => {
@@ -77,16 +77,19 @@ describe('official print layout regressions', () => {
       expect(html).toContain('class="of-badge"');
       expect(html).toContain('VEHICLE INSPECTION EXPERTS');
     }
-    expect(receipt).toContain('سند قبض');
+    expect(receipt).not.toContain('class="of-title-ar"');
+    expect(receipt).toContain('class="of-title-en" lang="en" dir="ltr">RECEIPT');
     expect(receipt).toContain('RECEIPT #');
     expect(receipt).toContain('RCPT-001');
     expect(receipt).toContain('Receipt Date');
     expect(receipt).toContain('Customer / Payer');
-    expect(voucher).toContain('سند صرف');
+    expect(voucher).not.toContain('class="of-title-ar"');
+    expect(voucher).toContain('class="of-title-en" lang="en" dir="ltr">VOUCHER');
     expect(voucher).toContain('VOUCHER #');
     expect(voucher).toContain('PV-002');
     expect(voucher).toContain('Payment Date');
     expect(voucher).toContain('Supplier / Payee');
+    expect(invoice).toContain('class="of-title-ar" lang="ar" dir="rtl">فاتورة');
     expect(invoice).toContain('INV-003');
     expect(invoice).toContain('Customer Name');
   });
@@ -106,6 +109,9 @@ describe('official footer contact visibility contract', () => {
     const html = officialFooterTemplate(issuer);
     expect(html).toContain('height:40pt');
     expect(html).toContain('border-top:0.75px solid #94a3b8');
+    expect(html).toContain('grid-template-columns:repeat(3,minmax(0,1fr))');
+    expect(html).not.toContain('text-overflow:ellipsis');
+    expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
   });
   it('renders every configured phone, email, website and address in the printable footer', () => {
     const fixture: DocumentIssuer = {

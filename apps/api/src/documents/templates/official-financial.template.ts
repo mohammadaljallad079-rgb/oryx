@@ -260,9 +260,12 @@ export function verificationStrip(verification: DocumentVerification | null): st
 /** The centred bilingual document title (reference y 79.7 / 93.9). */
 function titleBlock(payload: FinancialDocumentPayload): string {
   const title = documentTitle(payload);
+  // Cash receipt/payment vouchers have a single English heading; invoices and
+  // the other documents keep their existing bilingual approved layout.
+  const englishOnly = /receipt|voucher/i.test(payload.titleEn) && !/pos/i.test(payload.titleEn);
   return `
   <div class="of-title">
-    <div class="of-title-ar" lang="ar" dir="rtl">${esc(title.ar)}</div>
+    ${englishOnly ? '' : `<div class="of-title-ar" lang="ar" dir="rtl">${esc(title.ar)}</div>`}
     <div class="of-title-en" lang="en" dir="ltr">${esc(title.en)}</div>
   </div>`;
 }

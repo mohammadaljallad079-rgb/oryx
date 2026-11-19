@@ -246,7 +246,9 @@ function brandBand(issuer: DocumentIssuer, signatureWatermark = true): string {
 export function officialFooterTemplate(issuer: DocumentIssuer, signatureWatermark = true): string {
   const base = [
     "font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif",
-    'color:#64748b',
+    'color:#475569',
+    'font-size:7pt',
+    'line-height:1.2',
     '-webkit-print-color-adjust:exact',
   ].join(';');
   return `
@@ -283,31 +285,25 @@ function contactRow(issuer: DocumentIssuer): string {
   const address = [issuer.addressLine, issuer.city].filter(Boolean).join(' - ');
   const registration = issuer.crNumber ? `CR ${esc(issuer.crNumber)}` : '';
   const addressLine = [address, registration].filter(Boolean).join(' | ');
-  // Fit the contact row beneath the compact signature band inside the 28mm
-  // Chromium footer margin. The previous 14.8pt offset + 20px separator
-  // pushed phone and address off the printed page even though HTML contained them.
-  // Use a compact but legible fixed line: wrapping the contact figures created a
-  // second row outside the Chromium footer margin, hiding phone/website on PDF.
-  const contact = 'font-size:6.2pt;font-weight:700;color:#475569;white-space:nowrap;';
-  // The approved sheet prints the phone, email and website as three separate
-  // figures on one line (measured x 294 / 380 / 483 of a 595pt page), not the
-  // phone+email pair the first revision grouped with the website pushed to the
-  // far edge. They are laid out as one right-hand group so the spacing follows
-  // the reference rather than being spread by `space-between`.
-  const item = (html: string, gap: string) =>
-    html ? `<span dir="ltr" style="${contact}${gap}display:inline-flex;align-items:center;gap:2pt;">${html}</span>` : '';
+  // Keep every contact field readable instead of clipping it with ellipsis.
+  // An A4 footer has room for the 40pt signature band plus two compact rows in
+  // the reserved 28mm margin. Long text wraps inside its assigned column.
+  const contact = 'font-size:6.5pt;font-weight:700;color:#334155;line-height:1.15;overflow-wrap:anywhere;word-break:break-word;';
+  const item = (html: string) =>
+    html
+      ? `<span dir="ltr" style="${contact}display:inline-flex;align-items:center;gap:2pt;min-width:0;">${html}</span>`
+      : '';
   return `
-  <div style="border-top:0.75px solid #94a3b8;margin:3px 15.8pt 0 13.7pt;"></div>
-  <div style="padding:2pt 13.3mm 0 15mm;display:flex;align-items:baseline;font-size:6.5pt;font-weight:700;">
-    <span lang="en" dir="ltr" style="flex:0 0 auto;position:relative;top:2pt;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-    <span style="flex:1 1 auto;"></span>
-    <span dir="ltr" style="flex:0 1 auto;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:3pt;flex-wrap:wrap;text-align:end;">
-      ${item(phone, '')}${item(email, '')}${item(website, '')}
+  <div style="border-top:0.75px solid #94a3b8;margin:2pt 13.3mm 0 13.3mm;"></div>
+  <div style="padding:2pt 13.3mm 0;display:flex;align-items:center;gap:7pt;font-size:6.5pt;line-height:1.15;">
+    <span lang="en" dir="ltr" style="flex:0 0 auto;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+    <span dir="ltr" style="flex:1 1 auto;min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4pt;align-items:start;">
+      ${item(phone)}${item(email)}${item(website)}
     </span>
   </div>
   ${
     addressLine
-      ? `<div style="margin-top:1px;padding-inline-end:13.3mm;text-align:end;font-size:6.2pt;color:#64748b;overflow-wrap:anywhere;">${esc(addressLine)}</div>`
+      ? `<div dir="ltr" style="padding:2pt 13.3mm 0;text-align:right;font-size:6.5pt;line-height:1.15;font-weight:600;color:#475569;overflow-wrap:anywhere;">${esc(addressLine)}</div>`
       : ''
   }`;
 }
