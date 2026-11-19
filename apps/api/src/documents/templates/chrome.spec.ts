@@ -94,6 +94,18 @@ describe('document chrome', () => {
       expect(html).toContain('top:2pt;direction:ltr');
     });
 
+    it('keeps contacts in the printable footer margin below the signature band', () => {
+      const html = officialFooterTemplate(issuer);
+      expect(html).toContain('+97317000000');
+      expect(html).toContain('billing@oryx.local');
+      expect(html).toContain('Building 42, Road 15');
+      expect(html).toContain('Manama');
+      expect(html).toContain('position:relative;top:0;');
+      expect(html).toContain('border-top:0.75px solid #94a3b8;margin:3px');
+      expect(html).not.toContain('top:14.8pt');
+      expect(html).not.toContain('margin:20px 15.8pt');
+    });
+
     it('keeps the registered address and CR number in the footer', () => {
       const html = officialFooterTemplate(issuer);
       expect(html).toContain('Manama');
