@@ -513,8 +513,32 @@ body::before {
 /* ------------------------------------------------------------- point of sale */
 
 /* A POS workspace is wider than a form dialog: the grid and the cart share it. */
+/* Full-screen editing workspaces keep their header/X and save bar visible. */
+.oryx-modal-backdrop:has(.oryx-modal--full) {
+  padding: 0;
+  place-items: stretch;
+}
 .oryx-modal--full {
-  width: min(1180px, 100%);
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.oryx-modal--full > div:first-child {
+  flex: 0 0 auto;
+}
+.oryx-modal--full > div:nth-child(2) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.oryx-modal--full > div:nth-child(3) {
+  flex: 0 0 auto;
 }
 
 /*
@@ -659,7 +683,7 @@ body::before {
    the numeric columns stay close to equal, exactly as the document lays them out. */
 .oryx-doc-form__grid {
   display: grid;
-  grid-template-columns: 3.2fr 0.7fr 1fr 0.9fr 0.8fr 1fr 32px;
+  grid-template-columns: minmax(180px, 3.2fr) minmax(70px, .7fr) minmax(115px, 1fr) minmax(115px, .9fr) minmax(112px, .8fr) minmax(115px, 1fr) 32px;
   gap: 8px;
   align-items: center;
 }
