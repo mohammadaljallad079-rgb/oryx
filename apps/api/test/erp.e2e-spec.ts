@@ -807,6 +807,45 @@ describe('ORYX ERP core (e2e)', () => {
       expect(after.quantity - before.quantity).toBe(10000);
     });
 
+    it('prevents a second full return of items already credited against the invoice', async () => {
+      const duplicate = await erp<{ code: string }>('/sales/credit-notes', {
+        method: 'POST',
+        body: {
+          customerId, invoiceId, issueDate: '2026-05-06',
+          reason: 'Repeated return', warehouseId, restockInventory: true,
+          lines: [{
+            productId, description: 'Widget', quantity: 10000,
+            unitPriceMinor: 10000, taxPercentBp: 1500,
+          }],
+        },
+      });
+      expect(duplicate.status).toBe(400);
+      const alreadyCredited = await ctx.prisma.creditNote.count({
+        where: { companyId: tenantId, invoiceId },
+      });
+      expect(alreadyCredited).toBe(1);
+    });
+
+    it('refuses returns that reference a different customer’s invoice', async () => {
+      const other = await erp<{ id: string }>('/sales/customers', {
+        method: 'POST',
+        body: { code: 'C-WRONG-RETURN', nameEn: 'Unrelated Customer' },
+      });
+      expect(other.status).toBe(201);
+      const rejected = await erp('/sales/credit-notes', {
+        method: 'POST',
+        body: {
+          customerId: other.body.id, invoiceId, issueDate: '2026-05-06',
+          warehouseId, restockInventory: true,
+          lines: [{
+            productId, description: 'Widget', quantity: 10000,
+            unitPriceMinor: 10000, taxPercentBp: 1500,
+          }],
+        },
+      });
+      expect(rejected.status).toBe(400);
+    });
+
     it('enforces the customer credit limit', async () => {
       const tight = await erp<{ id: string }>('/sales/customers', {
         method: 'POST',
