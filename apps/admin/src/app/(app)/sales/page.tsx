@@ -1255,7 +1255,7 @@ function PosSaleModal({
         </p>
       ) : null}
 
-      <div className="oryx-pos oryx-pos--workspace-v4 oryx-pos--new-cashier" data-testid="pos-premium-workstation">
+      <div className="oryx-pos oryx-pos--premium oryx-pos--workspace-v4 oryx-pos--new-cashier" data-testid="pos-premium-workstation">
         <header className="oryx-pos__quickbar" data-testid="pos-command-bar">
           <div className="oryx-pos__quickbar-heading">
             <span className="oryx-pos__quickbar-mark"><Icon name="cart" size={19} /></span>
