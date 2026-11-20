@@ -737,6 +737,14 @@ export class PurchasingService {
         });
         if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This supplier invoice number was already recorded for this supplier.');
       }
+      // A direct invoice may receive physical goods only into an explicitly
+      // selected warehouse. Linked invoices never receive goods a second time.
+      if (!dto.purchaseOrderId && dto.post !== false && dto.lines.some((line) => line.productId)) {
+        if (!dto.warehouseId) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Choose a warehouse to receive stock for a direct supplier invoice.');
+        }
+        await this.assertWarehouse(companyId, dto.warehouseId);
+      }
       const totals = computePurchaseTotals(dto.lines);
       const invoiceDate = new Date(dto.invoiceDate);
       const invoiceNumber = await this.sequences.next(tx, companyId, 'supplierInvoice');
@@ -851,6 +859,27 @@ export class PurchasingService {
         },
         include: { supplier: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
       });
+
+      if (dto.post !== false && !dto.purchaseOrderId && dto.warehouseId) {
+        // An unlinked direct invoice is both the receiving document and the AP
+        // invoice. Record stock movements exactly once inside the same transaction.
+        for (const line of dto.lines) {
+          if (!line.productId) continue;
+          await this.inventory.recordMovement(tx, {
+            companyId,
+            branchId: invoice.branchId,
+            warehouseId: dto.warehouseId,
+            productId: line.productId,
+            movementType: 'RECEIPT',
+            source: 'SUPPLIER_INVOICE',
+            sourceId: invoice.id,
+            quantity: line.quantity,
+            unitCostMinor: line.unitCostMinor,
+            occurredAt: invoiceDate,
+            actorUserId: actor.userId,
+          });
+        }
+      }
 
       if (dto.post !== false) {
         const apAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AP_CONTROL);
