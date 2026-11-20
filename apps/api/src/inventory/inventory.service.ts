@@ -917,6 +917,14 @@ export class InventoryService {
         warehouse: { select: { code: true, nameEn: true, nameAr: true } },
       },
     });
+    // StockLevel is created only after a movement. Products entered in the
+    // catalogue without any stock activity must still appear in the valuation
+    // report, with zero on-hand and zero monetary value. Never manufacture stock.
+    const productsWithoutLevels = await this.prisma.product.findMany({
+      where: { companyId, levels: { none: {} } },
+      select: { id: true, sku: true, nameEn: true, nameAr: true, reorderLevel: true },
+      orderBy: { sku: 'asc' },
+    });
     const rows = levels.map((l) => {
       const averageCostMinor = wholeAverageCost(l.averageCostMinor);
       return {
@@ -932,6 +940,21 @@ export class InventoryService {
         reorderLevel: l.product.reorderLevel,
       };
     });
+    for (const product of productsWithoutLevels) {
+      rows.push({
+        warehouseId: '',
+        warehouseCode: '—',
+        productId: product.id,
+        sku: product.sku,
+        nameEn: product.nameEn,
+        nameAr: product.nameAr,
+        quantity: 0,
+        averageCostMinor: 0,
+        valueMinor: 0,
+        reorderLevel: product.reorderLevel,
+      });
+    }
+    rows.sort((a, b) => a.sku.localeCompare(b.sku) || a.warehouseCode.localeCompare(b.warehouseCode));
     return {
       rows,
       totalValueMinor: sumMinor(rows.map((r) => r.valueMinor)),
