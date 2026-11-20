@@ -11,6 +11,8 @@ import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import { EntityPicker } from '@/components/inline-create';
 import { ProductModal, WarehouseModal } from '@/components/entity-modals';
+import { AttachmentsPanel } from '@/components/document-print';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -685,6 +687,11 @@ function EditProductModal({
         />
         {t('common.active')}
       </label>
+      {product ? (
+        <div className="mt-4 border-t border-[var(--border)] pt-4">
+          <AttachmentsPanel entityType="PRODUCT" entityId={product.id} canManage categorised />
+        </div>
+      ) : null}
     </Modal>
   );
 }
@@ -1130,6 +1137,7 @@ function RecordMovementModal({
 
 function TransfersTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
+  const [preview, setPreview] = useState<StockTransferDto | null>(null);
   const list = useAsync(() => api.stockTransfers(), []);
 
   return (
@@ -1161,29 +1169,76 @@ function TransfersTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{tr.lines.length}</td>
                 <td><StatusBadge status={tr.status} label={tr.status} /></td>
                 <td>
-                  {canManage && tr.status === 'DRAFT' ? (
+                  <div className="flex flex-wrap items-center gap-1">
                     <Button
                       size="sm"
-                      onClick={async () => {
-                        await api.postStockTransfer(tr.id);
-                        await list.reload();
-                      }}
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${tr.transferNumber}`}
+                      onClick={() => setPreview(tr)}
+                      data-testid={`transfer-preview-${tr.transferNumber}`}
                     >
-                      {t('erp.inventory.post')}
+                      <Icon name="eye" size={14} />
                     </Button>
-                  ) : null}
+                    {canManage && tr.status === 'DRAFT' ? (
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          await api.postStockTransfer(tr.id);
+                          await list.reload();
+                        }}
+                      >
+                        {t('erp.inventory.post')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      {preview ? (
+        <RecordPreview
+          open
+          title={preview.transferNumber}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('erp.inventory.transferNumber'), value: preview.transferNumber },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('erp.inventory.from'), value: preview.fromWarehouseId },
+            { label: t('erp.inventory.to'), value: preview.toWarehouseId },
+            { label: t('erp.accounting.lines'), value: String(preview.lines.length) },
+            { label: t('common.date'), value: preview.createdAt.slice(0, 10) },
+            { label: t('erp.inventory.postedAt'), value: preview.postedAt?.slice(0, 16).replace('T', ' ') ?? '—' },
+            { label: t('common.notes'), value: preview.notes ?? '—', wide: true },
+          ]}
+          attachment={{ entityType: 'STOCK_TRANSFER', entityId: preview.id, canManage }}
+        >
+          <TableShell label={t('erp.accounting.lines')}>
+            <thead>
+              <tr>
+                <th>{t('erp.inventory.sku')}</th>
+                <th className="text-end">{t('erp.inventory.quantity')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.lines.map((line) => (
+                <tr key={line.id}>
+                  <td className="font-mono text-[12px]">{line.productId}</td>
+                  <td className="text-end tabular-nums">{qty(line.quantity)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </TableShell>
+        </RecordPreview>
+      ) : null}
     </Card>
   );
 }
 
 function AdjustmentsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
+  const [preview, setPreview] = useState<StockAdjustmentDto | null>(null);
   const list = useAsync(() => api.stockAdjustments(), []);
 
   return (
@@ -1213,23 +1268,70 @@ function AdjustmentsTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{a.lines.length}</td>
                 <td><StatusBadge status={a.status} label={a.status} /></td>
                 <td>
-                  {canManage && a.status === 'DRAFT' ? (
+                  <div className="flex flex-wrap items-center gap-1">
                     <Button
                       size="sm"
-                      onClick={async () => {
-                        await api.postStockAdjustment(a.id);
-                        await list.reload();
-                      }}
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${a.adjustmentNumber}`}
+                      onClick={() => setPreview(a)}
+                      data-testid={`adjustment-preview-${a.adjustmentNumber}`}
                     >
-                      {t('erp.inventory.post')}
+                      <Icon name="eye" size={14} />
                     </Button>
-                  ) : null}
+                    {canManage && a.status === 'DRAFT' ? (
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          await api.postStockAdjustment(a.id);
+                          await list.reload();
+                        }}
+                      >
+                        {t('erp.inventory.post')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      {preview ? (
+        <RecordPreview
+          open
+          title={preview.adjustmentNumber}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('erp.inventory.adjustmentNumber'), value: preview.adjustmentNumber },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('erp.inventory.warehouse'), value: preview.warehouseId },
+            { label: t('erp.inventory.reason'), value: preview.reason, wide: true },
+            { label: t('erp.accounting.lines'), value: String(preview.lines.length) },
+            { label: t('common.date'), value: preview.createdAt.slice(0, 10) },
+            { label: t('erp.inventory.postedAt'), value: preview.postedAt?.slice(0, 16).replace('T', ' ') ?? '—' },
+          ]}
+          attachment={{ entityType: 'STOCK_ADJUSTMENT', entityId: preview.id, canManage }}
+        >
+          <TableShell label={t('erp.accounting.lines')}>
+            <thead>
+              <tr>
+                <th>{t('erp.inventory.sku')}</th>
+                <th className="text-end">{t('erp.inventory.quantity')}</th>
+                <th className="text-end">{t('erp.inventory.unitCost')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.lines.map((line) => (
+                <tr key={line.id}>
+                  <td className="font-mono text-[12px]">{line.productId}</td>
+                  <td className="text-end tabular-nums">{qty(line.quantityDelta)}</td>
+                  <td className="text-end tabular-nums">{money(line.unitCostMinor)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </TableShell>
+        </RecordPreview>
+      ) : null}
     </Card>
   );
 }

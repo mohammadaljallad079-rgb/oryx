@@ -96,15 +96,30 @@ export interface DocumentActionsProps {
 }
 
 /**
- * The attachment entity an attachment row hangs off, or null when the record
- * kind has no attachment support. Only the invoice and the receipt carry
- * supporting paperwork today; anything else hides the control rather than
- * offering a button the API would reject.
+ * The attachment entity an attachment row hangs off.
+ *
+ * Every record kind the register can render now has a matching attachment
+ * entity, so the row's paperclip opens the same register the record's own form
+ * uses. A kind that is added here without a server-side entity check would be
+ * refused by the API, which is why `ATTACHMENT_ENTITY_TYPES` and
+ * `assertEntityExists` must gain the same entry.
  */
+const ATTACHMENT_ENTITY_BY_SOURCE: Partial<Record<DocumentSourceType, AttachmentEntityType>> = {
+  SalesInvoice: 'SALES_INVOICE',
+  Quotation: 'QUOTATION',
+  SalesOrder: 'SALES_ORDER',
+  CreditNote: 'CREDIT_NOTE',
+  Payment: 'PAYMENT',
+  SupplierInvoice: 'SUPPLIER_INVOICE',
+  PurchaseOrder: 'PURCHASE_ORDER',
+  PurchaseReturn: 'PURCHASE_RETURN',
+  JournalEntry: 'JOURNAL_ENTRY',
+  Customer: 'CUSTOMER',
+  Supplier: 'SUPPLIER',
+};
+
 function attachmentEntityFor(sourceType: DocumentSourceType): AttachmentEntityType | null {
-  if (sourceType === 'SalesInvoice') return 'SALES_INVOICE';
-  if (sourceType === 'Payment') return 'PAYMENT';
-  return null;
+  return ATTACHMENT_ENTITY_BY_SOURCE[sourceType] ?? null;
 }
 
 export function DocumentActions({ sourceType, sourceId, type, permissions, autoOpenOnMount = false, iconsOnly = false }: DocumentActionsProps) {

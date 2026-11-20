@@ -76,6 +76,14 @@ import type {
   PayrollPeriodDto,
   PayrollRunDto,
   EmployeeAdvanceDto,
+  EmployeeBonusDto,
+  EmployeeBonusListDto,
+  EmployeeFileCounts,
+  EmployeeLeaveTabDto,
+  EmployeePayrollLedgerDto,
+  EmployeePenaltyDto,
+  EmployeePersonalCardDto,
+  EmployeeReportPackDto,
   HrDashboardDto,
   LeadDto,
   PipelineDto,
@@ -1249,6 +1257,34 @@ export const api = {
     request<AttendanceDto>('/hr/attendance', { method: 'POST', body }),
   createSalaryStructure: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>('/hr/salary-structures', { method: 'POST', body }),
+
+  // ------------------------------------------- employee electronic file (E06)
+  hrEmployeeFile: {
+    counts: (id: string) => request<EmployeeFileCounts>(`/hr/employees/${id}/file/counts`),
+    personalCard: (id: string) =>
+      request<EmployeePersonalCardDto>(`/hr/employees/${id}/file/personal-card`),
+    payroll: (id: string, range: { from?: string; to?: string } = {}) =>
+      request<EmployeePayrollLedgerDto>(`/hr/employees/${id}/file/payroll?${toQuery(range)}`),
+    leave: (id: string, year?: number) =>
+      request<EmployeeLeaveTabDto>(`/hr/employees/${id}/file/leave?${toQuery({ year })}`),
+    penalties: (id: string) =>
+      request<{ items: EmployeePenaltyDto[] }>(`/hr/employees/${id}/file/penalties`),
+    createPenalty: (id: string, body: Record<string, unknown>) =>
+      request<EmployeePenaltyDto>(`/hr/employees/${id}/file/penalties`, { method: 'POST', body }),
+    deletePenalty: (penaltyId: string) =>
+      request<{ removed: true }>(`/hr/file/penalties/${penaltyId}`, { method: 'DELETE' }),
+    bonuses: (id: string) =>
+      request<EmployeeBonusListDto>(`/hr/employees/${id}/file/bonuses`),
+    createBonus: (id: string, body: Record<string, unknown>) =>
+      request<EmployeeBonusDto>(`/hr/employees/${id}/file/bonuses`, { method: 'POST', body }),
+    updateBonus: (bonusId: string, body: Record<string, unknown>) =>
+      request<EmployeeBonusDto>(`/hr/file/bonuses/${bonusId}`, { method: 'PATCH', body }),
+    deleteBonus: (bonusId: string) =>
+      request<{ removed: true }>(`/hr/file/bonuses/${bonusId}`, { method: 'DELETE' }),
+    reports: (id: string, range: { from?: string; to?: string } = {}) =>
+      request<EmployeeReportPackDto>(`/hr/employees/${id}/file/reports?${toQuery(range)}`),
+  },
+
   payrollPeriods: (params: { companyId?: string } = {}) =>
     request<Paginated<PayrollPeriodDto>>(`/hr/payroll-periods?${toQuery(params)}`),
   createPayrollPeriod: (body: Record<string, unknown>) =>

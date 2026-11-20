@@ -8,6 +8,8 @@ import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
+import { PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
+import { RecordPreview } from '@/components/record-preview';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import { EntityPicker } from '@/components/inline-create';
@@ -261,6 +263,7 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
   const [page, setPage] = useState(1);
   const [postOpen, setPostOpen] = useState(false);
   const [reversing, setReversing] = useState<JournalEntryDto | null>(null);
+  const [preview, setPreview] = useState<JournalEntryDto | null>(null);
   const list = useAsync(() => api.journals({ page, pageSize: 15 }), [page]);
   const accounts = useAsync(() => api.accountingAccounts(), []);
   const canReverse = can('erp.accounting.journal.reverse');
@@ -326,6 +329,15 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
                   </td>
                   <td>
                     <div className="flex flex-wrap items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`${t('print.preview')} ${j.entryNumber}`}
+                        onClick={() => setPreview(j)}
+                        data-testid={`journal-preview-${j.entryNumber}`}
+                      >
+                        <Icon name="eye" size={14} />
+                      </Button>
                       <span className="oryx-faint text-[11.5px]">
                         {j.lines.length} {t('erp.accounting.lines')}
                       </span>
@@ -368,6 +380,46 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
         onClose={() => setPostOpen(false)}
         onPosted={list.reload}
       />
+
+      {preview ? (
+        <RecordPreview
+          open
+          title={preview.entryNumber}
+          subtitle={preview.memo ?? undefined}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('erp.accounting.entryNumber'), value: preview.entryNumber },
+            { label: t('common.date'), value: preview.entryDate.slice(0, 10) },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('erp.accounting.source'), value: preview.sourceType },
+            { label: t('erp.accounting.debit'), value: money(preview.totalDebitMinor, preview.currency) },
+            { label: t('erp.accounting.credit'), value: money(preview.totalCreditMinor, preview.currency) },
+            { label: t('erp.accounting.memo'), value: preview.memo ?? '—', wide: true },
+          ]}
+          attachment={{ entityType: 'JOURNAL_ENTRY', entityId: preview.id, canManage: can('erp.accounting.write') }}
+        >
+          <TableShell label={t('erp.accounting.lines')}>
+            <thead>
+              <tr>
+                <th>{t('erp.accounting.account')}</th>
+                <th>{t('erp.accounting.memo')}</th>
+                <th className="text-end">{t('erp.accounting.debit')}</th>
+                <th className="text-end">{t('erp.accounting.credit')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.lines.map((line) => (
+                <tr key={line.id}>
+                  <td className="font-mono text-[12px]">{line.accountCode ?? line.accountId}</td>
+                  <td className="text-[12.5px]">{line.description ?? '—'}</td>
+                  <td className="text-end tabular-nums">{money(line.debitMinor, preview.currency)}</td>
+                  <td className="text-end tabular-nums">{money(line.creditMinor, preview.currency)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </TableShell>
+        </RecordPreview>
+      ) : null}
 
       {reversing ? (
         <ReverseJournalModal
@@ -468,6 +520,9 @@ function PostJournalModal({
     { accountId: '', debit: '', credit: '' },
     { accountId: '', debit: '', credit: '' },
   ]);
+  const [pending, setPending] = useState<File[]>([]);
+  const { can } = useAuth();
+  const canAttach = can('erp.accounting.write');
 
   const totalDebit = lines.reduce((s, l) => s + toMinorInput(l.debit), 0);
   const totalCredit = lines.reduce((s, l) => s + toMinorInput(l.credit), 0);
@@ -477,7 +532,7 @@ function PostJournalModal({
     setBusy(true);
     setError(null);
     try {
-      await api.createJournal({
+      const created = await api.createJournal({
         entryDate,
         memo,
         lines: lines.map((l) => ({
@@ -486,8 +541,12 @@ function PostJournalModal({
           creditMinor: toMinorInput(l.credit),
         })),
       });
+      // The entry only has an id after posting, so the paperwork chosen in this
+      // form is uploaded immediately afterwards and never needs a second screen.
+      if (pending.length) await uploadPendingAttachments('JOURNAL_ENTRY', created.id, pending);
       await onPosted();
       onClose();
+      setPending([]);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -593,6 +652,10 @@ function PostJournalModal({
         <Badge tone={balanced ? 'success' : 'danger'} data-testid="journal-balanced">
           {balanced ? t('erp.accounting.balanced') : t('erp.accounting.unbalanced')}
         </Badge>
+      </div>
+
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
       </div>
     </Modal>
   );
@@ -806,6 +869,9 @@ function PaymentModal({
   // Chosen invoice allocations, keyed by invoice id. An empty amount leaves the
   // invoice open; the sum may never exceed the payment amount.
   const [allocations, setAllocations] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState<File[]>([]);
+  const { can } = useAuth();
+  const canAttach = can('erp.accounting.payment.manage');
 
   const partyId = direction === 'RECEIPT' ? customerId : supplierId;
 
@@ -860,7 +926,7 @@ function PaymentModal({
       const chosen = Object.entries(allocations)
         .map(([id, value]) => ({ id, amountMinor: toMinorInput(value) }))
         .filter((a) => a.amountMinor > 0);
-      await api.recordPayment({
+      const recorded = await api.recordPayment({
         direction,
         partyType: direction === 'RECEIPT' ? 'CUSTOMER' : 'SUPPLIER',
         ...(direction === 'RECEIPT' ? { customerId } : { supplierId }),
@@ -880,12 +946,14 @@ function PaymentModal({
             }
           : {}),
       });
+      if (pending.length) await uploadPendingAttachments('PAYMENT', recorded.id, pending);
       await onCreated();
       onClose();
       setAmount('');
       setReference('');
       setNotes('');
       setAllocations({});
+      setPending([]);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -1043,6 +1111,10 @@ function PaymentModal({
           ) : null}
         </div>
       ) : null}
+
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
+      </div>
     </Modal>
   );
 }

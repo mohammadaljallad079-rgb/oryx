@@ -8,8 +8,9 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Card, ErrorBanner, Skeleton } from '@/components/ui';
+import { EmployeeFile } from '@/components/employee-file';
 
-type EmployeeFile = {
+type EmployeeDetail = {
   id?: string;
   code?: string;
   fullNameEn?: string;
@@ -26,7 +27,7 @@ type EmployeeFile = {
   leaveBalances?: Array<{ id: string; balanceDays?: number; remainingDays?: number; leaveType?: { nameAr?: string; nameEn?: string } }>;
   lifecycle?: Array<{ id: string; type?: string; status?: string; startedAt?: string }>;
 };
-type EmployeeFileTab = 'identity' | 'contracts' | 'leave' | 'documents';
+type EmployeeFileTab = 'dossier' | 'identity' | 'contracts' | 'leave' | 'documents';
 
 function date(value: unknown): string {
   return typeof value === 'string' && value ? value.slice(0, 10) : '—';
@@ -36,10 +37,11 @@ function display(value: unknown): string {
 }
 
 /**
- * Read-only E06 employee dossier built on the CURRENT production HR and document
- * APIs. No legacy API routes, schema changes or payroll mutations are introduced.
- * Salary, bank and payroll fields are intentionally omitted until the server
- * exposes a dedicated salary-permission-gated dossier endpoint.
+ * The employee dossier.
+ *
+ * The default tab is the full electronic file (`EmployeeFile`), which reads the
+ * permission-gated `/hr/employees/:id/file/*` routes. The older read-only tabs
+ * are kept alongside it so existing bookmarks and links keep working.
  */
 export default function EmployeeFilePage() {
   const params = useParams<{ id: string }>();
@@ -47,7 +49,7 @@ export default function EmployeeFilePage() {
   const { canAny, ready } = useAuth();
   const { locale } = useUi();
   const ar = locale === 'ar';
-  const [tab, setTab] = useState<EmployeeFileTab>('identity');
+  const [tab, setTab] = useState<EmployeeFileTab>('dossier');
   const allowed = ready && canAny('erp.hr.read', 'erp.hr.employee.manage');
   const file = useAsync(
     () => allowed && employeeId ? api.hrEmployee(employeeId) : Promise.resolve(null),
@@ -58,8 +60,9 @@ export default function EmployeeFilePage() {
       ? api.employeeDocuments(employeeId) : Promise.resolve(null),
     [allowed, employeeId, tab],
   );
-  const employee = file.data as EmployeeFile | null;
+  const employee = file.data as EmployeeDetail | null;
   const tabs: Array<{ id: EmployeeFileTab; label: string }> = [
+    { id: 'dossier', label: ar ? 'الملف الشامل' : 'Full file' },
     { id: 'identity', label: ar ? 'البيانات الشخصية' : 'Personal details' },
     { id: 'contracts', label: ar ? 'العقود' : 'Contracts' },
     { id: 'leave', label: ar ? 'رصيد الإجازات' : 'Leave balances' },
@@ -92,6 +95,13 @@ export default function EmployeeFilePage() {
                 onClick={() => setTab(item.id)}>{item.label}</button>
             ))}
           </div>
+          {tab === 'dossier' ? (
+            <EmployeeFile
+              employeeId={employeeId}
+              employeeName={name(employee.fullNameEn, employee.fullNameAr)}
+              employeeCode={employee.code ?? ''}
+            />
+          ) : null}
           {tab === 'identity' ? (
             <Card>
               <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">

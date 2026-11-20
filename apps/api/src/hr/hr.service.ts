@@ -12,6 +12,7 @@ import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../commo
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import { computePayslip, leaveDaysBetween, type SalaryComponentInput } from './payroll-calculator';
+import { SALARY_READ_PERMISSION } from './hr.dto';
 import { deriveAttendance, zonedDateKey, zonedParts } from './attendance-calculator';
 import { verifyPunch, qrTokenFor, type PunchLocation } from './attendance-verification';
 import type {
@@ -215,6 +216,10 @@ export class HrService {
 
   async getEmployee(id: string, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    // Pay and advances are withheld unless the caller holds salary access. The
+    // fields are omitted, not blanked, so the screen can tell "not recorded"
+    // from "not permitted". The dedicated file endpoints are the read path.
+    const salaryVisible = principal.grantedPermissions.includes(SALARY_READ_PERMISSION);
     const employee = await this.prisma.employee.findFirst({
       where: { id, companyId },
       include: {
@@ -225,12 +230,17 @@ export class HrService {
         documents: { orderBy: { createdAt: 'desc' } },
         lifecycle: { include: { items: true }, orderBy: { startedAt: 'desc' } },
         leaveBalances: { include: { leaveType: true } },
-        salaryStructures: { include: { components: true }, orderBy: { effectiveFrom: 'desc' } },
-        advances: { orderBy: { issuedAt: 'desc' } },
+        ...(salaryVisible
+          ? {
+              salaryStructures: { include: { components: true }, orderBy: { effectiveFrom: 'desc' } },
+              advances: { orderBy: { issuedAt: 'desc' } },
+            }
+          : {}),
       },
     });
     if (!employee) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found.');
-    return toEmployeeDetailDto(employee);
+    const detail = toEmployeeDetailDto(employee);
+    return salaryVisible ? detail : { ...detail, salaryVisible: false };
   }
 
   async createEmployee(dto: CreateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
@@ -259,6 +269,7 @@ export class HrService {
           phone: dto.phone ?? null,
           secondaryPhone: dto.secondaryPhone ?? null,
           nationalId: dto.nationalId ?? null,
+          nationality: dto.nationality ?? null,
           departmentId: dto.departmentId ?? null,
           jobTitleId: dto.jobTitleId ?? null,
           branchId: dto.branchId ?? null,
@@ -308,6 +319,10 @@ export class HrService {
         ...(dto.email !== undefined ? { email: dto.email } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
         ...(dto.secondaryPhone !== undefined ? { secondaryPhone: dto.secondaryPhone } : {}),
+        ...(dto.nationalId !== undefined ? { nationalId: dto.nationalId || null } : {}),
+        ...(dto.dateOfBirth !== undefined ? { dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null } : {}),
+        ...(dto.gender !== undefined ? { gender: dto.gender || null } : {}),
+        ...(dto.nationality !== undefined ? { nationality: dto.nationality || null } : {}),
         ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
         ...(dto.jobTitleId !== undefined ? { jobTitleId: dto.jobTitleId } : {}),
         ...(dto.branchId !== undefined ? { branchId: dto.branchId } : {}),
@@ -1439,6 +1454,10 @@ export class HrService {
             endDate: { gte: period.startDate },
           },
         },
+        // Only an approved bonus that no payslip has consumed joins the run.
+        // A bonus stamped with a payslip id has already been paid and must
+        // never be paid a second time by a later or retried run.
+        bonuses: { where: { payslipId: null, approvedAt: { not: null } } },
       },
     });
     if (employees.length === 0) throw badRequest(ERROR_CODES.PAYROLL_NO_EMPLOYEES, 'No active employees with a salary structure.');
@@ -1493,9 +1512,22 @@ export class HrService {
             )
           : 0;
 
+        // An approved, unpaid bonus joins the run as its own earning line. The
+        // payslip id stamped below is what makes the payment single-use.
+        const bonusComponents: SalaryComponentInput[] = employee.bonuses.map((bonus, index) => ({
+          type: 'ALLOWANCE',
+          code: `BONUS_${bonus.type}`,
+          nameEn: `Bonus — ${bonus.reason}`,
+          nameAr: `مكافأة — ${bonus.reason}`,
+          amountMinor: bonus.amountMinor,
+          isPercentage: false,
+          percentBp: 0,
+          sortOrder: 8000 + index,
+        }));
+
         const slip = computePayslip({
           basicMinor: structure.basicMinor,
-          components,
+          components: [...components, ...bonusComponents],
           overtimeRateMinor: structure.overtimeRateMinor,
           unpaidLeaveDays,
           advanceDeductionMinor: advanceDeduction,
@@ -1540,6 +1572,7 @@ export class HrService {
               absenceDays,
               unpaidLeaveDays,
               advanceDeductionMinor: advanceDeduction,
+              bonuses: employee.bonuses.map((b) => ({ id: b.id, type: b.type, reason: b.reason, amountMinor: b.amountMinor })) as unknown as Prisma.InputJsonValue,
               policy: {
                 overtimeEnabled: policy.overtimeEnabled,
                 overtimeMultiplierBp: dto.overtimeMultiplierBp ?? policy.overtimeMultiplierBp,
@@ -1551,6 +1584,15 @@ export class HrService {
             lines: { create: slip.lines.map((l) => ({ type: l.type as never, code: l.code, nameEn: l.nameEn, nameAr: l.nameAr, amountMinor: l.amountMinor, sortOrder: l.sortOrder })) },
           },
         });
+
+        // Stamp the consumed bonuses with this payslip inside the same
+        // transaction, so a retried run cannot pay them again.
+        if (employee.bonuses.length > 0) {
+          await tx.employeeBonus.updateMany({
+            where: { id: { in: employee.bonuses.map((b) => b.id) }, payslipId: null },
+            data: { payslipId: payslip.id },
+          });
+        }
 
         // Settle the advance inside the same transaction.
         if (advance && advanceDeduction > 0) {

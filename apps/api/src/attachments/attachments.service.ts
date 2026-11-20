@@ -78,6 +78,16 @@ export class AttachmentsService {
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
       return;
     }
+    if (entityType === 'QUOTATION') {
+      const found = await this.prisma.quotation.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Quotation not found.');
+      return;
+    }
+    if (entityType === 'SALES_ORDER') {
+      const found = await this.prisma.salesOrder.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales order not found.');
+      return;
+    }
     if (entityType === 'CREDIT_NOTE') {
       const found = await this.prisma.creditNote.findFirst({ where: { id: entityId, companyId } });
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Credit note not found.');
@@ -123,6 +133,51 @@ export class AttachmentsService {
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase order not found.');
       return;
     }
+    if (entityType === 'PURCHASE_REQUISITION') {
+      const found = await this.prisma.purchaseRequisition.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase requisition not found.');
+      return;
+    }
+    if (entityType === 'GOODS_RECEIPT') {
+      const found = await this.prisma.goodsReceipt.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Goods receipt not found.');
+      return;
+    }
+    if (entityType === 'SUPPLIER_INVOICE') {
+      const found = await this.prisma.supplierInvoice.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Supplier invoice not found.');
+      return;
+    }
+    if (entityType === 'PURCHASE_RETURN') {
+      const found = await this.prisma.purchaseReturn.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase return not found.');
+      return;
+    }
+    if (entityType === 'STOCK_TRANSFER') {
+      const found = await this.prisma.stockTransfer.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Stock transfer not found.');
+      return;
+    }
+    if (entityType === 'STOCK_ADJUSTMENT') {
+      const found = await this.prisma.stockAdjustment.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Stock adjustment not found.');
+      return;
+    }
+    if (entityType === 'LEAD') {
+      const found = await this.prisma.lead.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Lead not found.');
+      return;
+    }
+    if (entityType === 'SERVICE_REQUEST') {
+      const found = await this.prisma.serviceRequest.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Service request not found.');
+      return;
+    }
+    if (entityType === 'PROJECT_TASK') {
+      const found = await this.prisma.projectTask.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Task not found.');
+      return;
+    }
     if (entityType === 'JOURNAL_ENTRY') {
       const found = await this.prisma.journalEntry.findFirst({ where: { id: entityId, companyId } });
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Journal entry not found.');
@@ -136,6 +191,41 @@ export class AttachmentsService {
     if (entityType === 'INSPECTION') {
       const found = await this.prisma.inspectionSession.findFirst({ where: { id: entityId, companyId } });
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');
+      return;
+    }
+    if (entityType === 'EMPLOYEE_PENALTY') {
+      const found = await this.prisma.employeePenalty.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Disciplinary action not found.');
+      return;
+    }
+    if (entityType === 'OPPORTUNITY') {
+      const found = await this.prisma.opportunity.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Opportunity not found.');
+      return;
+    }
+    if (entityType === 'SUPPORT_TICKET') {
+      const found = await this.prisma.supportTicket.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Support ticket not found.');
+      return;
+    }
+    if (entityType === 'PROJECT') {
+      const found = await this.prisma.project.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Project not found.');
+      return;
+    }
+    if (entityType === 'PRODUCT') {
+      const found = await this.prisma.product.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Product not found.');
+      return;
+    }
+    if (entityType === 'LEAVE_REQUEST') {
+      const found = await this.prisma.leaveRequest.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Leave request not found.');
+      return;
+    }
+    if (entityType === 'EMPLOYEE_BONUS') {
+      const found = await this.prisma.employeeBonus.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Bonus not found.');
       return;
     }
     throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Unsupported attachment entity type.');

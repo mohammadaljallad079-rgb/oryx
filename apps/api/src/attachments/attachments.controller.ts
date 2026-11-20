@@ -29,6 +29,7 @@ export class AttachmentsController {
   @Get(':entityType/:entityId')
   @RequireAnyPermission(
     'erp.sales.read',
+    'erp.sales.order.manage',
     'erp.accounting.read',
     'erp.accounting.payment.manage',
     'erp.hr.read',
@@ -37,6 +38,16 @@ export class AttachmentsController {
     'erp.maintenance.read',
     'erp.inspection.read',
     'erp.operations.read',
+    'erp.sales.customer.manage',
+    'erp.purchasing.supplier.manage',
+    'erp.inventory.item.manage',
+    'erp.hr.document.read',
+    'erp.hr.leave.approve',
+    'erp.hr.leave.manage',
+    'erp.crm.read',
+    'erp.crm.write',
+    'erp.crm.opportunity.manage',
+    'erp.crm.ticket.manage',
   )
   @ApiOperation({ summary: 'List attachments for a document' })
   list(
@@ -50,12 +61,26 @@ export class AttachmentsController {
   @Post(':entityType/:entityId')
   @RequireAnyPermission(
     'erp.sales.invoice.manage',
+    'erp.sales.order.manage',
     'erp.accounting.payment.manage',
     'erp.hr.write',
     'erp.purchasing.write',
     'erp.inventory.write',
     'erp.maintenance.write',
     'erp.operations.write',
+    'erp.hr.penalty.manage',
+    'erp.hr.bonus.manage',
+    'erp.sales.customer.manage',
+    'erp.purchasing.supplier.manage',
+    'erp.inventory.item.manage',
+    'erp.inventory.movement.manage',
+    'erp.hr.employee.manage',
+    'erp.hr.leave.request',
+    'erp.hr.leave.approve',
+    'erp.hr.leave.manage',
+    'erp.crm.write',
+    'erp.crm.opportunity.manage',
+    'erp.crm.ticket.manage',
   )
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
@@ -86,6 +111,16 @@ export class AttachmentsController {
     'erp.maintenance.read',
     'erp.inspection.read',
     'erp.operations.read',
+    'erp.sales.customer.manage',
+    'erp.purchasing.supplier.manage',
+    'erp.inventory.item.manage',
+    'erp.hr.document.read',
+    'erp.hr.leave.approve',
+    'erp.hr.leave.manage',
+    'erp.crm.read',
+    'erp.crm.write',
+    'erp.crm.opportunity.manage',
+    'erp.crm.ticket.manage',
   )
   @ApiOperation({ summary: 'Download an attachment (or open it for preview)' })
   async download(
@@ -116,6 +151,19 @@ export class AttachmentsController {
     'erp.inventory.write',
     'erp.maintenance.write',
     'erp.operations.write',
+    'erp.hr.penalty.manage',
+    'erp.hr.bonus.manage',
+    'erp.sales.customer.manage',
+    'erp.purchasing.supplier.manage',
+    'erp.inventory.item.manage',
+    'erp.inventory.movement.manage',
+    'erp.hr.employee.manage',
+    'erp.hr.leave.request',
+    'erp.hr.leave.approve',
+    'erp.hr.leave.manage',
+    'erp.crm.write',
+    'erp.crm.opportunity.manage',
+    'erp.crm.ticket.manage',
   )
   @ApiOperation({ summary: 'Remove an attachment' })
   remove(
