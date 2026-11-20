@@ -521,11 +521,39 @@ export function SearchableSelect({
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 280 });
+
+  // The menu must escape modal scroll containers; render it at viewport level
+  // and flip above the field when the bottom edge would clip the options.
+  useIsomorphicLayoutEffect(() => {
+    if (!open) return;
+    const position = () => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const below = window.innerHeight - rect.bottom - 12;
+      const above = rect.top - 12;
+      const maxHeight = Math.max(120, Math.min(320, Math.max(below, above)));
+      setPopoverPosition({
+        top: below >= 180 || below >= above ? rect.bottom + 4 : Math.max(8, rect.top - maxHeight - 4),
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8)),
+        width: Math.min(rect.width, window.innerWidth - 16),
+        maxHeight,
+      });
+    };
+    position();
+    window.addEventListener('resize', position);
+    window.addEventListener('scroll', position, true);
+    return () => {
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onDocClick = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(e.target as Node) && !popoverRef.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
@@ -571,9 +599,11 @@ export function SearchableSelect({
         </span>
         <Icon name="chevronDown" size={14} />
       </button>
-      {open ? (
+      {open && typeof document !== 'undefined' ? createPortal(
         <div
-          className="oryx-popover absolute z-30 mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg"
+          ref={popoverRef}
+          className="oryx-popover fixed overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg"
+          style={{ zIndex: 9999, top: popoverPosition.top, left: popoverPosition.left, width: popoverPosition.width, maxHeight: popoverPosition.maxHeight }}
           role="listbox"
         >
           <input
@@ -587,7 +617,7 @@ export function SearchableSelect({
             placeholder={placeholder}
             data-testid={testId ? `${testId}-search` : undefined}
           />
-          <div className="max-h-56 overflow-y-auto">
+          <div className="overflow-y-auto" style={{ maxHeight: Math.max(75, popoverPosition.maxHeight - 64) }}>
             {emptyLabel !== undefined ? (
               <button
                 type="button"
@@ -646,7 +676,8 @@ export function SearchableSelect({
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
       {createOpen && create ? (
         <Modal
