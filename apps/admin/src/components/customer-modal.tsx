@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
+import { useAuth } from '@/lib/auth-context';
 import { minorToInput, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { AttachmentsPanel, PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
 import { CatalogModal, EntityPicker, type EntityOption } from '@/components/inline-create';
 import {
   Button,
@@ -94,13 +96,19 @@ export function CustomerModal({
   onCreatedDepartment?: () => Promise<void> | void;
 }) {
   const { t, locale } = useUi();
+  const { canAny } = useAuth();
+  const canAttach = canAny('erp.sales.customer.manage', 'erp.sales.write');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(customer?.id ?? null);
+  const [pending, setPending] = useState<File[]>([]);
   const [form, setForm] = useState<CustomerFormState>(EMPTY);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setSavedId(customer?.id ?? null);
+    setPending([]);
     setForm({
       code: customer?.code ?? '',
       kind: customer?.kind ?? 'INDIVIDUAL',
@@ -159,6 +167,7 @@ export function CustomerModal({
       const saved = customer
         ? await api.updateCustomer(customer.id, body)
         : await api.createCustomer({ ...body, ...(form.code.trim() ? { code: form.code.trim() } : {}) });
+      if (!customer && pending.length) await uploadPendingAttachments('CUSTOMER', saved.id, pending);
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -351,6 +360,17 @@ export function CustomerModal({
             <textarea className="oryx-textarea" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </Field>
         </div>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <p className="oryx-label mb-2 inline-flex items-center gap-1.5">
+          <Icon name="paperclip" size={15} />
+          {t('attachments.title')}
+        </p>
+        {savedId ? (
+          <AttachmentsPanel entityType="CUSTOMER" entityId={savedId} canManage={canAttach} categorised />
+        ) : (
+          <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
+        )}
       </div>
       <p className="oryx-faint m-0 mt-3 text-[11px]">{locale === 'ar' ? 'يُسمح باسم واحد على الأقل.' : 'At least one name is required.'}</p>
     </Modal>

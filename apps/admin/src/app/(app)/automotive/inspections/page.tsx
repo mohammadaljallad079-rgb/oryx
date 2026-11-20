@@ -7,6 +7,9 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
 import { minorToInput, money, toMinorInput } from '@/lib/erp-format';
 import { EntitySelect } from '@/components/entity-select';
+import { AttachmentsPanel } from '@/components/document-print';
+import { RecordPreview } from '@/components/record-preview';
+import { recordPrintInput } from '@/lib/print-table';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -23,7 +26,7 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
-import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, VehicleDocumentDto, VehicleDocumentOcrResultDto, CustomerDto } from '@oryx/shared';
+import type { InspectionBookingDto, InspectionServiceDto, InspectionSessionSummaryDto, VehicleDto, VehicleDocumentDto, VehicleDocumentOcrResultDto, CustomerDto } from '@oryx/shared';
 import {
   basisPointsOfMinor,
   INSPECTION_TYPES,
@@ -94,10 +97,13 @@ export default function InspectionsPage() {
  */
 function JobsTab({ canWrite }: { canWrite: boolean }) {
   const { t, locale } = useUi();
+  const { memberships, companyId } = useAuth();
+  const company = memberships.find((m) => m.companyId === companyId);
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<InspectionSessionSummaryDto | null>(null);
   const debounced = useDebounced(search);
   const list = useAsync(() => api.inspectionSessions({ search: debounced || undefined }), [debounced]);
 
@@ -179,6 +185,15 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
                     </td>
                     <td className="text-end">
                       <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`${t('print.preview')} ${j.jobNumber}`}
+                          onClick={() => setPreview(j)}
+                          data-testid={`inspection-preview-${j.jobNumber}`}
+                        >
+                          <Icon name="eye" size={14} />
+                        </Button>
                         <Button size="sm" onClick={() => router.push(`/automotive/inspections/${j.id}`)} data-testid={`open-job-${j.id}`}>
                           {t('inspection.open')}
                         </Button>
@@ -206,6 +221,54 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
       ) : null}
 
       {open ? <NewJobModal onClose={() => setOpen(false)} onCreated={list.reload} /> : null}
+      {preview ? (
+        <RecordPreview
+          open
+          title={`${preview.jobNumber} — ${preview.make} ${preview.model}`}
+          subtitle={preview.customerName}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('inspection.jobNumber'), value: preview.jobNumber },
+            { label: t('inspection.customer'), value: preview.customerName },
+            { label: t('inspection.vehicle'), value: `${preview.make} ${preview.model} · ${preview.modelYear}` },
+            { label: t('inspection.plateNumber'), value: preview.plateNumber ?? '—' },
+            { label: t('inspection.vin'), value: preview.vin },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={t(`inspection.status.${preview.status}`)} /> },
+            { label: t('inspection.inspectedAt'), value: preview.inspectedAt?.slice(0, 10) ?? '—' },
+            {
+              label: t('inspection.selectTypes'),
+              value:
+                preview.selectedTypes
+                  .map((a) => {
+                    const spec = INSPECTION_TYPES.find((x) => x.key === a);
+                    return spec ? (locale === 'ar' ? spec.labelAr : spec.labelEn) : a;
+                  })
+                  .join(' · ') || '—',
+              wide: true,
+            },
+          ]}
+          printInput={recordPrintInput({
+            locale,
+            titleEn: 'Inspection report',
+            titleAr: 'تقرير الفحص',
+            subjectName: preview.customerName,
+            subjectCode: preview.jobNumber,
+            companyNameEn: company?.companyNameEn ?? 'ORYX',
+            companyNameAr: company?.companyNameAr ?? 'أوريكس',
+            windowLabel: preview.inspectedAt?.slice(0, 10),
+            fields: [
+              { label: t('inspection.jobNumber'), value: preview.jobNumber },
+              { label: t('inspection.customer'), value: preview.customerName },
+              { label: t('inspection.vehicle'), value: `${preview.make} ${preview.model} · ${preview.modelYear}` },
+              { label: t('inspection.plateNumber'), value: preview.plateNumber ?? '—' },
+              { label: t('inspection.vin'), value: preview.vin },
+              { label: t('common.status'), value: preview.status },
+            ],
+          })}
+          csvName={`inspection-${preview.jobNumber}`}
+          attachment={{ entityType: 'INSPECTION', entityId: preview.id, canManage: canWrite }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -840,6 +903,11 @@ function VehicleDocumentsModal({
           </TableShell>
         )}
       </div>
+      {vehicleId ? (
+        <div className="mt-4 border-t border-[var(--border)] pt-4">
+          <AttachmentsPanel entityType="VEHICLE" entityId={vehicleId} canManage={canManage} categorised />
+        </div>
+      ) : null}
     </Modal>
   );
 }

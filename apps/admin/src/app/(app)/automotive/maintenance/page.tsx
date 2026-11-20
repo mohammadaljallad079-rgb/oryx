@@ -10,6 +10,9 @@ import { EntitySelect } from '@/components/entity-select';
 import { EntityPicker } from '@/components/inline-create';
 import { CustomerModal } from '@/components/customer-modal';
 import { VehicleModal } from '@/components/entity-modals';
+import { AttachmentsPanel } from '@/components/document-print';
+import { RecordPreview } from '@/components/record-preview';
+import { recordPrintInput } from '@/lib/print-table';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -752,6 +755,11 @@ function JobCardDetailModal({
           <ReservePartsModal open={reserveOpen} jobId={job.id} onClose={() => setReserveOpen(false)} onCreated={refresh} />
         </>
       ) : null}
+      {job ? (
+        <div className="mt-4 border-t border-[var(--border)] pt-4">
+          <AttachmentsPanel entityType="JOB_CARD" entityId={job.id} canManage={canManage} categorised />
+        </div>
+      ) : null}
     </Modal>
   );
 }
@@ -1489,9 +1497,12 @@ function CreateProviderModal({
 }
 
 function RequestsTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const { memberships, companyId } = useAuth();
+  const company = memberships.find((m) => m.companyId === companyId);
   const list = useAsync(() => api.serviceRequests(), []);
   const providers = useAsync(() => api.marketplaceProviders({ status: 'APPROVED' }), []);
+  const [preview, setPreview] = useState<ServiceRequestDto | null>(null);
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4">
@@ -1532,24 +1543,68 @@ function RequestsTab({ canManage }: { canManage: boolean }) {
                   <StatusBadge status={r.status} label={r.status} />
                 </td>
                 <td>
-                  {canManage && r.status === 'NEW' && (providers.data?.items.length ?? 0) > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       size="sm"
-                      data-testid={`assign-request-${r.requestNumber}`}
-                      onClick={async () => {
-                        await api.assignServiceRequest(r.id, providers.data!.items[0].id);
-                        await list.reload();
-                      }}
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${r.requestNumber}`}
+                      onClick={() => setPreview(r)}
+                      data-testid={`request-preview-${r.requestNumber}`}
                     >
-                      {t('erp.automotive.assign')}
+                      <Icon name="eye" size={14} />
                     </Button>
-                  ) : null}
+                    {canManage && r.status === 'NEW' && (providers.data?.items.length ?? 0) > 0 ? (
+                      <Button
+                        size="sm"
+                        data-testid={`assign-request-${r.requestNumber}`}
+                        onClick={async () => {
+                          await api.assignServiceRequest(r.id, providers.data!.items[0].id);
+                          await list.reload();
+                        }}
+                      >
+                        {t('erp.automotive.assign')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      {preview ? (
+        <RecordPreview
+          open
+          title={`${preview.requestNumber} — ${preview.categoryKey}`}
+          subtitle={preview.provider ? preview.provider.nameEn : undefined}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('erp.automotive.requestNumber'), value: preview.requestNumber },
+            { label: t('erp.automotive.category'), value: preview.categoryKey },
+            { label: t('erp.automotive.provider'), value: preview.provider?.nameEn ?? '—' },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('erp.operations.startDate'), value: preview.createdAt.slice(0, 10) },
+          ]}
+          printInput={recordPrintInput({
+            locale,
+            titleEn: 'Service request',
+            titleAr: 'طلب خدمة',
+            subjectName: preview.provider?.nameEn ?? preview.requestNumber,
+            subjectCode: preview.requestNumber,
+            companyNameEn: company?.companyNameEn ?? 'ORYX',
+            companyNameAr: company?.companyNameAr ?? 'أوريكس',
+            windowLabel: preview.createdAt.slice(0, 10),
+            fields: [
+              { label: t('erp.automotive.requestNumber'), value: preview.requestNumber },
+              { label: t('erp.automotive.category'), value: preview.categoryKey },
+              { label: t('erp.automotive.provider'), value: preview.provider?.nameEn ?? '—' },
+              { label: t('common.status'), value: preview.status },
+            ],
+          })}
+          csvName={`service-request-${preview.requestNumber}`}
+          attachment={{ entityType: 'SERVICE_REQUEST', entityId: preview.id, canManage }}
+        />
+      ) : null}
     </Card>
   );
 }

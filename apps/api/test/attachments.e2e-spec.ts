@@ -22,8 +22,10 @@ describe('Document attachments (e2e)', () => {
   let companyId = '';
   let otherCompanyId = '';
   let customerId = '';
+  let supplierId = '';
   let invoiceId = '';
   let paymentId = '';
+  let leaveRequestId = '';
   let token = '';
   let otherToken = '';
 
@@ -110,10 +112,15 @@ describe('Document attachments (e2e)', () => {
     });
     const companyIds = companies.map((c) => c.id);
     await prisma.entityAttachment.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.leaveRequest.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.leaveBalance.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.leaveType.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.employee.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.salesInvoiceLine.deleteMany({ where: { invoice: { companyId: { in: companyIds } } } });
     await prisma.salesInvoice.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.payment.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.customer.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.supplier.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.membership.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.rolePermission.deleteMany({ where: { role: { companyId: { in: companyIds } } } });
     await prisma.role.deleteMany({ where: { companyId: { in: companyIds } } });
@@ -145,6 +152,11 @@ describe('Document attachments (e2e)', () => {
       data: { companyId, code: `${PREFIX}-CUST`, nameEn: 'Attach Customer', nameAr: 'عميل', email: 'c@example.local' },
     });
     customerId = customer.id;
+
+    const supplier = await prisma.supplier.create({
+      data: { companyId, code: `${PREFIX}-SUP`, nameEn: 'Attach Supplier', nameAr: 'مورد' },
+    });
+    supplierId = supplier.id;
 
     const invoice = await prisma.salesInvoice.create({
       data: {
@@ -194,6 +206,32 @@ describe('Document attachments (e2e)', () => {
       },
     });
     paymentId = payment.id;
+
+    const employee = await prisma.employee.create({
+      data: {
+        companyId,
+        code: `${PREFIX}-EMP-1`,
+        fullNameEn: 'Attach Employee',
+        fullNameAr: 'موظف',
+        hireDate: new Date('2024-01-01'),
+      },
+    });
+    const leaveType = await prisma.leaveType.create({
+      data: { companyId, code: `${PREFIX}-ANNUAL`, nameEn: 'Annual', nameAr: 'سنوية', annualEntitlementDays: 2500 },
+    });
+    const leaveRequest = await prisma.leaveRequest.create({
+      data: {
+        companyId,
+        employeeId: employee.id,
+        leaveTypeId: leaveType.id,
+        startDate: new Date('2025-02-01'),
+        endDate: new Date('2025-02-03'),
+        days: 300,
+        status: 'SUBMITTED',
+        reason: 'Family travel',
+      },
+    });
+    leaveRequestId = leaveRequest.id;
 
     const perms = [
       'erp.sales.read',
@@ -289,6 +327,47 @@ describe('Document attachments (e2e)', () => {
     expect(parsed.entityType).toBe('CUSTOMER');
     expect(parsed.category).toBe('IDENTITY');
     createdAttachmentIds.push(parsed.id);
+  });
+
+  it('attaches a document to a supplier with purchasing permissions only', async () => {
+    // A purchasing officer holds no sales permission, so this proves the
+    // attachment routes accept the module's own permission rather than
+    // requiring a sales or accounting grant.
+    const purchasingToken = await createStaff(`${PREFIX.toLowerCase()}-buyer@test.local`, companyId, [
+      'erp.purchasing.read',
+      'erp.purchasing.supplier.manage',
+    ]);
+    const res = await upload(companyId, purchasingToken, 'SUPPLIER', supplierId, pdf);
+    expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
+    expect(res.body.entityType).toBe('SUPPLIER');
+    createdAttachmentIds.push(res.body.id);
+  });
+
+  it('attaches a supporting document to a leave request with the leave permission only', async () => {
+    // A supervisor who can approve leave holds no sales or accounting grant.
+    const leaveToken = await createStaff(`${PREFIX.toLowerCase()}-leave@test.local`, companyId, [
+      'erp.hr.leave.approve',
+    ]);
+    const res = await upload(companyId, leaveToken, 'LEAVE_REQUEST', leaveRequestId, pdf);
+    expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
+    expect(res.body.entityType).toBe('LEAVE_REQUEST');
+    expect(res.body.entityId).toBe(leaveRequestId);
+    createdAttachmentIds.push(res.body.id);
+
+    const listed = await companyCall<Array<{ id: string }>>(
+      ctx.base,
+      companyId,
+      `/attachments/LEAVE_REQUEST/${leaveRequestId}`,
+      { token: leaveToken },
+    );
+    expect(listed.status).toBe(200);
+    expect(listed.body).toHaveLength(1);
+  });
+
+  it('refuses a leave request attachment to a role with no HR grant', async () => {
+    const crmToken = await createStaff(`${PREFIX.toLowerCase()}-crm@test.local`, companyId, ['erp.crm.read']);
+    const res = await upload(companyId, crmToken, 'LEAVE_REQUEST', leaveRequestId, pdf);
+    expect(res.status).toBe(403);
   });
 
   it('rejects an unknown document category', async () => {

@@ -8,6 +8,8 @@ import { useAsync, useDebounced } from '@/lib/hooks';
 import { minorToInput, money, qty, toMinorInput, toQuantityInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
+import { AttachmentsPanel, PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
+import { RecordPreview } from '@/components/record-preview';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import { EntityPicker } from '@/components/inline-create';
@@ -27,7 +29,7 @@ import {
   TableShell,
   type SearchableOption,
 } from '@/components/ui';
-import { ATTACHMENT_ACCEPT, type PurchaseDocumentDto, type RequisitionDto, type SupplierDto, type WarehouseDto } from '@oryx/shared';
+import { type PurchaseDocumentDto, type RequisitionDto, type SupplierDto, type WarehouseDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'orders' | 'requisitions' | 'receipts' | 'invoices' | 'returns' | 'suppliers';
 
@@ -195,6 +197,7 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SupplierDto | null>(null);
+  const [preview, setPreview] = useState<SupplierDto | null>(null);
   const list = useAsync(() => api.suppliers({ search: search || undefined }), [search]);
 
   const setStatus = async (row: SupplierDto, next: boolean) => {
@@ -256,6 +259,15 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
                 <td><Badge tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? t('common.active') : t('common.inactive')}</Badge></td>
                 <td>
                   <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${s.code}`}
+                      onClick={() => setPreview(s)}
+                      data-testid={`supplier-preview-${s.code}`}
+                    >
+                      <Icon name="eye" size={14} />
+                    </Button>
                     {canManage ? (
                       <>
                         <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${s.code}`} onClick={() => { setEditing(s); setOpen(true); }} data-testid={`supplier-edit-${s.code}`}>
@@ -301,6 +313,29 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
         onClose={() => { setOpen(false); setEditing(null); }}
         onCreated={list.reload}
       />
+      {preview ? (
+        <RecordPreview
+          open
+          title={`${preview.code} — ${preview.nameEn || preview.nameAr}`}
+          subtitle={preview.nameAr}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('common.code'), value: preview.code },
+            { label: `${t('common.name')} (EN)`, value: preview.nameEn || '—' },
+            { label: `${t('common.name')} (AR)`, value: preview.nameAr || '—' },
+            { label: t('common.type'), value: preview.kind },
+            { label: t('erp.sales.contactPerson'), value: preview.contactPerson ?? '—' },
+            { label: t('erp.sales.phone'), value: preview.phone ?? '—' },
+            { label: t('common.email'), value: preview.email ?? '—' },
+            { label: t('erp.sales.taxNumber'), value: preview.taxNumber ?? '—' },
+            { label: t('common.address'), value: preview.addressLine ?? '—', wide: true },
+            { label: t('erp.sales.paymentTerms'), value: String(preview.paymentTermsDays) },
+            { label: t('common.status'), value: <Badge tone={preview.isActive ? 'success' : 'neutral'}>{preview.isActive ? t('common.active') : t('common.inactive')}</Badge> },
+            { label: t('common.notes'), value: preview.notes ?? '—', wide: true },
+          ]}
+          attachment={{ entityType: 'SUPPLIER', entityId: preview.id, canManage }}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -350,6 +385,51 @@ function PurchasingListFilters({
   );
 }
 
+/**
+ * One preview for the four purchasing documents, which share
+ * `PurchaseDocumentDto`. The entity type decides which attachment register the
+ * panel reads, so the paperclip and the preview always agree.
+ */
+function PurchaseDocumentPreview({
+  document: doc,
+  entityType,
+  canManage,
+  onClose,
+}: {
+  document: PurchaseDocumentDto;
+  entityType: 'PURCHASE_ORDER' | 'GOODS_RECEIPT' | 'SUPPLIER_INVOICE' | 'PURCHASE_RETURN';
+  canManage: boolean;
+  onClose: () => void;
+}) {
+  const { t } = useUi();
+  const number =
+    doc.orderNumber ?? doc.receiptNumber ?? doc.invoiceNumber ?? doc.returnNumber ?? doc.id;
+  const date =
+    doc.orderDate ?? doc.receivedAt ?? doc.invoiceDate ?? doc.returnDate ?? null;
+  return (
+    <RecordPreview
+      open
+      title={number}
+      subtitle={doc.supplierNameEn ?? doc.supplierNameAr}
+      onClose={onClose}
+      fields={[
+        { label: t('erp.purchasing.supplier'), value: doc.supplierNameEn ?? doc.supplierNameAr ?? '—' },
+        { label: t('common.date'), value: date?.slice(0, 10) ?? '—' },
+        { label: t('common.status'), value: <StatusBadge status={doc.status} label={doc.status} /> },
+        { label: t('erp.sales.total'), value: money(doc.totalMinor, doc.currency) },
+        { label: t('erp.sales.tax'), value: money(doc.taxMinor, doc.currency) },
+        { label: t('erp.sales.pos.subtotal'), value: money(doc.subtotalMinor, doc.currency) },
+        ...(doc.outstandingMinor !== undefined
+          ? [{ label: t('erp.sales.outstanding'), value: money(doc.outstandingMinor, doc.currency) }]
+          : []),
+        { label: t('erp.accounting.lines'), value: String(doc.lines.length) },
+        { label: t('common.notes'), value: doc.notes ?? doc.reason ?? '—', wide: true },
+      ]}
+      attachment={{ entityType, entityId: doc.id, canManage }}
+    />
+  );
+}
+
 // ---------------------------------------------------------------- requisitions
 
 function RequisitionsTab({ canManage, onConverted }: { canManage: boolean; onConverted: () => void }) {
@@ -357,6 +437,7 @@ function RequisitionsTab({ canManage, onConverted }: { canManage: boolean; onCon
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<RequisitionDto | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const debouncedSearch = useDebounced(search, 300);
@@ -399,6 +480,16 @@ function RequisitionsTab({ canManage, onConverted }: { canManage: boolean; onCon
                 <td className="tabular-nums text-[12.5px]">{r.lines.length}</td>
                 <td><StatusBadge status={r.status} label={r.status} /></td>
                 <td>
+                  <div className="flex flex-wrap items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`${t('print.preview')} ${r.requisitionNumber}`}
+                    onClick={() => setPreview(r)}
+                    data-testid={`requisition-preview-${r.requisitionNumber}`}
+                  >
+                    <Icon name="eye" size={14} />
+                  </Button>
                   {canManage && r.status === 'DRAFT' ? (
                     <Button
                       size="sm"
@@ -426,6 +517,7 @@ function RequisitionsTab({ canManage, onConverted }: { canManage: boolean; onCon
                       {t('erp.purchasing.convert')}
                     </Button>
                   ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -442,7 +534,25 @@ function RequisitionsTab({ canManage, onConverted }: { canManage: boolean; onCon
         onTaxCreated={reloadTaxOptions}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
+        canManage={canManage}
       />
+      {preview ? (
+        <RecordPreview
+          open
+          title={preview.requisitionNumber}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('erp.purchasing.requisitionNumber'), value: preview.requisitionNumber },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('erp.purchasing.supplier'), value: preview.supplierNameEn ?? preview.supplierNameAr ?? '—' },
+            { label: t('erp.purchasing.neededBy'), value: preview.neededBy?.slice(0, 10) ?? '—' },
+            { label: t('erp.accounting.lines'), value: String(preview.lines.length) },
+            { label: t('common.date'), value: preview.createdAt.slice(0, 10) },
+            { label: t('common.notes'), value: preview.notes ?? '—', wide: true },
+          ]}
+          attachment={{ entityType: 'PURCHASE_REQUISITION', entityId: preview.id, canManage }}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -469,18 +579,20 @@ function RequisitionModal({
   onCreated: () => Promise<void>;
   /** Reload the supplier list after one is created from the picker. */
   onSupplierCreated?: () => Promise<void> | void;
+  canManage: boolean;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const [pending, setPending] = useState<File[]>([]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createRequisition({
+      const created = await api.createRequisition({
         supplierId: supplierId || undefined,
         lines: lines.map((l) => ({
           productId: l.productId || undefined,
@@ -489,6 +601,7 @@ function RequisitionModal({
           estimatedUnitCostMinor: toMinorInput(l.unitCost),
         })),
       });
+      if (pending.length) await uploadPendingAttachments('PURCHASE_REQUISITION', created.id, pending);
       await onCreated();
       onClose();
     } catch (e) {
@@ -549,6 +662,10 @@ function RequisitionModal({
       <PurchaseFormSection prefix="requisition-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
         <PurchaseLineSummary lines={lines} estimated prefix="requisition-form" />
       </PurchaseFormSection>
+
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <PendingAttachments files={pending} onChange={setPending} canManage />
+      </div>
     </Modal>
   );
 }
@@ -560,6 +677,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<PurchaseDocumentDto | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const debouncedSearch = useDebounced(search, 300);
@@ -608,6 +726,15 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
                 <td><StatusBadge status={o.status} label={o.status} /></td>
                 <td>
                   <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${o.orderNumber}`}
+                      onClick={() => setPreview(o)}
+                      data-testid={`purchase-order-preview-${o.orderNumber}`}
+                    >
+                      <Icon name="eye" size={14} />
+                    </Button>
                     {canManage && o.status === 'DRAFT' ? (
                       <Button
                         size="sm"
@@ -647,6 +774,9 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
+      {preview ? (
+        <PurchaseDocumentPreview document={preview} entityType="PURCHASE_ORDER" canManage={canManage} onClose={() => setPreview(null)} />
+      ) : null}
     </Card>
   );
 }
@@ -691,12 +821,16 @@ function PurchaseOrderModal({
   const [currency, setCurrency] = useState('BHD');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [pending, setPending] = useState<File[]>([]);
+  const { canAny } = useAuth();
+  const canAttach = canAny('erp.purchasing.order.manage', 'erp.purchasing.write');
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createPurchaseOrder({
+      const created = await api.createPurchaseOrder({
         supplierId,
         branchId: branchId || undefined,
         warehouseId: warehouseId || undefined,
@@ -713,8 +847,11 @@ function PurchaseOrderModal({
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
       });
+      if (pending.length) await uploadPendingAttachments('PURCHASE_ORDER', created.id, pending);
       await onCreated();
-      onClose();
+      // Keep the modal open after the first save so more documents can be
+      // added to the new order from the same form.
+      setSavedId(created.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -828,6 +965,14 @@ function PurchaseOrderModal({
       <PurchaseFormSection prefix="purchase-order-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
         <PurchaseLineSummary lines={lines} currency={currency} prefix="purchase-order-form" />
       </PurchaseFormSection>
+
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        {savedId ? (
+          <AttachmentsPanel entityType="PURCHASE_ORDER" entityId={savedId} canManage={canAttach} categorised />
+        ) : (
+          <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
+        )}
+      </div>
     </Modal>
   );
 }
@@ -836,6 +981,7 @@ function PurchaseOrderModal({
 
 function ReceiptsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
+  const [preview, setPreview] = useState<PurchaseDocumentDto | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const debouncedSearch = useDebounced(search, 300);
@@ -947,6 +1093,7 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.purchasing.supplier')}</th>
               <th>{t('erp.accounting.lines')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -957,11 +1104,25 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{r.supplierNameEn}</td>
                 <td className="tabular-nums text-[12.5px]">{r.lines.length}</td>
                 <td><StatusBadge status={r.status} label={r.status} /></td>
+                <td>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`${t('print.preview')} ${r.receiptNumber}`}
+                    onClick={() => setPreview(r)}
+                    data-testid={`receipt-preview-${r.receiptNumber}`}
+                  >
+                    <Icon name="eye" size={14} />
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      {preview ? (
+        <PurchaseDocumentPreview document={preview} entityType="GOODS_RECEIPT" canManage={canManage} onClose={() => setPreview(null)} />
+      ) : null}
     </Card>
   );
 }
@@ -973,6 +1134,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<PurchaseDocumentDto | null>(null);
   const [sourceOrder, setSourceOrder] = useState<PurchaseDocumentDto | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -1048,13 +1210,24 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{money(i.outstandingMinor ?? 0, i.currency)}</td>
                 <td><StatusBadge status={i.status} label={i.status} /></td>
                 <td>
-                  <DocumentActions
-                    sourceType="SupplierInvoice"
-                    sourceId={i.id}
-                    type="PURCHASE_INVOICE"
-                    iconsOnly
-                    permissions={['erp.purchasing.read']}
-                  />
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${i.invoiceNumber}`}
+                      onClick={() => setPreview(i)}
+                      data-testid={`supplier-invoice-preview-${i.invoiceNumber}`}
+                    >
+                      <Icon name="eye" size={14} />
+                    </Button>
+                    <DocumentActions
+                      sourceType="SupplierInvoice"
+                      sourceId={i.id}
+                      type="PURCHASE_INVOICE"
+                      iconsOnly
+                      permissions={['erp.purchasing.read']}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}
@@ -1074,7 +1247,11 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         onTaxCreated={reloadTaxOptions}
         onClose={() => { setOpen(false); setSourceOrder(null); }}
         onCreated={list.reload}
+        canManage={canManage}
       />
+      {preview ? (
+        <PurchaseDocumentPreview document={preview} entityType="SUPPLIER_INVOICE" canManage={canManage} onClose={() => setPreview(null)} />
+      ) : null}
     </Card>
   );
 }
@@ -1107,6 +1284,7 @@ function SupplierInvoiceModal({
   onCreated: () => Promise<void>;
   /** Reload the supplier list after one is created from the picker. */
   onSupplierCreated?: () => Promise<void> | void;
+  canManage: boolean;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
@@ -1120,6 +1298,7 @@ function SupplierInvoiceModal({
   const [currency, setCurrency] = useState('BHD');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const [pending, setPending] = useState<File[]>([]);
 
   // The order becomes visible in the invoice tab immediately after approval,
   // but supplier invoice number is supplied by the vendor, not invented by ORYX.
@@ -1149,7 +1328,7 @@ function SupplierInvoiceModal({
     setBusy(true);
     setError(null);
     try {
-      await api.createSupplierInvoice({
+      const created = await api.createSupplierInvoice({
         supplierId,
         supplierInvoiceNumber,
         invoiceDate: new Date(invoiceDate).toISOString(),
@@ -1166,6 +1345,7 @@ function SupplierInvoiceModal({
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
       });
+      if (pending.length) await uploadPendingAttachments('SUPPLIER_INVOICE', created.id, pending);
       await onCreated();
       onClose();
     } catch (e) {
@@ -1259,6 +1439,10 @@ function SupplierInvoiceModal({
       <PurchaseFormSection prefix="supplier-invoice-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
         <PurchaseLineSummary lines={lines} currency={currency} prefix="supplier-invoice-form" />
       </PurchaseFormSection>
+
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <PendingAttachments files={pending} onChange={setPending} canManage />
+      </div>
     </Modal>
   );
 }
@@ -1270,6 +1454,7 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<PurchaseDocumentDto | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const debouncedSearch = useDebounced(search, 300);
@@ -1342,7 +1527,11 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
         onTaxCreated={reloadTaxOptions}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
+        canManage={canManage}
       />
+      {preview ? (
+        <PurchaseDocumentPreview document={preview} entityType="PURCHASE_RETURN" canManage={canManage} onClose={() => setPreview(null)} />
+      ) : null}
     </Card>
   );
 }
@@ -1359,6 +1548,7 @@ function PurchaseReturnModal({
   onClose,
   onCreated,
   onSupplierCreated,
+  canManage,
 }: {
   open: boolean;
   suppliers: SupplierDto[];
@@ -1373,6 +1563,7 @@ function PurchaseReturnModal({
   onCreated: () => Promise<void>;
   /** Reload the supplier list after one is created from the picker. */
   onSupplierCreated?: () => Promise<void> | void;
+  canManage: boolean;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
@@ -1382,9 +1573,9 @@ function PurchaseReturnModal({
   const [returnDate, setReturnDate] = useState(todayIso());
   const [reason, setReason] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
-  const [attachment, setAttachment] = useState<File | null>(null);
-  // If the return was posted but uploading its supporting file failed, retry
-  // only the attachment. Never create/post a second return or stock movement.
+  const [pending, setPending] = useState<File[]>([]);
+  // If the return was posted but uploading its supporting files failed, retry
+  // only the attachments. Never create/post a second return or stock movement.
   const [createdReturnId, setCreatedReturnId] = useState<string | null>(null);
 
   const submit = async () => {
@@ -1409,9 +1600,9 @@ function PurchaseReturnModal({
         returnId = created.id;
         setCreatedReturnId(returnId);
       }
-      if (attachment) {
-        await api.uploadAttachment('PURCHASE_RETURN', returnId, attachment, 'OFFICIAL');
-        setAttachment(null);
+      if (pending.length) {
+        await uploadPendingAttachments('PURCHASE_RETURN', returnId, pending, 'OFFICIAL');
+        setPending([]);
       }
       await onCreated();
       onClose();
@@ -1505,18 +1696,16 @@ function PurchaseReturnModal({
         <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-return-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
       </PurchaseFormSection>
       <PurchaseFormSection prefix="purchase-return-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div>
-            <Field label={t('attachments.title')}>
-              <input type="file" className="oryx-input w-full" accept={ATTACHMENT_ACCEPT}
-                onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
-                data-testid="purchase-return-attachment" />
-              {attachment ? <span className="oryx-muted text-xs">{attachment.name}</span> : null}
-            </Field>
-          </div>
-          <PurchaseLineSummary lines={lines} prefix="purchase-return-form" />
-        </div>
+        <PurchaseLineSummary lines={lines} prefix="purchase-return-form" />
       </PurchaseFormSection>
+
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        {createdReturnId ? (
+          <AttachmentsPanel entityType="PURCHASE_RETURN" entityId={createdReturnId} canManage={canManage} categorised />
+        ) : (
+          <PendingAttachments files={pending} onChange={setPending} canManage={canManage} />
+        )}
+      </div>
     </Modal>
   );
 }

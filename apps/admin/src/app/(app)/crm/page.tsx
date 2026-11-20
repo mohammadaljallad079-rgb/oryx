@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -11,6 +11,8 @@ import { EntityPicker } from '@/components/inline-create';
 import { LeadModal } from '@/components/entity-modals';
 import { PipelineModal } from '@/components/pipeline-modal';
 import { CustomerModal } from '@/components/customer-modal';
+import { PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
+import { RecordPreview } from '@/components/record-preview';
 import { CustomersTab } from '@/components/customers-tab';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
@@ -97,6 +99,7 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<LeadDto | null>(null);
+  const [preview, setPreview] = useState<LeadDto | null>(null);
   const list = useAsync(() => api.crmLeads({ search: search || undefined }), [search]);
 
   const setStatus = async (row: LeadDto, status: string) => {
@@ -161,6 +164,15 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
                 <td><StatusBadge status={l.status} label={l.status} /></td>
                 <td>
                   <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${l.code}`}
+                      onClick={() => setPreview(l)}
+                      data-testid={`lead-preview-${l.code}`}
+                    >
+                      <Icon name="eye" size={14} />
+                    </Button>
                     {canManage ? (
                       <>
                         <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${l.code}`} onClick={() => { setEditing(l); setOpen(true); }} data-testid={`lead-edit-${l.code}`}>
@@ -202,6 +214,27 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
         onClose={() => { setOpen(false); setEditing(null); }}
         onCreated={list.reload}
       />
+
+      {preview ? (
+        <RecordPreview
+          open
+          title={`${preview.code} — ${preview.nameEn || preview.nameAr}`}
+          subtitle={preview.nameAr}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('common.code'), value: preview.code },
+            { label: `${t('common.name')} (EN)`, value: preview.nameEn || '—' },
+            { label: `${t('common.name')} (AR)`, value: preview.nameAr || '—' },
+            { label: t('erp.crm.contact'), value: preview.contactName ?? '—' },
+            { label: t('common.email'), value: preview.email ?? '—' },
+            { label: t('erp.sales.phone'), value: preview.phone ?? '—' },
+            { label: t('erp.crm.estimatedValue'), value: money(preview.estimatedValueMinor, preview.currency) },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('common.date'), value: preview.createdAt.slice(0, 10) },
+          ]}
+          attachment={{ entityType: 'LEAD', entityId: preview.id, canManage }}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -213,6 +246,7 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
   const pipelines = useAsync(() => api.crmPipelines(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<OpportunityDto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const removeOpportunity = async (o: OpportunityDto) => {
@@ -267,6 +301,15 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
                 <td><StatusBadge status={o.status} label={o.status} /></td>
                 <td>
                   <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${o.code}`}
+                      onClick={() => setPreview(o)}
+                      data-testid={`opportunity-preview-${o.code}`}
+                    >
+                      <Icon name="eye" size={14} />
+                    </Button>
                     {canConvert && o.status === 'WON' && !o.quotationId ? (
                       <Button size="sm" data-testid={`convert-opportunity-${o.code}`} onClick={async () => { await api.convertOpportunity(o.id); await list.reload(); }}>
                         {t('erp.crm.convert')}
@@ -302,6 +345,25 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
+      {preview ? (
+        <RecordPreview
+          open
+          title={`${preview.code} — ${preview.title}`}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('common.code'), value: preview.code },
+            { label: t('erp.crm.title'), value: preview.title },
+            { label: t('erp.crm.pipeline'), value: preview.pipelineNameEn ?? '—' },
+            { label: t('erp.crm.stage'), value: preview.stageNameEn ?? preview.stageNameAr ?? '—' },
+            { label: t('erp.crm.probability'), value: `${(preview.probabilityBp / 100).toFixed(0)}%` },
+            { label: t('erp.crm.amount'), value: money(preview.amountMinor, preview.currency) },
+            { label: t('erp.crm.expectedClose'), value: preview.expectedCloseDate?.slice(0, 10) ?? '—' },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('erp.crm.converted'), value: preview.quotationId ? t('erp.crm.converted') : '—' },
+          ]}
+          attachment={{ entityType: 'OPPORTUNITY', entityId: preview.id, canManage }}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -327,6 +389,11 @@ function CreateOpportunityModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', title: '', pipelineId: '', stageId: '', customerId: '', amount: '0.00' });
+  const [pending, setPending] = useState<File[]>([]);
+
+  useEffect(() => {
+    if (open) setPending([]);
+  }, [open]);
 
   const stages = pipelines.find((p) => p.id === form.pipelineId)?.stages ?? [];
 
@@ -334,7 +401,7 @@ function CreateOpportunityModal({
     setBusy(true);
     setError(null);
     try {
-      await api.createOpportunity({
+      const created = await api.createOpportunity({
         code: form.code,
         title: form.title,
         pipelineId: form.pipelineId,
@@ -342,6 +409,7 @@ function CreateOpportunityModal({
         customerId: form.customerId || undefined,
         amountMinor: toMinorInput(form.amount),
       });
+      if (pending.length) await uploadPendingAttachments('OPPORTUNITY', created.id, pending);
       await onCreated();
       onClose();
     } catch (e) {
@@ -420,6 +488,9 @@ function CreateOpportunityModal({
           <input className="oryx-input" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} data-testid="opportunity-amount" />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <PendingAttachments files={pending} onChange={setPending} canManage />
+      </div>
     </Modal>
   );
 }
@@ -428,6 +499,7 @@ function TicketsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<SupportTicketDto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const list = useAsync(() => api.crmTickets({ search: search || undefined }), [search]);
 
@@ -485,6 +557,15 @@ function TicketsTab({ canManage }: { canManage: boolean }) {
                 <td><StatusBadge status={k.status} label={k.status} /></td>
                 <td>
                   <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${k.ticketNumber}`}
+                      onClick={() => setPreview(k)}
+                      data-testid={`ticket-preview-${k.ticketNumber}`}
+                    >
+                      <Icon name="eye" size={14} />
+                    </Button>
                     {canManage && k.status !== 'RESOLVED' && k.status !== 'CLOSED' ? (
                       <Button size="sm" data-testid={`resolve-ticket-${k.ticketNumber}`} onClick={async () => { await api.updateTicket(k.id, { status: 'RESOLVED' }); await list.reload(); }}>
                         {t('erp.crm.resolve')}
@@ -510,6 +591,23 @@ function TicketsTab({ canManage }: { canManage: boolean }) {
         </TableShell>
       )}
       <CreateTicketModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      {preview ? (
+        <RecordPreview
+          open
+          title={`${preview.ticketNumber} — ${preview.subject}`}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('erp.crm.ticketNumber'), value: preview.ticketNumber },
+            { label: t('erp.crm.subject'), value: preview.subject },
+            { label: t('erp.crm.priority'), value: preview.priority },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('erp.crm.responseDue'), value: preview.responseDueAt?.slice(0, 16).replace('T', ' ') ?? '—' },
+            { label: t('erp.crm.resolutionDue'), value: preview.resolutionDueAt?.slice(0, 16).replace('T', ' ') ?? '—' },
+            { label: t('common.date'), value: preview.createdAt.slice(0, 10) },
+          ]}
+          attachment={{ entityType: 'SUPPORT_TICKET', entityId: preview.id, canManage }}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -519,12 +617,18 @@ function CreateTicketModal({ open, onClose, onCreated }: { open: boolean; onClos
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ subject: '', description: '', priority: 'NORMAL' });
+  const [pending, setPending] = useState<File[]>([]);
+
+  useEffect(() => {
+    if (open) setPending([]);
+  }, [open]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createTicket({ subject: form.subject, description: form.description || undefined, priority: form.priority });
+      const saved = await api.createTicket({ subject: form.subject, description: form.description || undefined, priority: form.priority });
+      if (pending.length) await uploadPendingAttachments('SUPPORT_TICKET', saved.id, pending);
       await onCreated();
       onClose();
     } catch (e) {
@@ -559,6 +663,9 @@ function CreateTicketModal({ open, onClose, onCreated }: { open: boolean; onClos
         <Field label={t('erp.accounting.description')}>
           <textarea className="oryx-input" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </Field>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <PendingAttachments files={pending} onChange={setPending} canManage />
       </div>
     </Modal>
   );
