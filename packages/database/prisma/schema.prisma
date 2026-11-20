@@ -1751,6 +1751,18 @@ model Warehouse {
 /**
  * Sellable / stockable item. Serves both the sales catalog and inventory.
  */
+/** User-maintained product categories; product.category remains a compatible string key. */
+model StockProductCategory {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
 model Product {
   id                 String      @id @default(cuid())
   companyId          String
@@ -1761,10 +1773,9 @@ model Product {
   unit               String      @default("unit")
   barcode            String?
   /**
-   * Free-text merchandise grouping ("Oils", "Filters"). Optional, company-scoped
-   * by nature, and used by the point-of-sale to offer category chips; it is not a
-   * separate table because a till only needs to group and filter, not to manage a
-   * hierarchy.
+   * Merchandise grouping shared by inventory, POS, and spare parts.
+   * Existing categories remain stored by name for backward compatibility;
+   * StockProductCategory provides independent CRUD and safe renaming.
    */
   category           String?
   salesPriceMinor    Int         @default(0)
