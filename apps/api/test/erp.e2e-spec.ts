@@ -1302,6 +1302,55 @@ describe('ORYX ERP core (e2e)', () => {
       expect(replayQuantity.body.code).toBe('purchasing.over_receipt');
     });
 
+    it('posts a supplier-invoice price difference without revaluing received stock', async () => {
+      const order = await erp<{ id: string }>('/purchasing/orders', {
+        method: 'POST',
+        body: {
+          supplierId,
+          warehouseId,
+          approve: true,
+          orderDate: '2026-06-01',
+          lines: [{ productId, description: 'Variance test item', quantity: 10000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(order.status).toBe(201);
+      const receipt = await erp('/purchasing/receipts', {
+        method: 'POST',
+        body: {
+          purchaseOrderId: order.body.id,
+          warehouseId,
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(receipt.status).toBe(201);
+      const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+
+      const invoice = await erp<{ id: string; journalEntryId: string }>('/purchasing/supplier-invoices', {
+        method: 'POST',
+        body: {
+          supplierId,
+          purchaseOrderId: order.body.id,
+          supplierInvoiceNumber: 'VARIANCE-TEST-1',
+          invoiceDate: '2026-06-01',
+          lines: [{ productId, description: 'Variance test item', quantity: 10000, unitCostMinor: 7200 }],
+        },
+      });
+      expect(invoice.status).toBe(201);
+      const journal = await ctx.prisma.journalEntry.findUniqueOrThrow({
+        where: { id: invoice.body.journalEntryId },
+        include: { lines: true },
+      });
+      expect(journal.lines.reduce((sum, line) => sum + line.debitMinor, 0)).toBe(1200);
+      expect(journal.lines.reduce((sum, line) => sum + line.creditMinor, 0)).toBe(1200);
+      const after = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      expect(after.quantity).toBe(before.quantity);
+      expect(after.averageCostMinor).toBe(before.averageCostMinor);
+    });
+
     it('records a supplier invoice and pays it', async () => {
       const invoice = await erp<{ id: string; invoiceNumber: string; totalMinor: number; status: string }>(
         '/purchasing/supplier-invoices',
