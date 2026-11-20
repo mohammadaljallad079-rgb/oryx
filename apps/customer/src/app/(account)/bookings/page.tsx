@@ -63,13 +63,13 @@ function BookingsContent() {
   const serviceName = selectedService
     ? (locale === 'ar' ? selectedService.nameAr : selectedService.nameEn) || selectedService.nameEn || selectedService.nameAr
     : categoryKey;
-  const whatsappMessage = locale === 'ar'
-    ? `مرحباً، أرغب بحجز ${serviceName} بتاريخ ${date}. يرجى تأكيد الموعد المتاح.`
-    : `Hello, I would like to book ${serviceName} on ${date}. Please confirm availability.`;
   const [bookingType, setBookingType] = useState<'INSPECTION' | 'MAINTENANCE' | 'PROVIDER_SERVICE'>(
     'INSPECTION',
   );
   const [date, setDate] = useState(todayIso());
+  const whatsappMessage = locale === 'ar'
+    ? `مرحباً، أرغب بحجز ${serviceName} بتاريخ ${date}. يرجى تأكيد الموعد المتاح.`
+    : `Hello, I would like to book ${serviceName} on ${date}. Please confirm availability.`;
   const [vehicleId, setVehicleId] = useState('');
   const [notes, setNotes] = useState('');
 
