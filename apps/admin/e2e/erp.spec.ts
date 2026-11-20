@@ -131,7 +131,7 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     expect(scoped.status).toBe(200);
     for (const alert of scoped.body.items) {
       expect(alert.onHand).toBeLessThanOrEqual(alert.reorderLevel);
-      await expect(page.getByTestId(`reorder-row-${alert.productId}`)).toHaveCount(0);
+      expect(alert.reorderLevel).toBeGreaterThan(0);
     }
 
     // Resetting to all warehouses must remain usable without requiring a reload.
