@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -13,6 +14,7 @@ import { TabDeepLink } from '@/components/tab-deep-link';
 import { EntityPicker } from '@/components/inline-create';
 import { EmployeeModal } from '@/components/entity-modals';
 import { LeaveTypeModal } from '@/components/leave-type-modal';
+import { AttachmentsPanel, PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
 import {
   Badge,
   Button,
@@ -205,12 +207,19 @@ function DepartmentsTab({ companyId, canManage }: { companyId: string | null; ca
 
 function EmployeesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
+  const { can, companyId } = useAuth();
+  const canSalary = can('erp.hr.salary.read');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<EmployeeDto | null>(null);
   const [salaryFor, setSalaryFor] = useState<EmployeeDto | null>(null);
   const list = useAsync(() => api.hrEmployees({ search: search || undefined }), [search]);
   const departments = useAsync(() => api.hrDepartments(), []);
+  const jobTitles = useAsync(() => api.hrJobTitles(), []);
+  const branches = useAsync(
+    () => (companyId ? api.listBranches(companyId, { pageSize: 200 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 200 })),
+    [companyId],
+  );
 
   const setStatus = async (row: EmployeeDto, status: string) => {
     await api.updateEmployee(row.id, { status });
@@ -274,14 +283,24 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
                 <td><StatusBadge status={e.status} label={e.status} /></td>
                 <td>
                   <div className="flex flex-wrap items-center gap-1">
+                    <Link
+                      href={`/hr/employees/${e.id}`}
+                      className="oryx-btn oryx-btn--sm oryx-btn--ghost"
+                      aria-label={`${t('erp.hr.preview')} ${e.code}`}
+                      data-testid={`employee-preview-${e.code}`}
+                    >
+                      <Icon name="eye" size={14} />
+                    </Link>
                     {canManage ? (
                       <>
                         <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${e.code}`} onClick={() => { setEditing(e); setOpen(true); }} data-testid={`employee-edit-${e.code}`}>
                           <Icon name="edit" size={14} />
                         </Button>
-                        <Button size="sm" variant="ghost" aria-label={`${t('erp.hr.salary')} ${e.code}`} onClick={() => setSalaryFor(e)} data-testid={`employee-salary-${e.code}`}>
-                          <Icon name="wallet" size={14} />
-                        </Button>
+                        {canSalary ? (
+                          <Button size="sm" variant="ghost" aria-label={`${t('erp.hr.salary')} ${e.code}`} onClick={() => setSalaryFor(e)} data-testid={`employee-salary-${e.code}`}>
+                            <Icon name="wallet" size={14} />
+                          </Button>
+                        ) : null}
                         <select
                           className="oryx-select"
                           value={e.status}
@@ -315,6 +334,8 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
         open={open}
         employee={editing}
         departments={departments.data?.items ?? []}
+        jobTitles={jobTitles.data?.items ?? []}
+        branches={branches.data?.items ?? []}
         canManage={canManage}
         documentsSlot={editing ? <EmployeeDocumentsSection employeeId={editing.id} canManage={canManage} /> : null}
         onDepartmentCreated={departments.reload}
@@ -547,6 +568,8 @@ function SalaryModal({ employee, canManage, onClose }: { employee: EmployeeDto |
       {error ? <ErrorBanner message={error} /> : null}
       {detail.loading ? (
         <Skeleton height={100} />
+      ) : detail.data?.salaryVisible === false ? (
+        <EmptyState title={t('erp.hr.salaryRestrictedTitle')} hint={t('erp.hr.salaryRestrictedHint')} />
       ) : structures.length === 0 ? (
         <EmptyState title={t('common.empty')} hint={t('erp.hr.emptySalary')} />
       ) : (
@@ -711,13 +734,19 @@ function LeaveRequestModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ employeeId: '', leaveTypeId: '', startDate: '', endDate: '', reason: '' });
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [pending, setPending] = useState<File[]>([]);
+  const canRequest = can('erp.hr.leave.request') || can('erp.hr.leave.approve') || can('erp.hr.leave.manage');
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setSavedId(null);
+    setPending([]);
     setForm({
       employeeId: editing?.employeeId ?? '',
       leaveTypeId: editing?.leaveTypeId ?? '',
@@ -733,22 +762,24 @@ function LeaveRequestModal({
     setBusy(true);
     setError(null);
     try {
-      if (editing) {
-        await api.updateLeaveRequest(editing.id, {
-          leaveTypeId: form.leaveTypeId,
-          startDate: form.startDate,
-          endDate: form.endDate,
-          reason: form.reason || undefined,
-        });
-      } else {
-        await api.requestLeave({
-          employeeId: form.employeeId,
-          leaveTypeId: form.leaveTypeId,
-          startDate: form.startDate,
-          endDate: form.endDate,
-          reason: form.reason || undefined,
-        });
-      }
+      const saved = editing
+        ? await api.updateLeaveRequest(editing.id, {
+            leaveTypeId: form.leaveTypeId,
+            startDate: form.startDate,
+            endDate: form.endDate,
+            reason: form.reason || undefined,
+          })
+        : await api.requestLeave({
+            employeeId: form.employeeId,
+            leaveTypeId: form.leaveTypeId,
+            startDate: form.startDate,
+            endDate: form.endDate,
+            reason: form.reason || undefined,
+          });
+      // The files were chosen in this form before the record existed, so they
+      // are uploaded now that it has an id — the user never leaves the screen.
+      if (pending.length) await uploadPendingAttachments('LEAVE_REQUEST', saved.id, pending);
+      setSavedId(saved.id);
       await onCreated();
       onClose();
     } catch (e) {
@@ -824,6 +855,13 @@ function LeaveRequestModal({
             <input className="oryx-input" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} data-testid="leave-reason" />
           </Field>
         </div>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        {savedId ? (
+          <AttachmentsPanel entityType="LEAVE_REQUEST" entityId={savedId} canManage categorised />
+        ) : (
+          <PendingAttachments files={pending} onChange={setPending} canManage={canRequest} />
+        )}
       </div>
     </Modal>
   );

@@ -3,9 +3,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
+import { useAuth } from '@/lib/auth-context';
 import { toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Button, ErrorBanner, Field, Modal } from '@/components/ui';
 import { EntityPicker } from '@/components/inline-create';
+import { PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
 import { CustomerModal } from '@/components/customer-modal';
 import type { EmployeeDto, ErpAccountDto, LeadDto, MarketplaceProviderDto, ProductDto, SupplierDto, VehicleDto } from '@oryx/shared';
 
@@ -524,6 +526,8 @@ export function EmployeeModal({
   open,
   employee,
   departments,
+  jobTitles = [],
+  branches = [],
   canManage,
   documentsSlot,
   onDepartmentCreated,
@@ -534,6 +538,8 @@ export function EmployeeModal({
   open: boolean;
   employee?: EmployeeDto | null;
   departments: Array<{ id: string; nameEn: string }>;
+  jobTitles?: Array<{ id: string; nameEn: string }>;
+  branches?: Array<{ id: string; nameEn: string }>;
   canManage?: boolean;
   /** Rendered under the fields, e.g. the employee's documents section on edit. */
   documentsSlot?: ReactNode;
@@ -544,16 +550,23 @@ export function EmployeeModal({
   onSaved?: (saved: { id: string }) => void;
 }) {
   const { t } = useUi();
+  const { canAny } = useAuth();
+  const canAttach = canAny('erp.hr.write', 'erp.hr.employee.manage');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<File[]>([]);
   const [form, setForm] = useState({
     code: '', fullNameEn: '', fullNameAr: '', email: '', phone: '', secondaryPhone: '',
-    departmentId: '', hireDate: new Date().toISOString().slice(0, 10), terminationDate: '', addressLine: '', notes: '',
+    nationalId: '', dateOfBirth: '', gender: '', nationality: '',
+    bankName: '', bankAccountName: '', bankIban: '',
+    departmentId: '', jobTitleId: '', branchId: '', status: 'ACTIVE',
+    hireDate: new Date().toISOString().slice(0, 10), terminationDate: '', addressLine: '', notes: '',
   });
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setPending([]);
     setForm({
       code: employee?.code ?? '',
       fullNameEn: employee?.fullNameEn ?? '',
@@ -561,11 +574,21 @@ export function EmployeeModal({
       email: employee?.email ?? '',
       phone: employee?.phone ?? '',
       secondaryPhone: employee?.secondaryPhone ?? '',
+      nationalId: (employee as { nationalId?: string | null } | null)?.nationalId ?? '',
+      dateOfBirth: (employee as { dateOfBirth?: string | null } | null)?.dateOfBirth?.slice(0, 10) ?? '',
+      gender: (employee as { gender?: string | null } | null)?.gender ?? '',
+      nationality: (employee as { nationality?: string | null } | null)?.nationality ?? '',
+      bankName: (employee as { bankName?: string | null } | null)?.bankName ?? '',
+      bankAccountName: (employee as { bankAccountName?: string | null } | null)?.bankAccountName ?? '',
+      bankIban: (employee as { bankIban?: string | null } | null)?.bankIban ?? '',
       departmentId: employee?.departmentId ?? '',
+      jobTitleId: employee?.jobTitleId ?? '',
+      branchId: (employee as { branchId?: string | null } | null)?.branchId ?? '',
+      status: (employee as { status?: string } | null)?.status ?? 'ACTIVE',
       hireDate: employee?.hireDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
       terminationDate: employee?.terminationDate?.slice(0, 10) ?? '',
-      addressLine: '',
-      notes: '',
+      addressLine: (employee as { addressLine?: string | null } | null)?.addressLine ?? '',
+      notes: (employee as { notes?: string | null } | null)?.notes ?? '',
     });
   }, [open, employee]);
 
@@ -579,13 +602,29 @@ export function EmployeeModal({
         email: form.email || undefined,
         phone: form.phone || undefined,
         secondaryPhone: form.secondaryPhone || undefined,
+        nationalId: form.nationalId || undefined,
+        dateOfBirth: form.dateOfBirth || undefined,
+        gender: form.gender || undefined,
+        nationality: form.nationality || undefined,
+        bankName: form.bankName || undefined,
+        bankAccountName: form.bankAccountName || undefined,
+        bankIban: form.bankIban || undefined,
         departmentId: form.departmentId || undefined,
+        jobTitleId: form.jobTitleId || undefined,
+        branchId: form.branchId || undefined,
         addressLine: form.addressLine || undefined,
         notes: form.notes || undefined,
       };
       const saved = employee
-        ? await api.updateEmployee(employee.id, { ...body, terminationDate: form.terminationDate || undefined })
-        : await api.createEmployee({ ...body, code: form.code, hireDate: form.hireDate });
+        ? await api.updateEmployee(employee.id, {
+            ...body,
+            status: form.status,
+            terminationDate: form.terminationDate || undefined,
+          })
+        : await api.createEmployee({ ...body, ...(form.code.trim() ? { code: form.code.trim() } : {}), hireDate: form.hireDate });
+      if (pending.length) {
+        await uploadPendingAttachments('EMPLOYEE', saved.id, pending);
+      }
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -618,8 +657,15 @@ export function EmployeeModal({
     >
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(employee)} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="employee-code" />
+        <Field label={t('common.code')}>
+          <input
+            className="oryx-input"
+            value={form.code}
+            disabled={Boolean(employee)}
+            placeholder={employee ? undefined : 'Automatic / تلقائي'}
+            onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))}
+            data-testid="employee-code"
+          />
         </Field>
         <Field label={t('erp.hr.department')}>
           <EntityPicker
@@ -639,6 +685,26 @@ export function EmployeeModal({
                 onCreated={(id) => void onSaved(id)}
               />
             )}
+          />
+        </Field>
+        <Field label={t('erp.hr.jobTitle')}>
+          <EntityPicker
+            value={form.jobTitleId || null}
+            options={jobTitles.map((j) => ({ value: j.id, label: j.nameEn }))}
+            onChange={(v) => setForm((prev) => ({ ...prev, jobTitleId: v ?? '' }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="employee-job-title"
+          />
+        </Field>
+        <Field label={t('erp.hr.branch')}>
+          <EntityPicker
+            value={form.branchId || null}
+            options={branches.map((b) => ({ value: b.id, label: b.nameEn }))}
+            onChange={(v) => setForm((prev) => ({ ...prev, branchId: v ?? '' }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="employee-branch"
           />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
@@ -661,16 +727,54 @@ export function EmployeeModal({
             <input type="date" className="oryx-input" value={form.hireDate} onChange={(e) => setForm((prev) => ({ ...prev, hireDate: e.target.value }))} data-testid="employee-hire-date" />
           </Field>
         ) : (
-          <Field label={t('erp.hr.employmentEndDate')}>
-            <input type="date" className="oryx-input" value={form.terminationDate} onChange={(e) => setForm((prev) => ({ ...prev, terminationDate: e.target.value }))} data-testid="employee-termination-date" />
-          </Field>
+          <>
+            <Field label={t('erp.hr.employmentEndDate')}>
+              <input type="date" className="oryx-input" value={form.terminationDate} onChange={(e) => setForm((prev) => ({ ...prev, terminationDate: e.target.value }))} data-testid="employee-termination-date" />
+            </Field>
+            <Field label={t('erp.hr.employeeStatus')}>
+              <select className="oryx-select" value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))} data-testid="employee-status">
+                <option value="ACTIVE">{t('erp.hr.employeeStatusValue.ACTIVE')}</option>
+                <option value="ON_LEAVE">{t('erp.hr.employeeStatusValue.ON_LEAVE')}</option>
+                <option value="SUSPENDED">{t('erp.hr.employeeStatusValue.SUSPENDED')}</option>
+                <option value="TERMINATED">{t('erp.hr.employeeStatusValue.TERMINATED')}</option>
+              </select>
+            </Field>
+          </>
         )}
+        <Field label={t('erp.hr.nationalId')}>
+          <input className="oryx-input" value={form.nationalId} onChange={(e) => setForm((prev) => ({ ...prev, nationalId: e.target.value }))} data-testid="employee-national-id" />
+        </Field>
+        <Field label={t('erp.hr.dateOfBirth')}>
+          <input type="date" className="oryx-input" value={form.dateOfBirth} onChange={(e) => setForm((prev) => ({ ...prev, dateOfBirth: e.target.value }))} data-testid="employee-date-of-birth" />
+        </Field>
+        <Field label={t('erp.hr.gender')}>
+          <select className="oryx-select" value={form.gender} onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value }))} data-testid="employee-gender">
+            <option value="">{t('common.none')}</option>
+            <option value="MALE">{t('erp.hr.genderValue.MALE')}</option>
+            <option value="FEMALE">{t('erp.hr.genderValue.FEMALE')}</option>
+          </select>
+        </Field>
+        <Field label={t('erp.hr.nationality')}>
+          <input className="oryx-input" value={form.nationality} onChange={(e) => setForm((prev) => ({ ...prev, nationality: e.target.value }))} data-testid="employee-nationality" />
+        </Field>
+        <Field label={t('erp.hr.bankName')}>
+          <input className="oryx-input" value={form.bankName} onChange={(e) => setForm((prev) => ({ ...prev, bankName: e.target.value }))} data-testid="employee-bank-name" />
+        </Field>
+        <Field label={t('erp.hr.bankAccountName')}>
+          <input className="oryx-input" value={form.bankAccountName} onChange={(e) => setForm((prev) => ({ ...prev, bankAccountName: e.target.value }))} data-testid="employee-bank-account-name" />
+        </Field>
+        <Field label={t('erp.hr.bankIban')}>
+          <input className="oryx-input font-mono" value={form.bankIban} onChange={(e) => setForm((prev) => ({ ...prev, bankIban: e.target.value }))} data-testid="employee-bank-iban" />
+        </Field>
         <Field label={t('common.address')}>
           <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm((prev) => ({ ...prev, addressLine: e.target.value }))} data-testid="employee-address" />
         </Field>
         <Field label={t('common.notes')}>
           <input className="oryx-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} data-testid="employee-notes" />
         </Field>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
       </div>
       {employee && canManage !== undefined ? documentsSlot : null}
     </Modal>

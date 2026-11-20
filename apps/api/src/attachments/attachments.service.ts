@@ -138,6 +138,21 @@ export class AttachmentsService {
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Contract not found.');
       return;
     }
+    if (entityType === 'EMPLOYEE_PENALTY') {
+      const found = await this.prisma.employeePenalty.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Disciplinary action not found.');
+      return;
+    }
+    if (entityType === 'EMPLOYEE_BONUS') {
+      const found = await this.prisma.employeeBonus.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Bonus not found.');
+      return;
+    }
+    if (entityType === 'LEAVE_REQUEST') {
+      const found = await this.prisma.leaveRequest.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Leave request not found.');
+      return;
+    }
     if (entityType === 'INSPECTION') {
       const found = await this.prisma.inspectionSession.findFirst({ where: { id: entityId, companyId } });
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');

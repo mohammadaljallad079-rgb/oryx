@@ -37,6 +37,9 @@ export const ATTACHMENT_ENTITY_TYPES = [
   'JOURNAL_ENTRY',
   'CONTRACT',
   'INSPECTION',
+  'EMPLOYEE_PENALTY',
+  'EMPLOYEE_BONUS',
+  'LEAVE_REQUEST',
 ] as const;
 export type AttachmentEntityType = (typeof ATTACHMENT_ENTITY_TYPES)[number];
 
