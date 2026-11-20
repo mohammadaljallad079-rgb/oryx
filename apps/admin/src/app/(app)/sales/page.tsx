@@ -132,7 +132,6 @@ function computePosTotals(
     // Cart quantities are human units; the shared money helper expects 10^4-scaled units.
     const lineSubtotalMinor = lineAmountMinor(l.quantity * 10000, l.unitPriceMinor);
     const discountMinor = Math.min(lineSubtotalMinor, Math.max(0, l.discountAmountMinor));
-    const net = lineSubtotalMinor - discountMinor;
     const taxMinor = basisPointsOfMinor(lineSubtotalMinor, l.taxPercentBp);
     return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: lineSubtotalMinor + taxMinor - discountMinor };
   });
@@ -1915,7 +1914,6 @@ function priceDraftLine(line: LineDraft, currency?: string) {
   const taxPercentBp = Math.round((Number(line.taxPercent) || 0) * 100);
   const lineSubtotalMinor = lineAmountMinor(quantity, unitPriceMinor);
   const discountMinor = Math.min(lineSubtotalMinor, Math.max(0, discountAmountMinor));
-  const net = lineSubtotalMinor - discountMinor;
   const taxMinor = basisPointsOfMinor(lineSubtotalMinor, taxPercentBp);
   return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: lineSubtotalMinor + taxMinor - discountMinor };
 }
