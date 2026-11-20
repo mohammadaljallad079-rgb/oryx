@@ -1319,6 +1319,330 @@ export interface EmployeeDto {
   managerNameEn: string | null;
 }
 
+// ------------------------------------------- employee electronic file (E06)
+
+/** How many records each tab of the employee file will list. */
+export interface EmployeeFileCounts {
+  contracts: number;
+  documents: number;
+  payslips: number;
+  leaveRequests: number;
+  penalties: number;
+  bonuses: number;
+}
+
+/** One salary component inside the active structure. */
+export interface EmployeeCompensationComponent {
+  id: string;
+  type: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  amountMinor: number;
+}
+
+/**
+ * Pay, bank details and allowances.
+ *
+ * A caller without `erp.hr.salary.read` receives `{ visible: false, reason }`
+ * rather than zeros, so a screen can distinguish "nothing recorded" from
+ * "not permitted".
+ */
+export type EmployeeCompensationView =
+  | {
+      visible: true;
+      basicMinor: number | null;
+      allowancesMinor: number;
+      deductionsMinor: number;
+      currency: string | null;
+      effectiveFrom: string | null;
+      components: EmployeeCompensationComponent[];
+      bankName?: string | null;
+      bankAccountName?: string | null;
+      bankIban?: string | null;
+    }
+  | { visible: false; reason: string };
+
+export interface EmployeePersonalCardDto {
+  employee: {
+    id: string;
+    code: string;
+    fullNameEn: string;
+    fullNameAr: string;
+    email: string | null;
+    phone: string | null;
+    secondaryPhone: string | null;
+    nationalId: string | null;
+    dateOfBirth: string | null;
+    gender: string | null;
+    nationality: string | null;
+    addressLine: string | null;
+    status: string;
+    hireDate: string;
+    terminationDate: string | null;
+    notes: string | null;
+    departmentId: string | null;
+    departmentNameEn: string | null;
+    departmentNameAr: string | null;
+    jobTitleId: string | null;
+    jobTitleNameEn: string | null;
+    jobTitleNameAr: string | null;
+    branchId: string | null;
+    branchNameEn: string | null;
+    branchNameAr: string | null;
+    managerCode: string | null;
+    managerNameEn: string | null;
+    managerNameAr: string | null;
+  };
+  compensation: EmployeeCompensationView;
+  contracts: Array<{
+    id: string;
+    contractNumber: string;
+    type: string;
+    status: string;
+    startDate: string;
+    endDate: string | null;
+    probationDays: number | null;
+    baseSalaryMinor?: number;
+    currency?: string;
+  }>;
+}
+
+/** A payslip row plus the lines that make up its net. */
+export interface EmployeePayslipRow {
+  id: string;
+  payrollRunId: string;
+  runNumber: string;
+  runStatus: string;
+  paymentStatus: 'DUE' | 'APPROVED' | 'PAID';
+  periodCode: string;
+  periodNameEn: string;
+  periodNameAr: string;
+  periodStart: string;
+  periodEnd: string;
+  paidAt: string | null;
+  basicMinor: number;
+  allowancesMinor: number;
+  deductionsMinor: number;
+  grossMinor: number;
+  netMinor: number;
+  advanceDeductionMinor: number;
+  overtimeMinutes: number;
+  lateMinutes: number;
+  absenceDays: number;
+  paidLeaveDays: number;
+  workedMinutes: number;
+  currency: string;
+  lines: Array<{
+    id: string;
+    type: string;
+    code: string;
+    nameEn: string;
+    nameAr: string;
+    amountMinor: number;
+  }>;
+}
+
+export interface EmployeePayrollLedgerDto {
+  items: EmployeePayslipRow[];
+  totals: {
+    basicMinor: number;
+    allowancesMinor: number;
+    deductionsMinor: number;
+    grossMinor: number;
+    netMinor: number;
+    payslipCount: number;
+    currency: string | null;
+  };
+  from: string | null;
+  to: string | null;
+}
+
+export interface EmployeeLeaveTabDto {
+  items: Array<{
+    id: string;
+    leaveTypeId: string;
+    leaveTypeCode: string;
+    leaveTypeNameEn: string;
+    leaveTypeNameAr: string;
+    isPaid: boolean;
+    startDate: string;
+    endDate: string;
+    days: number;
+    status: string;
+    reason: string | null;
+    decisionNote: string | null;
+    decidedAt: string | null;
+    approvedByNameEn: string | null;
+    approvedByNameAr: string | null;
+  }>;
+  balances: Array<{
+    id: string;
+    leaveTypeId: string;
+    leaveTypeCode: string;
+    leaveTypeNameEn: string;
+    leaveTypeNameAr: string;
+    year: number;
+    entitledDays: number;
+    accruedDays: number;
+    usedDays: number;
+    pendingDays: number;
+    remainingDays: number;
+  }>;
+  year: number;
+}
+
+export interface EmployeePenaltyDto {
+  id: string;
+  actionType: string;
+  reason: string;
+  effectiveDate: string;
+  amountMinor?: number;
+  currency?: string;
+  decidedByName: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface EmployeeBonusDto {
+  id: string;
+  type: string;
+  reason: string;
+  amountMinor: number;
+  currency: string;
+  payPeriodId: string | null;
+  payPeriodCode: string | null;
+  payPeriodNameEn: string | null;
+  payPeriodNameAr: string | null;
+  approvedAt: string | null;
+  payslipId: string | null;
+  paid: boolean;
+  createdAt: string;
+}
+
+export interface EmployeeBonusListDto {
+  items: EmployeeBonusDto[];
+  totals: {
+    pendingMinor: number;
+    approvedMinor: number;
+    paidMinor: number;
+    currency: string | null;
+  };
+}
+
+export interface EmployeeReportPackDto {
+  employee: {
+    id: string;
+    code: string;
+    fullNameEn: string;
+    fullNameAr: string;
+    hireDate: string;
+    status: string;
+  };
+  window: { from: string; to: string };
+  attendance: {
+    records: Array<{
+      id: string;
+      workDate: string;
+      status: string;
+      workedMinutes: number;
+      overtimeMinutes: number;
+      lateMinutes: number;
+      earlyLeaveMinutes: number;
+      checkInAt: string | null;
+      checkOutAt: string | null;
+    }>;
+    summary: {
+      recordedDays: number;
+      presentDays: number;
+      lateDays: number;
+      absentDays: number;
+      halfDays: number;
+      workedMinutes: number;
+      overtimeMinutes: number;
+      lateMinutes: number;
+      earlyLeaveMinutes: number;
+    };
+  };
+  leave: {
+    records: Array<{
+      id: string;
+      leaveTypeCode: string;
+      leaveTypeNameEn: string;
+      leaveTypeNameAr: string;
+      startDate: string;
+      endDate: string;
+      days: number;
+      status: string;
+      reason: string | null;
+    }>;
+    balances: Array<{
+      leaveTypeCode: string;
+      leaveTypeNameEn: string;
+      leaveTypeNameAr: string;
+      year: number;
+      entitledDays: number;
+      accruedDays: number;
+      usedDays: number;
+      pendingDays: number;
+      remainingDays: number;
+    }>;
+    summary: { approvedDays: number; requestCount: number };
+  };
+  penalties: {
+    records: Array<{
+      id: string;
+      actionType: string;
+      reason: string;
+      effectiveDate: string;
+      amountMinor?: number;
+      currency?: string;
+      decidedByName: string | null;
+    }>;
+    summary: { count: number; totalAmountMinor?: number };
+  };
+  bonuses:
+    | {
+        records: Array<{
+          id: string;
+          type: string;
+          reason: string;
+          amountMinor: number;
+          currency: string;
+          approvedAt: string | null;
+          payslipId: string | null;
+          paid: boolean;
+          createdAt: string;
+        }>;
+        summary: { count: number; totalAmountMinor: number; paidAmountMinor: number };
+      }
+    | { visible: false; reason: string };
+  payroll:
+    | {
+        records: Array<{
+          id: string;
+          payrollRunId: string;
+          basicMinor: number;
+          allowancesMinor: number;
+          deductionsMinor: number;
+          grossMinor: number;
+          netMinor: number;
+          currency: string;
+          workedMinutes: number;
+          overtimeMinutes: number;
+          createdAt: string;
+        }>;
+        summary: {
+          payslipCount: number;
+          grossMinor: number;
+          deductionsMinor: number;
+          netMinor: number;
+          currency: string | null;
+        };
+      }
+    | { visible: false; reason: string };
+}
+
 export interface LeaveTypeDto {
   id: string;
   code: string;

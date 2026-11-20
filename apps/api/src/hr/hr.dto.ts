@@ -71,6 +71,7 @@ export class CreateEmployeeDto {
   @NormaliseIsoDate() @IsISO8601() hireDate!: string;
   @IsOptional() @NormaliseIsoDate() @IsISO8601() dateOfBirth?: string;
   @IsOptional() @IsString() @MaxLength(20) gender?: string;
+  @IsOptional() @IsString() @MaxLength(80) nationality?: string;
   @IsOptional() @IsString() @MaxLength(240) addressLine?: string;
   @IsOptional() @IsString() @MaxLength(600) notes?: string;
 }
@@ -81,12 +82,19 @@ export class UpdateEmployeeDto {
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsString() @MaxLength(40) secondaryPhone?: string;
+  @IsOptional() @IsString() @MaxLength(40) nationalId?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() dateOfBirth?: string;
+  @IsOptional() @IsString() @MaxLength(20) gender?: string;
+  @IsOptional() @IsString() @MaxLength(80) nationality?: string;
   @IsOptional() @IsString() departmentId?: string;
   @IsOptional() @IsString() jobTitleId?: string;
   @IsOptional() @IsString() branchId?: string;
   @IsOptional() @IsString() managerId?: string;
   @IsOptional() @IsIn(['ACTIVE', 'ON_LEAVE', 'SUSPENDED', 'TERMINATED']) status?: string;
   @IsOptional() @NormaliseIsoDate() @IsISO8601() terminationDate?: string;
+  @IsOptional() @IsString() @MaxLength(160) bankName?: string;
+  @IsOptional() @IsString() @MaxLength(160) bankAccountName?: string;
+  @IsOptional() @IsString() @MaxLength(64) bankIban?: string;
   @IsOptional() @IsString() @MaxLength(240) addressLine?: string;
   @IsOptional() @IsString() @MaxLength(600) notes?: string;
 }
@@ -319,4 +327,54 @@ export class CreateAdvanceDto {
 export class SettleAdvanceDto {
   @Type(() => Number) @IsInt() @Min(1) amountMinor!: number;
   @IsOptional() @IsString() @MaxLength(400) note?: string;
+}
+
+// ------------------------------------------------- employee electronic file
+
+/** The permission that gates pay, bank details and the payroll ledger. */
+export const SALARY_READ_PERMISSION = 'erp.hr.salary.read';
+
+/** The date window every employee-file report and ledger accepts. */
+export class FileRangeQueryDto {
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() from?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() to?: string;
+}
+
+export class CreatePenaltyDto {
+  /** WARNING, FINE, SUSPENSION, TERMINATION_NOTICE or OTHER. */
+  @IsString() @MinLength(2) @MaxLength(40) actionType!: string;
+  @IsString() @MinLength(2) @MaxLength(600) reason!: string;
+  @NormaliseIsoDate() @IsISO8601() effectiveDate!: string;
+  /** Zero records a non-monetary action; a positive value needs salary access. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) amountMinor?: number;
+  @IsOptional() @IsString() @MaxLength(3) currency?: string;
+  @IsOptional() @IsString() @MaxLength(160) decidedByName?: string;
+  @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+}
+
+export class UpdatePenaltyDto {
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(40) actionType?: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(600) reason?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() effectiveDate?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) amountMinor?: number;
+  @IsOptional() @IsString() @MaxLength(160) decidedByName?: string;
+  @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+}
+
+export class CreateBonusDto {
+  /** BONUS, INCENTIVE, COMMISSION, OVERTIME_AWARD or OTHER. */
+  @IsOptional() @IsString() @MaxLength(40) type?: string;
+  @IsString() @MinLength(2) @MaxLength(600) reason!: string;
+  @Type(() => Number) @IsInt() @Min(1) amountMinor!: number;
+  @IsOptional() @IsString() @MaxLength(3) currency?: string;
+  @IsOptional() @IsString() payPeriodId?: string;
+  /** Approve immediately so the next payroll run consumes it. */
+  @IsOptional() @ToBoolean() @IsBoolean() approveNow?: boolean;
+}
+
+export class UpdateBonusDto {
+  @IsOptional() @IsString() @MaxLength(40) type?: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(600) reason?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) amountMinor?: number;
+  @IsOptional() @IsString() payPeriodId?: string;
 }
