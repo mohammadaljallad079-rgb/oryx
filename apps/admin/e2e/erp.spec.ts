@@ -114,6 +114,31 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     expect(valuation.body.totalValueMinor).toBeGreaterThan(0);
   });
 
+  test('4b. reorder alerts filter by warehouse and never exceed configured threshold', async ({ page }) => {
+    await page.goto('/inventory');
+    await page.getByTestId('inventory-tab-reorder').click();
+    const filter = page.getByTestId('reorder-warehouse-filter');
+    await expect(filter).toBeVisible();
+    await expect.poll(async () => filter.locator('option').count()).toBeGreaterThan(1);
+
+    const warehouseId = await filter.locator('option').nth(1).getAttribute('value');
+    expect(warehouseId).toBeTruthy();
+    await filter.selectOption(warehouseId!);
+
+    const scoped = await apiCall<{
+      items: Array<{ productId: string; onHand: number; reorderLevel: number }>;
+    }>(page, `/inventory/reorder-alerts?warehouseId=${encodeURIComponent(warehouseId!)}`);
+    expect(scoped.status).toBe(200);
+    for (const alert of scoped.body.items) {
+      expect(alert.onHand).toBeLessThanOrEqual(alert.reorderLevel);
+      await expect(page.getByTestId(`reorder-row-${alert.productId}`)).toHaveCount(0);
+    }
+
+    // Resetting to all warehouses must remain usable without requiring a reload.
+    await filter.selectOption('');
+    await expect(filter).toHaveValue('');
+  });
+
   test('5. sales invoice list renders the seeded tenant data', async ({ page }) => {
     await page.goto('/sales');
     await expect(page.getByTestId('sales-page')).toBeVisible();
