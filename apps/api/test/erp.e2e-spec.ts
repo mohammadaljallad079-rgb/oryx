@@ -1282,6 +1282,35 @@ describe('ORYX ERP core (e2e)', () => {
       expect(payment.status).toBe(201);
     });
 
+    it('rejects a replayed supplier invoice without creating a second payable journal', async () => {
+      const before = await ctx.prisma.supplierInvoice.count({
+        where: { supplierId, supplierInvoiceNumber: 'SUP-INV-1' },
+      });
+      expect(before).toBe(1);
+
+      const duplicate = await erp<{ code: string }>('/purchasing/supplier-invoices', {
+        method: 'POST',
+        body: {
+          supplierId,
+          purchaseOrderId: orderId,
+          supplierInvoiceNumber: 'SUP-INV-1',
+          invoiceDate: '2026-06-01',
+          lines: [{ productId, description: 'Widget', quantity: 50000, unitCostMinor: 6000, taxPercentBp: 1500 }],
+        },
+      });
+      expect(duplicate.status).toBe(409);
+      expect(duplicate.body.code).toBe('resource.conflict');
+
+      const after = await ctx.prisma.supplierInvoice.count({
+        where: { supplierId, supplierInvoiceNumber: 'SUP-INV-1' },
+      });
+      expect(after).toBe(before);
+      const journals = await ctx.prisma.journalEntry.count({
+        where: { sourceType: 'SUPPLIER_INVOICE', sourceId: supplierInvoiceId },
+      });
+      expect(journals).toBe(1);
+    });
+
     it('returns goods to the supplier, reversing the payable and reducing stock', async () => {
       const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
         where: { warehouseId_productId: { warehouseId, productId } },
