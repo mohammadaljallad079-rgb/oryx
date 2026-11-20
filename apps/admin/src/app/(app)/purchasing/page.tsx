@@ -118,7 +118,7 @@ function PurchasingInner() {
 
       {tab === 'dashboard' ? <ModuleDashboard moduleKey="purchasing_procurement" /> : null}
       {tab === 'orders' ? <OrdersTab canManage={can('erp.purchasing.order.manage')} /> : null}
-      {tab === 'requisitions' ? <RequisitionsTab canManage={can('erp.purchasing.requisition.manage')} /> : null}
+      {tab === 'requisitions' ? <RequisitionsTab canManage={can('erp.purchasing.requisition.manage')} onConverted={() => setTab('orders')} /> : null}
       {tab === 'receipts' ? <ReceiptsTab canManage={can('erp.purchasing.receipt.manage')} /> : null}
       {tab === 'invoices' ? <InvoicesTab canManage={can('erp.purchasing.invoice.manage')} /> : null}
       {tab === 'returns' ? <ReturnsTab canManage={can('erp.purchasing.return.manage')} /> : null}
@@ -289,7 +289,7 @@ function PurchasingListFilters({
 
 // ---------------------------------------------------------------- requisitions
 
-function RequisitionsTab({ canManage }: { canManage: boolean }) {
+function RequisitionsTab({ canManage, onConverted }: { canManage: boolean; onConverted: () => void }) {
   const { companyId } = useAuth();
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
@@ -357,6 +357,7 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
                         if (!supplierId) return;
                         await api.convertRequisition(r.id, supplierId);
                         await list.reload();
+                        onConverted();
                       }}
                     >
                       {t('erp.purchasing.convert')}
