@@ -729,16 +729,13 @@ export class PurchasingService {
         dto.supplierId,
         companyId,
       );
-      const existing = await tx.supplierInvoice.findFirst({
-        where: {
-          companyId,
-          supplierId: dto.supplierId,
-          supplierInvoiceNumber: dto.supplierInvoiceNumber.trim(),
-        },
-        select: { id: true },
-      });
-      if (existing) {
-        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This supplier invoice number was already recorded for this supplier.');
+      const externalNumber = dto.supplierInvoiceNumber?.trim();
+      if (externalNumber) {
+        const existing = await tx.supplierInvoice.findFirst({
+          where: { companyId, supplierId: dto.supplierId, supplierInvoiceNumber: externalNumber },
+          select: { id: true },
+        });
+        if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This supplier invoice number was already recorded for this supplier.');
       }
       const totals = computePurchaseTotals(dto.lines);
       const invoiceDate = new Date(dto.invoiceDate);
@@ -826,7 +823,7 @@ export class PurchasingService {
           companyId,
           branchId: dto.branchId ?? null,
           invoiceNumber,
-          supplierInvoiceNumber: dto.supplierInvoiceNumber.trim(),
+          supplierInvoiceNumber: externalNumber || `AUTO-${invoiceNumber}`,
           supplierId: dto.supplierId,
           purchaseOrderId: dto.purchaseOrderId ?? null,
           status: 'DRAFT',
