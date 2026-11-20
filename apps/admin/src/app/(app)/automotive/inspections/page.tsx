@@ -184,6 +184,10 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
                         <Button size="sm" onClick={() => router.push(`/automotive/inspections/${j.id}`)} data-testid={`open-job-${j.id}`}>
                           {t('inspection.open')}
                         </Button>
+                        <Button size="sm" variant="ghost" onClick={() => router.push(`/automotive/inspections/${j.id}`)} data-testid={`preview-job-${j.id}`} title={locale === 'ar' ? 'معاينة الفحص الكامل والتقرير' : 'Preview full inspection and report'}>
+                          <Icon name="eye" size={14} />
+                          {locale === 'ar' ? 'معاينة' : 'Preview'}
+                        </Button>
                         {canWrite ? (
                           <Button
                             size="sm"
