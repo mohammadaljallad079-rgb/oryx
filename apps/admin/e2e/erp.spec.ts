@@ -139,6 +139,39 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     await expect(filter).toHaveValue('');
   });
 
+  test('4c. opening quantity is posted once as a warehouse stock movement', async ({ page }) => {
+    await page.goto('/inventory');
+    await page.getByTestId('inventory-tab-products').click();
+    await page.getByTestId('new-product').click();
+    await expect(page.getByTestId('product-opening-stock')).toBeVisible();
+
+    const unique = Date.now().toString().slice(-8);
+    await page.getByTestId('product-name-en').fill(`Opening Stock ${unique}`);
+    await page.getByTestId('product-opening-quantity').fill('3');
+    const warehouses = page.getByTestId('product-opening-warehouse');
+    await expect.poll(async () => warehouses.locator('option').count()).toBeGreaterThan(1);
+    const warehouseId = await warehouses.locator('option').nth(1).getAttribute('value');
+    expect(warehouseId).toBeTruthy();
+    await warehouses.selectOption(warehouseId!);
+    await page.getByTestId('save-product').click();
+
+    await expect(page.getByTestId('new-product')).toBeVisible({ timeout: 20_000 });
+    const rows = await apiCall<{ items: Array<{ id: string; sku: string; nameEn: string }> }>(
+      page, `/inventory/products?search=${encodeURIComponent(`Opening Stock ${unique}`)}`,
+    );
+    expect(rows.status).toBe(200);
+    const product = rows.body.items.find((item) => item.nameEn === `Opening Stock ${unique}`);
+    expect(product).toBeTruthy();
+
+    const movements = await apiCall<{ items: Array<{ productId: string; warehouseId: string; quantity: number }> }>(
+      page, '/inventory/movements?page=1&pageSize=100',
+    );
+    expect(movements.status).toBe(200);
+    const opening = movements.body.items.filter((movement) => movement.productId === product!.id);
+    expect(opening).toHaveLength(1);
+    expect(opening[0].quantity).toBe(30_000);
+  });
+
   test('5. sales invoice list renders the seeded tenant data', async ({ page }) => {
     await page.goto('/sales');
     await expect(page.getByTestId('sales-page')).toBeVisible();
