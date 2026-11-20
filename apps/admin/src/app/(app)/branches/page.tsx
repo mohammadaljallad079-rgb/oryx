@@ -388,7 +388,7 @@ function EditBranchModal({
             value={form.responsibleUserId || null}
             options={users.map((user) => ({
               value: user.id,
-              label: (locale === 'ar' ? user.fullNameAr : user.fullNameEn) || user.email,
+              label: (locale === 'ar' ? user.fullNameAr || user.fullNameEn : user.fullNameEn || user.fullNameAr) || user.email,
               hint: user.email,
             }))}
             onChange={(value) => setForm((prev) => ({ ...prev, responsibleUserId: value ?? '' }))}
