@@ -467,7 +467,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
               <DocumentPrintActions kind="SALES_INVOICE" id={detail.id} compact />
             </div>
             <InvoiceLineBreakdown document={detail} />
-            <AttachmentsPanel entityType="SALES_INVOICE" entityId={detail.id} canManage={false} />
+            <AttachmentsPanel entityType="SALES_INVOICE" entityId={detail.id} canManage={canManage} />
           </div>
         ) : null}
       </Modal>
