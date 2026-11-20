@@ -222,6 +222,7 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
                       sourceType="Supplier"
                       sourceId={s.id}
                       type="SUPPLIER_STATEMENT"
+                      iconsOnly
                       permissions={['erp.purchasing.read', 'erp.accounting.read']}
                     />
                   </div>
@@ -547,6 +548,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
                       sourceType="PurchaseOrder"
                       sourceId={o.id}
                       type="PURCHASE_ORDER"
+                      iconsOnly
                       permissions={['erp.purchasing.read']}
                     />
                   </div>
@@ -939,6 +941,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                     sourceType="SupplierInvoice"
                     sourceId={i.id}
                     type="PURCHASE_INVOICE"
+                    iconsOnly
                     permissions={['erp.purchasing.read']}
                   />
                 </td>
@@ -1170,6 +1173,7 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
                     sourceType="PurchaseReturn"
                     sourceId={r.id}
                     type="PURCHASE_RETURN"
+                    iconsOnly
                     permissions={['erp.purchasing.read']}
                   />
                 </td>
