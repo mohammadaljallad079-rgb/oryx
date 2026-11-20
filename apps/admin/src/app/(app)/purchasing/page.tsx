@@ -5,7 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
-import { minorToInput, money, toMinorInput, toQuantityInput, todayIso } from '@/lib/erp-format';
+import { minorToInput, money, qty, toMinorInput, toQuantityInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
 import { ModuleDashboard } from '@/components/module-dashboard';
@@ -888,6 +888,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [sourceOrder, setSourceOrder] = useState<PurchaseDocumentDto | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const debouncedSearch = useDebounced(search, 300);
@@ -902,12 +903,36 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.purchasing.invoices')}</p>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-supplier-invoice">
+          <Button variant="primary" size="sm" onClick={() => { setSourceOrder(null); setOpen(true); }} data-testid="new-supplier-invoice">
             <Icon name="plus" size={16} />
             {t('erp.purchasing.newInvoice')}
           </Button>
         ) : null}
       </div>
+
+      {canManage && (purchaseOrders.data?.items ?? []).some((o) => ['APPROVED', 'PARTIALLY_RECEIVED', 'RECEIVED'].includes(o.status)) ? (
+        <div className="border-b border-[var(--border)] p-4" data-testid="supplier-invoice-source-orders">
+          <p className="oryx-panel-title m-0 mb-2">
+            {t('erp.purchasing.orders')} — {t('erp.purchasing.invoices')}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {(purchaseOrders.data?.items ?? [])
+              .filter((o) => ['APPROVED', 'PARTIALLY_RECEIVED', 'RECEIVED'].includes(o.status))
+              .map((order) => (
+                <Button
+                  key={order.id}
+                  size="sm"
+                  variant="ghost"
+                  data-testid={`invoice-from-order-${order.orderNumber}`}
+                  onClick={() => { setSourceOrder(order); setOpen(true); }}
+                >
+                  <Icon name="plus" size={14} />
+                  {order.orderNumber} — {order.supplierNameEn}
+                </Button>
+              ))}
+          </div>
+        </div>
+      ) : null}
       <PurchasingListFilters
         search={search} onSearch={setSearch} status={status} onStatus={setStatus}
         statuses={(list.data?.items ?? []).map((item) => item.status)}
@@ -956,12 +981,13 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         suppliers={suppliers.data?.items ?? []}
         branches={branches.data?.items ?? []}
         purchaseOrders={purchaseOrders.data?.items ?? []}
+        initialOrder={sourceOrder}
         onSupplierCreated={suppliers.reload}
         products={products.data?.items ?? []}
         onProductCreated={products.reload}
         taxOptions={taxOptions}
         onTaxCreated={reloadTaxOptions}
-        onClose={() => setOpen(false)}
+        onClose={() => { setOpen(false); setSourceOrder(null); }}
         onCreated={list.reload}
       />
     </Card>
@@ -969,6 +995,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
 }
 
 function SupplierInvoiceModal({
+  initialOrder,
   taxOptions,
   onTaxCreated,
   open,
@@ -985,6 +1012,7 @@ function SupplierInvoiceModal({
   suppliers: SupplierDto[];
   branches: Array<{ id: string; code: string; nameEn: string }>;
   purchaseOrders: Array<{ id: string; orderNumber?: string; supplierNameEn?: string; status?: string }>;
+  initialOrder?: PurchaseDocumentDto | null;
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
   onProductCreated?: () => Promise<void> | void;
   taxOptions: SearchableOption[];
@@ -1007,6 +1035,30 @@ function SupplierInvoiceModal({
   const [currency, setCurrency] = useState('BHD');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+
+  // The order becomes visible in the invoice tab immediately after approval,
+  // but supplier invoice number is supplied by the vendor, not invented by ORYX.
+  // Prefill the order's quantities/prices; posting still requires a deliberate save.
+  useEffect(() => {
+    if (!open || !initialOrder) return;
+    setSupplierId(initialOrder.supplierId);
+    setPurchaseOrderId(initialOrder.id);
+    setCurrency(initialOrder.currency);
+    setLines((initialOrder.lines as Array<{
+      productId?: string | null;
+      description?: string;
+      quantity?: number;
+      unitCostMinor?: number;
+      taxPercentBp?: number;
+    }>).map((l) => ({
+      ...emptyLine(),
+      productId: l.productId ?? '',
+      description: l.description ?? '',
+      quantity: qty(l.quantity ?? 10000),
+      unitCost: minorToInput(l.unitCostMinor ?? 0, initialOrder.currency),
+      taxPercent: String((l.taxPercentBp ?? 0) / 100),
+    })));
+  }, [open, initialOrder]);
 
   const submit = async () => {
     setBusy(true);
