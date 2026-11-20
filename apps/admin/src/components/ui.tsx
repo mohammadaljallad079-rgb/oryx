@@ -333,20 +333,61 @@ export function Skeleton({ height = 16, width = '100%' }: { height?: number; wid
 }
 
 export function TableShell({ children, label }: { children: ReactNode; label?: string }) {
+  const tableRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const [scrollWidth, setScrollWidth] = useState(0);
+  const [isWide, setIsWide] = useState(false);
+
+  // Keep a visible, sticky horizontal scrollbar at the bottom of a long table
+  // even when its real scrollbar is below the viewport.
+  useEffect(() => {
+    const table = tableRef.current;
+    const dock = dockRef.current;
+    if (!table || !dock) return;
+    const measure = () => {
+      setScrollWidth(table.scrollWidth);
+      setIsWide(table.scrollWidth > table.clientWidth + 2);
+    };
+    const fromTable = () => { dock.scrollLeft = table.scrollLeft; };
+    const fromDock = () => { table.scrollLeft = dock.scrollLeft; };
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(table);
+    const inner = table.querySelector('table');
+    if (inner) observer?.observe(inner);
+    window.addEventListener('resize', measure);
+    table.addEventListener('scroll', fromTable, { passive: true });
+    dock.addEventListener('scroll', fromDock, { passive: true });
+    measure();
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      table.removeEventListener('scroll', fromTable);
+      dock.removeEventListener('scroll', fromDock);
+    };
+  }, [children]);
+
   return (
-    // The scroll container is the shell itself rather than a bare wrapper: it
-    // keeps the horizontal scrollbar inside the card and lets a narrow viewport
-    // pan the table instead of clipping its rightmost columns. `role="region"`
-    // plus a label keeps the scrollable area reachable by keyboard and
-    // announced by a screen reader.
-    <div
-      className="oryx-table-scroll"
-      data-testid="table-scroll"
-      role="region"
-      aria-label={label}
-      tabIndex={0}
-    >
-      <table className="oryx-table">{children}</table>
+    <div className="oryx-table-container">
+      <div
+        ref={tableRef}
+        className="oryx-table-scroll"
+        data-testid="table-scroll"
+        role="region"
+        aria-label={label}
+        tabIndex={0}
+      >
+        <table className="oryx-table">{children}</table>
+      </div>
+      <div
+        ref={dockRef}
+        className="oryx-table-scroll-dock"
+        data-testid="table-scroll-bottom"
+        aria-label={label ?? 'Horizontal table navigation'}
+        tabIndex={isWide ? 0 : -1}
+        style={{ display: isWide ? undefined : 'none' }}
+      >
+        <div style={{ width: scrollWidth, height: 1 }} aria-hidden="true" />
+      </div>
     </div>
   );
 }
