@@ -287,8 +287,8 @@ function EditBranchModal({
     try {
       await api.updateBranch(branch.id, {
         code: form.code.trim().toUpperCase(),
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
+        nameEn: form.nameEn.trim() || form.nameAr.trim(),
+        nameAr: form.nameAr.trim() || form.nameEn.trim(),
         city: form.city || undefined,
         countryCode: form.countryCode || undefined,
         addressLine: form.addressLine || undefined,
@@ -319,7 +319,7 @@ function EditBranchModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())}
             onClick={submit}
             data-testid="save-branch"
           >
@@ -342,7 +342,7 @@ function EditBranchModal({
         <Field label={t('common.code')} required>
           <input className="oryx-input font-mono uppercase" value={branch?.code ?? form.code} readOnly data-testid="edit-branch-code" />
         </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
+        <Field label={`${t('common.name')} (EN)`}>
           <input
             className="oryx-input"
             value={form.nameEn}
@@ -350,7 +350,7 @@ function EditBranchModal({
             data-testid="edit-branch-name-en"
           />
         </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
+        <Field label={`${t('common.name')} (AR)`}>
           <input
             className="oryx-input"
             value={form.nameAr}
