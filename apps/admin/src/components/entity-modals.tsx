@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
+import { useAuth } from '@/lib/auth-context';
 import { toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Button, ErrorBanner, Field, Modal } from '@/components/ui';
 import { EntityPicker } from '@/components/inline-create';
@@ -193,7 +194,10 @@ export function ProductModal({
   onSaved?: (saved: ProductDto) => void;
   defaultCategory?: string;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const { can } = useAuth();
+  const canOpenStock = can('erp.inventory.movement.manage');
+  const [warehouseOptions, setWarehouseOptions] = useState<Array<{ id: string; code: string; nameEn: string; nameAr: string }>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productImage, setProductImage] = useState<File | null>(null);
@@ -203,6 +207,7 @@ export function ProductModal({
   const [form, setForm] = useState({
     sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
     barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
+    openingQuantity: '0', openingWarehouseId: '',
   });
 
   useEffect(() => {
@@ -213,13 +218,30 @@ export function ProductModal({
     setForm({
       sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
       barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
+      openingQuantity: '0', openingWarehouseId: '',
     });
   }, [open, defaultCategory]);
+
+  useEffect(() => {
+    if (!open || !canOpenStock) return;
+    let live = true;
+    void api.warehouses().then((result) => {
+      if (live) setWarehouseOptions(result.items.filter((warehouse) => warehouse.isActive));
+    }).catch(() => {
+      if (live) setWarehouseOptions([]);
+    });
+    return () => { live = false; };
+  }, [open, canOpenStock]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
+      const openingQuantity = toQuantityInput(form.openingQuantity);
+      if (openingQuantity > 0 && (!canOpenStock || !form.trackStock || !form.openingWarehouseId)) {
+        setError(locale === 'ar' ? 'اختر المستودع للكمية الافتتاحية.' : 'Select a warehouse for opening stock.');
+        return;
+      }
       const saved = createdProduct ?? await api.createProduct({
         sku: form.sku,
         nameEn: form.nameEn.trim() || form.nameAr.trim(),
@@ -234,6 +256,9 @@ export function ProductModal({
         reorderLevel: toQuantityInput(form.reorderLevel),
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
+        ...(canOpenStock && openingQuantity > 0
+          ? { openingQuantity, openingWarehouseId: form.openingWarehouseId }
+          : {}),
       });
       setCreatedProduct(saved);
       if (productImage) {
@@ -305,6 +330,29 @@ export function ProductModal({
           <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm((prev) => ({ ...prev, reorderQuantity: e.target.value }))} />
         </Field>
       </div>
+      {canOpenStock && form.trackStock ? (
+        <div className="mt-4 grid gap-3 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-2"
+          data-testid="product-opening-stock">
+          <Field label={locale === 'ar' ? 'الكمية الافتتاحية' : 'Opening stock quantity'}>
+            <input className="oryx-input" type="number" min="0" step="0.0001"
+              value={form.openingQuantity}
+              onChange={(event) => setForm((prev) => ({ ...prev, openingQuantity: event.target.value }))}
+              data-testid="product-opening-quantity" />
+          </Field>
+          <Field label={t('erp.inventory.warehouse')} required={Number(form.openingQuantity) > 0}>
+            <select className="oryx-select" value={form.openingWarehouseId}
+              onChange={(event) => setForm((prev) => ({ ...prev, openingWarehouseId: event.target.value }))}
+              data-testid="product-opening-warehouse">
+              <option value="">{t('common.select')}</option>
+              {warehouseOptions.map((warehouse) => (
+                <option key={warehouse.id} value={warehouse.id}>
+                  {warehouse.code} — {locale === 'ar' ? warehouse.nameAr || warehouse.nameEn : warehouse.nameEn}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      ) : null}
       <div className="mt-4 rounded-xl border border-[var(--border)] p-3" data-testid="product-inline-image">
         <Field label={t('erp.inventory.images')}>
           <input type="file" accept="image/jpeg,image/png,image/webp,image/avif"

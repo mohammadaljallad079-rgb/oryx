@@ -1382,7 +1382,7 @@ function PurchaseReturnModal({
   const [returnDate, setReturnDate] = useState(todayIso());
   const [reason, setReason] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
-  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
   // If the return was posted but uploading its supporting file failed, retry
   // only the attachment. Never create/post a second return or stock movement.
   const [createdReturnId, setCreatedReturnId] = useState<string | null>(null);
@@ -1409,9 +1409,9 @@ function PurchaseReturnModal({
         returnId = created.id;
         setCreatedReturnId(returnId);
       }
-      if (attachment) {
+      for (const attachment of attachments) {
         await api.uploadAttachment('PURCHASE_RETURN', returnId, attachment, 'OFFICIAL');
-        setAttachment(null);
+        setAttachments((pending) => pending.filter((file) => file !== attachment));
       }
       await onCreated();
       onClose();
@@ -1508,10 +1508,27 @@ function PurchaseReturnModal({
         <div className="grid gap-4 lg:grid-cols-2">
           <div>
             <Field label={t('attachments.title')}>
-              <input type="file" className="oryx-input w-full" accept={ATTACHMENT_ACCEPT}
-                onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
+              <input type="file" multiple className="oryx-input w-full" accept={ATTACHMENT_ACCEPT}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  setAttachments((pending) => [...pending, ...files]);
+                  e.target.value = '';
+                }}
                 data-testid="purchase-return-attachment" />
-              {attachment ? <span className="oryx-muted text-xs">{attachment.name}</span> : null}
+              {attachments.length ? (
+                <ul className="mt-2 flex flex-col gap-1">
+                  {attachments.map((file, index) => (
+                    <li key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate">{file.name}</span>
+                      <button type="button" className="oryx-btn oryx-btn--ghost"
+                        aria-label={`Remove ${file.name}`}
+                        onClick={() => setAttachments((pending) => pending.filter((_, i) => i !== index))}>
+                        <Icon name="close" size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </Field>
           </div>
           <PurchaseLineSummary lines={lines} prefix="purchase-return-form" />
