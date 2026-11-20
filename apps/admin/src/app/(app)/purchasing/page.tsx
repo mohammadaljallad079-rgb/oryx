@@ -982,6 +982,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const products = useAsync(() => api.products(), []);
   const branches = useAsync(() => (companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 })), [companyId]);
   const purchaseOrders = useAsync(() => api.purchaseOrders(), []);
+  const warehouses = useAsync(() => api.warehouses(), []);
 
   return (
     <Card>
@@ -1065,6 +1066,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         open={open}
         suppliers={suppliers.data?.items ?? []}
         branches={branches.data?.items ?? []}
+        warehouses={warehouses.data?.items ?? []}
         purchaseOrders={purchaseOrders.data?.items ?? []}
         initialOrder={sourceOrder}
         onSupplierCreated={suppliers.reload}
@@ -1086,6 +1088,7 @@ function SupplierInvoiceModal({
   open,
   suppliers,
   branches,
+  warehouses,
   purchaseOrders,
   products,
   onProductCreated,
@@ -1096,6 +1099,7 @@ function SupplierInvoiceModal({
   open: boolean;
   suppliers: SupplierDto[];
   branches: Array<{ id: string; code: string; nameEn: string }>;
+  warehouses: WarehouseDto[];
   purchaseOrders: Array<{ id: string; orderNumber?: string; supplierNameEn?: string; status?: string }>;
   initialOrder?: PurchaseDocumentDto | null;
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
@@ -1116,6 +1120,7 @@ function SupplierInvoiceModal({
   const [invoiceDate, setInvoiceDate] = useState(todayIso());
   const [dueDate, setDueDate] = useState('');
   const [branchId, setBranchId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
   const [purchaseOrderId, setPurchaseOrderId] = useState('');
   const [currency, setCurrency] = useState('BHD');
   const [notes, setNotes] = useState('');
@@ -1155,7 +1160,7 @@ function SupplierInvoiceModal({
         invoiceDate: new Date(invoiceDate).toISOString(),
         ...(dueDate ? { dueDate: new Date(dueDate).toISOString() } : {}),
         ...(branchId ? { branchId } : {}),
-        ...(purchaseOrderId ? { purchaseOrderId } : {}),
+        ...(purchaseOrderId ? { purchaseOrderId } : { warehouseId: warehouseId || undefined }),
         currency,
         ...(notes.trim() ? { notes: notes.trim() } : {}),
         lines: lines.map((l) => ({
@@ -1184,7 +1189,7 @@ function SupplierInvoiceModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !supplierId} onClick={submit} data-testid="save-supplier-invoice">
+          <Button variant="primary" disabled={busy || !supplierId || (!purchaseOrderId && lines.some((line) => Boolean(line.productId)) && !warehouseId)} onClick={submit} data-testid="save-supplier-invoice">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -1235,6 +1240,17 @@ function SupplierInvoiceModal({
         <Field label={t('context.branch')}>
           <EntityPicker value={branchId || null} options={branches.map((b) => ({ value: b.id, label: `${b.code} — ${b.nameEn}` }))} onChange={(v) => setBranchId(v ?? '')} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="supplier-invoice-branch" />
         </Field>
+        {!purchaseOrderId ? (
+          <Field label={t('erp.inventory.warehouse')} required>
+            <EntityPicker
+              value={warehouseId || null}
+              options={warehouses.filter((w) => w.isActive).map((w) => ({ value: w.id, label: w.nameEn || w.nameAr }))}
+              onChange={(value) => setWarehouseId(value ?? '')}
+              placeholder={t('common.select')}
+              testId="supplier-invoice-direct-warehouse"
+            />
+          </Field>
+        ) : null}
         <Field label={t('erp.purchasing.orders')}>
           <EntityPicker value={purchaseOrderId || null} options={purchaseOrders.map((o) => ({ value: o.id, label: o.orderNumber ?? o.id, hint: o.supplierNameEn ?? o.status }))} onChange={(v) => setPurchaseOrderId(v ?? '')} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="supplier-invoice-purchase-order" />
         </Field>
