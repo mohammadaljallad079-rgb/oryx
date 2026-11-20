@@ -1170,13 +1170,51 @@ function TransfersTab({ canManage }: { canManage: boolean }) {
 }
 
 function AdjustmentsTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warehouseId, setWarehouseId] = useState('');
+  const [productId, setProductId] = useState('');
+  const [reason, setReason] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [direction, setDirection] = useState<'add' | 'subtract'>('add');
   const list = useAsync(() => api.stockAdjustments(), []);
+  const warehouses = useAsync(() => api.warehouses(), []);
+  const products = useAsync(() => api.products({ pageSize: 500 }), []);
+
+  const create = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const magnitude = toQuantityInput(quantity);
+      if (!warehouseId || !productId || reason.trim().length < 2 || magnitude <= 0) {
+        throw new Error(locale === 'ar' ? 'اختر المستودع والمنتج وأدخل كمية موجبة وسببًا للتسوية.' : 'Choose a warehouse, product, positive quantity and reason.');
+      }
+      await api.createStockAdjustment({
+        warehouseId,
+        reason: reason.trim(),
+        lines: [{ productId, quantityDelta: direction === 'add' ? magnitude : -magnitude }],
+      });
+      setOpen(false);
+      setProductId('');
+      setQuantity('1');
+      setReason('');
+      await list.reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Card>
-      <div className="border-b border-[var(--border)] p-4">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.inventory.adjustments')}</p>
+        {canManage ? <Button variant="primary" size="sm" onClick={() => { setError(null); setOpen(true); }} data-testid="new-stock-adjustment">
+          <Icon name="plus" size={16} />{locale === 'ar' ? 'تسوية جديدة' : 'New adjustment'}
+        </Button> : null}
       </div>
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={120} /></div> : (list.data?.items.length ?? 0) === 0 ? (
@@ -1217,6 +1255,55 @@ function AdjustmentsTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
+      <Modal
+        open={open}
+        size="form"
+        title={locale === 'ar' ? 'تسوية مخزون جديدة' : 'New stock adjustment'}
+        onClose={() => { if (!busy) setOpen(false); }}
+        footer={<>
+          <Button onClick={() => setOpen(false)} disabled={busy}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={busy || !warehouseId || !productId || !reason.trim() || !quantity.trim()} onClick={() => void create()} data-testid="save-stock-adjustment">
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </>}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('erp.inventory.warehouse')} required>
+            <EntityPicker
+              value={warehouseId || null}
+              options={(warehouses.data?.items ?? []).filter((w) => w.isActive).map((w) => ({ value: w.id, label: locale === 'ar' ? w.nameAr || w.nameEn : w.nameEn || w.nameAr }))}
+              onChange={(id) => setWarehouseId(id ?? '')}
+              placeholder={t('common.select')}
+              testId="adjustment-warehouse"
+            />
+          </Field>
+          <Field label={t('erp.inventory.products')} required>
+            <EntityPicker
+              value={productId || null}
+              options={(products.data?.items ?? []).filter((p) => p.trackStock && p.type === 'PRODUCT').map((p) => ({ value: p.id, label: `${p.sku} — ${locale === 'ar' ? p.nameAr || p.nameEn : p.nameEn || p.nameAr}` }))}
+              onChange={(id) => setProductId(id ?? '')}
+              placeholder={t('common.select')}
+              testId="adjustment-product"
+            />
+          </Field>
+          <Field label={locale === 'ar' ? 'نوع التسوية' : 'Adjustment direction'}>
+            <select className="oryx-select" value={direction} onChange={(e) => setDirection(e.target.value as typeof direction)} data-testid="adjustment-direction">
+              <option value="add">{locale === 'ar' ? 'زيادة الرصيد' : 'Increase stock'}</option>
+              <option value="subtract">{locale === 'ar' ? 'تخفيض الرصيد' : 'Decrease stock'}</option>
+            </select>
+          </Field>
+          <Field label={locale === 'ar' ? 'الكمية' : 'Quantity'} required>
+            <input type="number" min="0.0001" step="0.0001" className="oryx-input" value={quantity} onChange={(e) => setQuantity(e.target.value)} data-testid="adjustment-quantity" />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label={t('erp.inventory.reason')} required>
+              <textarea className="oryx-input oryx-textarea" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} data-testid="adjustment-reason" />
+            </Field>
+          </div>
+        </div>
+        <p className="oryx-muted text-xs">{locale === 'ar' ? 'تُحفظ التسوية كمسودة، ثم تُرحّل من القائمة بعد مراجعتها.' : 'The adjustment is saved as draft; post it from the list after review.'}</p>
+        {error ? <ErrorBanner message={error} /> : null}
+      </Modal>
     </Card>
   );
 }
