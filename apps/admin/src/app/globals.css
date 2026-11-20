@@ -5137,3 +5137,196 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     overflow-y: auto;
   }
 }
+
+
+/* Cashier v5: clearer catalog, visible cart and payment hierarchy.
+   Scoped to POS v5 so existing invoices, modals and other routes stay intact. */
+.oryx-pos--cashier-v5 .oryx-pos__viewbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  padding: 0 3px;
+  color: var(--pos-soft);
+  font-size: 12px;
+}
+.oryx-pos--cashier-v5 .oryx-pos__viewbar-result,
+.oryx-pos--cashier-v5 .oryx-pos__viewbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.oryx-pos--cashier-v5 .oryx-pos__viewbar-actions {
+  padding: 3px;
+  border: 1px solid var(--pos-line);
+  border-radius: 10px;
+  background: var(--pos-panel);
+}
+.oryx-pos--cashier-v5 .oryx-pos__viewbar-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 29px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--pos-soft);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+.oryx-pos--cashier-v5 .oryx-pos__viewbar-actions button.is-active {
+  color: var(--pos-action-ink);
+  background: var(--pos-action);
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid {
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 12px;
+  padding: 4px 6px 20px;
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile {
+  min-height: 228px;
+  border-radius: 15px;
+  overflow: hidden;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile__media {
+  aspect-ratio: 4 / 3;
+  border-bottom: 1px solid var(--pos-line);
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile__media img {
+  object-fit: contain;
+  padding: 12px;
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile__body {
+  padding: 11px 12px 44px;
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile__name {
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile__price {
+  font-size: 16px;
+  font-weight: 800;
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list {
+  grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
+  gap: 9px;
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list > div {
+  min-width: 0;
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list .oryx-pos-tile {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-height: 120px;
+  text-align: start;
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list .oryx-pos-tile__media {
+  width: 112px;
+  min-width: 112px;
+  align-self: stretch;
+  aspect-ratio: auto;
+  border-bottom: 0;
+  border-inline-end: 1px solid var(--pos-line);
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list .oryx-pos-tile__body {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 10px 37px;
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list .oryx-pos-tile__add {
+  bottom: 7px;
+}
+.oryx-pos--cashier-v5 .oryx-pos__empty--onboarding {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 25px 16px;
+  text-align: center;
+  color: var(--pos-ink);
+}
+.oryx-pos--cashier-v5 .oryx-pos__empty--onboarding strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+.oryx-pos--cashier-v5 .oryx-pos__empty--onboarding > span:not(.oryx-pos__empty-art) {
+  max-width: 250px;
+  font-size: 12px;
+  color: var(--pos-soft);
+  line-height: 1.6;
+}
+.oryx-pos--cashier-v5 .oryx-pos__empty-art {
+  width: 66px;
+  height: 66px;
+  border: 1px solid var(--pos-line);
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--pos-accent);
+  background: var(--pos-tint);
+}
+.oryx-pos--cashier-v5 .oryx-pos__payment-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--pos-soft);
+}
+.oryx-pos--cashier-v5 .oryx-pos__payment-title .oryx-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  color: var(--pos-ink);
+}
+.oryx-pos--cashier-v5 .oryx-pos__tender .oryx-btn--primary {
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.oryx-pos--cashier-v5 button:focus-visible,
+.oryx-pos--cashier-v5 input:focus-visible {
+  outline: 2px solid var(--pos-action);
+  outline-offset: 2px;
+}
+@media (min-width: 721px) {
+  .oryx-modal--pos .oryx-pos--cashier-v5 .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 12px;
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v5 .oryx-pos__grid--list {
+    grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v5 .oryx-pos__lines {
+    min-height: 115px;
+  }
+}
+@media (max-width: 720px) {
+  .oryx-modal--pos .oryx-pos--cashier-v5 .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v5 .oryx-pos__grid--list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .oryx-pos--cashier-v5 .oryx-pos__viewbar {
+    flex-wrap: wrap;
+  }
+  .oryx-pos--cashier-v5 .oryx-pos__payment-title > span:last-child {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oryx-pos--cashier-v5 .oryx-pos-tile { transition: none; }
+}
