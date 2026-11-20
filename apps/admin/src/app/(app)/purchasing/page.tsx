@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -67,6 +67,69 @@ function useTaxOptions(companyId: string | null | undefined): {
 }
 
 const TAB_KEYS = ['dashboard', 'requisitions', 'orders', 'receipts', 'invoices', 'returns', 'suppliers'] as const;
+
+/**
+ * Purchasing uses the same document-form visual hierarchy as Sales, while each
+ * purchasing document retains its own fields and posting rules.
+ */
+function PurchaseFormNav({ prefix, sections }: { prefix: string; sections: Array<[string, string]> }) {
+  const { locale } = useUi();
+  return (
+    <nav className="oryx-doc-form__section-tabs" aria-label={locale === 'ar' ? 'أقسام نموذج المشتريات' : 'Purchase form sections'} data-testid={`${prefix}-section-tabs`}>
+      {sections.map(([id, label]) => (
+        <button key={id} type="button" className="oryx-doc-form__section-tab"
+          data-testid={`${prefix}-tab-${id}`}
+          onClick={() => document.querySelector(`[data-testid="${prefix}-${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function PurchaseFormSection({ prefix, section, title, hint, children, className = '' }: {
+  prefix: string; section: string; title: string; hint?: string; children: ReactNode; className?: string;
+}) {
+  return (
+    <section className={`oryx-doc-form__section ${className}`} data-testid={`${prefix}-${section}`}>
+      <div className="oryx-doc-form__section-head">
+        <span>{title}</span>
+        {hint ? <span className="text-[11px] font-semibold text-[var(--muted)]">{hint}</span> : null}
+      </div>
+      <div className="p-3">{children}</div>
+    </section>
+  );
+}
+
+function PurchaseLineSummary({ lines, currency = 'BHD', estimated = false, prefix }: {
+  lines: LineDraft[]; currency?: string; estimated?: boolean; prefix: string;
+}) {
+  const { locale, t } = useUi();
+  // This is only a preview. The API remains the authority for saved totals.
+  const subtotalMinor = lines.reduce((sum, l) => sum + Math.round((Number(l.quantity) || 0) * toMinorInput(l.unitCost, currency)), 0);
+  const taxMinor = estimated ? 0 : lines.reduce((sum, l) => {
+    const base = Math.round((Number(l.quantity) || 0) * toMinorInput(l.unitCost, currency));
+    return sum + Math.round(base * (Number(l.taxPercent) || 0) / 100);
+  }, 0);
+  return (
+    <div className="ms-auto w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3" data-testid={`${prefix}-totals`}>
+      <div className="flex justify-between gap-3 text-sm">
+        <span>{estimated ? (locale === 'ar' ? 'التكلفة التقديرية' : 'Estimated cost') : t('erp.sales.form.untaxedAmount')}</span>
+        <strong className="tabular-nums">{money(subtotalMinor, currency)}</strong>
+      </div>
+      {!estimated ? <>
+        <div className="mt-2 flex justify-between gap-3 text-sm">
+          <span>{t('erp.sales.form.tax')}</span><span className="tabular-nums">{money(taxMinor, currency)}</span>
+        </div>
+        <div className="mt-3 flex justify-between gap-3 border-t border-[var(--border)] pt-3 text-sm font-bold">
+          <span>{t('erp.sales.form.total')}</span><span className="tabular-nums">{money(subtotalMinor + taxMinor, currency)}</span>
+        </div>
+      </> : null}
+      <p className="oryx-faint m-0 mt-2 text-[11px]">{locale === 'ar' ? 'معاينة تقديرية؛ يعتمد المبلغ النهائي بعد الحفظ.' : 'Preview only; final amounts are confirmed on save.'}</p>
+    </div>
+  );
+}
+
 
 export default function PurchasingPage() {
   return (
