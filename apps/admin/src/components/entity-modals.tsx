@@ -6,6 +6,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAuth } from '@/lib/auth-context';
 import { toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Button, ErrorBanner, Field, Modal } from '@/components/ui';
+import { Icon } from '@/components/icons';
 import { EntityPicker } from '@/components/inline-create';
 import { CustomerModal } from '@/components/customer-modal';
 import type { EmployeeDto, ErpAccountDto, LeadDto, MarketplaceProviderDto, ProductDto, SupplierDto, VehicleDto } from '@oryx/shared';
@@ -200,7 +201,7 @@ export function ProductModal({
   const [warehouseOptions, setWarehouseOptions] = useState<Array<{ id: string; code: string; nameEn: string; nameAr: string }>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [productImage, setProductImage] = useState<File | null>(null);
+  const [productImages, setProductImages] = useState<File[]>([]);
   // Save the product id immediately, so retrying a failed image upload cannot
   // create a duplicate product or assign another automatic SKU.
   const [createdProduct, setCreatedProduct] = useState<ProductDto | null>(null);
@@ -213,7 +214,7 @@ export function ProductModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
-    setProductImage(null);
+    setProductImages([]);
     setCreatedProduct(null);
     setForm({
       sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
@@ -261,13 +262,13 @@ export function ProductModal({
           : {}),
       });
       setCreatedProduct(saved);
-      if (productImage) {
+      for (const image of productImages) {
         const imageData = new FormData();
-        imageData.append('file', productImage);
+        imageData.append('file', image);
         imageData.append('altEn', form.nameEn.trim() || form.nameAr.trim());
         imageData.append('altAr', form.nameAr.trim() || form.nameEn.trim());
         await api.uploadProductImage(saved.id, imageData);
-        setProductImage(null);
+        setProductImages((pending) => pending.filter((candidate) => candidate !== image));
       }
       await onCreated();
       onSaved?.(saved);
@@ -355,11 +356,28 @@ export function ProductModal({
       ) : null}
       <div className="mt-4 rounded-xl border border-[var(--border)] p-3" data-testid="product-inline-image">
         <Field label={t('erp.inventory.images')}>
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif"
+          <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif"
             className="oryx-input" data-testid="product-inline-image-file"
-            onChange={(e) => setProductImage(e.target.files?.[0] ?? null)} />
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              setProductImages((pending) => [...pending, ...files]);
+              e.target.value = '';
+            }} />
         </Field>
-        {productImage ? <p className="oryx-muted m-0 mt-2 text-xs">{productImage.name}</p> : null}
+        {productImages.length > 0 ? (
+          <ul className="mt-2 flex flex-col gap-1">
+            {productImages.map((image, index) => (
+              <li key={`${image.name}-${image.lastModified}-${index}`} className="flex items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 truncate">{image.name}</span>
+                <button type="button" className="oryx-btn oryx-btn--ghost"
+                  aria-label={`Remove ${image.name}`}
+                  onClick={() => setProductImages((pending) => pending.filter((_, i) => i !== index))}>
+                  <Icon name="close" size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {createdProduct ? <p className="oryx-muted m-0 mt-2 text-xs">
           {t('erp.inventory.sku')}: {createdProduct.sku}
         </p> : null}
