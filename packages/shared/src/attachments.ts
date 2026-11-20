@@ -24,6 +24,7 @@
  */
 export const ATTACHMENT_ENTITY_TYPES = [
   'SALES_INVOICE',
+  'QUOTATION',
   'CREDIT_NOTE',
   'PAYMENT',
   'EMPLOYEE',
