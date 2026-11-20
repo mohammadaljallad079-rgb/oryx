@@ -752,8 +752,53 @@ export class PurchasingService {
         if (order.supplierId !== dto.supplierId) {
           throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Supplier invoice supplier must match the purchase order.');
         }
-        const receipts = await tx.goodsReceipt.findMany({ where: { purchaseOrderId: order.id, status: 'POSTED' } });
-        if (receipts.length > 0) alreadyAccrued = totals.subtotalMinor;
+        // Match invoice lines against quantities actually received, subtracting
+        // earlier posted invoices. A partial receipt cannot justify an invoice
+        // for the entire order, and successive invoices cannot bill one receipt
+        // allocation twice. Standalone invoices remain available without a PO.
+        const receipts = await tx.goodsReceipt.findMany({
+          where: { purchaseOrderId: order.id, status: 'POSTED' },
+          include: { lines: true },
+        });
+        const priorInvoices = await tx.supplierInvoice.findMany({
+          where: { purchaseOrderId: order.id, companyId, status: 'POSTED' },
+          include: { lines: true },
+        });
+        const receivedByProduct = new Map<string, number>();
+        for (const receipt of receipts) {
+          for (const line of receipt.lines) {
+            receivedByProduct.set(line.productId, (receivedByProduct.get(line.productId) ?? 0) + line.quantity);
+          }
+        }
+        const billedByProduct = new Map<string, number>();
+        for (const previous of priorInvoices) {
+          for (const line of previous.lines) {
+            if (!line.productId) continue;
+            billedByProduct.set(line.productId, (billedByProduct.get(line.productId) ?? 0) + line.quantity);
+          }
+        }
+        const requestedByProduct = new Map<string, number>();
+        for (const line of dto.lines) {
+          if (!line.productId) continue;
+          requestedByProduct.set(line.productId, (requestedByProduct.get(line.productId) ?? 0) + line.quantity);
+        }
+        for (const [productId, requested] of requestedByProduct) {
+          const available = (receivedByProduct.get(productId) ?? 0) - (billedByProduct.get(productId) ?? 0);
+          if (requested > available) {
+            throw badRequest(
+              ERROR_CODES.OVER_RECEIPT,
+              'Supplier invoice quantity exceeds received and not-yet-invoiced stock.',
+              { productId, requested, available: Math.max(0, available) },
+            );
+          }
+        }
+        // Only receipt-backed product value is already in AP. Unmatched
+        // non-stock service lines continue to accrue through the invoice.
+        if (receipts.length > 0) {
+          alreadyAccrued = sumMinor(dto.lines
+            .filter((line) => line.productId)
+            .map((line) => lineAmountMinor(line.quantity, line.unitCostMinor)));
+        }
       }
 
       const supplier = await tx.supplier.findFirst({ where: { id: dto.supplierId, companyId } });
