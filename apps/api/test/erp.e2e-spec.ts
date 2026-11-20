@@ -1112,6 +1112,31 @@ describe('ORYX ERP core (e2e)', () => {
       expect(duplicate.body.code).toBe('request.validation_failed');
     });
 
+    it('prevents a requisition with duplicate products from becoming an ambiguous purchase order', async () => {
+      const req = await erp<{ id: string }>('/purchasing/requisitions', {
+        method: 'POST',
+        body: {
+          supplierId,
+          lines: [
+            { productId, description: 'Widget A', quantity: 10000, estimatedUnitCostMinor: 6000 },
+            { productId, description: 'Widget B', quantity: 10000, estimatedUnitCostMinor: 6000 },
+          ],
+        },
+      });
+      expect(req.status).toBe(201);
+      const approved = await erp(`/purchasing/requisitions/${req.body.id}/approve`, {
+        method: 'POST',
+        body: {},
+      });
+      expect(approved.status).toBe(201);
+      const convert = await erp<{ code: string }>(`/purchasing/requisitions/${req.body.id}/convert`, {
+        method: 'POST',
+        body: { supplierId },
+      });
+      expect(convert.status).toBe(400);
+      expect(convert.body.code).toBe('request.validation_failed');
+    });
+
     it('rejects repeated product lines on receipts without changing stock or PO allocation', async () => {
       const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
         where: { warehouseId_productId: { warehouseId, productId } },
