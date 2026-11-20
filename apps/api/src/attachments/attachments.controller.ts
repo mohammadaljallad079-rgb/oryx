@@ -37,6 +37,11 @@ export class AttachmentsController {
     'erp.maintenance.read',
     'erp.inspection.read',
     'erp.operations.read',
+    'erp.hr.document.read',
+    'erp.hr.leave.approve',
+    'erp.hr.leave.manage',
+    'erp.hr.penalty.manage',
+    'erp.hr.bonus.manage',
   )
   @ApiOperation({ summary: 'List attachments for a document' })
   list(
@@ -58,6 +63,12 @@ export class AttachmentsController {
     'erp.inventory.write',
     'erp.maintenance.write',
     'erp.operations.write',
+    'erp.hr.penalty.manage',
+    'erp.hr.bonus.manage',
+    'erp.hr.employee.manage',
+    'erp.hr.leave.request',
+    'erp.hr.leave.approve',
+    'erp.hr.leave.manage',
   )
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
@@ -88,6 +99,11 @@ export class AttachmentsController {
     'erp.maintenance.read',
     'erp.inspection.read',
     'erp.operations.read',
+    'erp.hr.document.read',
+    'erp.hr.leave.approve',
+    'erp.hr.leave.manage',
+    'erp.hr.penalty.manage',
+    'erp.hr.bonus.manage',
   )
   @ApiOperation({ summary: 'Download an attachment (or open it for preview)' })
   async download(
@@ -120,6 +136,12 @@ export class AttachmentsController {
     'erp.inventory.write',
     'erp.maintenance.write',
     'erp.operations.write',
+    'erp.hr.penalty.manage',
+    'erp.hr.bonus.manage',
+    'erp.hr.employee.manage',
+    'erp.hr.leave.request',
+    'erp.hr.leave.approve',
+    'erp.hr.leave.manage',
   )
   @ApiOperation({ summary: 'Remove an attachment' })
   remove(
