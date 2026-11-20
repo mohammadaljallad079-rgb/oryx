@@ -312,6 +312,7 @@ function EditBranchModal({
     <Modal
       open={Boolean(branch)}
       title={t('branches.editTitle')}
+      size="form"
       onClose={onClose}
       footer={
         <>
