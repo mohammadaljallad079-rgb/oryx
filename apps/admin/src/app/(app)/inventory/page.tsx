@@ -55,7 +55,6 @@ function InventoryInner() {
   const canItem = can('erp.inventory.item.manage');
   const canWarehouse = can('erp.inventory.warehouse.manage');
   const canMove = can('erp.inventory.movement.manage');
-  const canTransfer = can('erp.inventory.transfer.manage');
   const canAdjust = can('erp.inventory.adjustment.manage');
 
   const tabs: Array<{ key: Tab; label: string }> = [
@@ -1204,6 +1203,8 @@ function ProductCategoriesTab({ canManage }: { canManage: boolean }) {
   );
 }
 
+// Keep the legacy transfer UI available for future audit/history access; not part of the current tabs.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TransfersTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.stockTransfers(), []);
