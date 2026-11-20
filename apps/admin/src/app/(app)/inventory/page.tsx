@@ -35,9 +35,9 @@ import type {
   WarehouseDto,
 } from '@oryx/shared';
 
-type Tab = 'dashboard' | 'valuation' | 'products' | 'spare-parts' | 'warehouses' | 'movements' | 'transfers' | 'adjustments' | 'reorder';
+type Tab = 'dashboard' | 'valuation' | 'products' | 'spare-parts' | 'warehouses' | 'movements' | 'categories' | 'adjustments' | 'reorder';
 
-const TAB_KEYS = ['dashboard', 'valuation', 'products', 'spare-parts', 'warehouses', 'movements', 'transfers', 'adjustments', 'reorder'] as const;
+const TAB_KEYS = ['dashboard', 'valuation', 'products', 'spare-parts', 'warehouses', 'movements', 'categories', 'adjustments', 'reorder'] as const;
 
 export default function InventoryPage() {
   return (
@@ -65,7 +65,7 @@ function InventoryInner() {
     { key: 'spare-parts', label: locale === 'ar' ? 'قطع الغيار' : 'Spare parts' },
     { key: 'warehouses', label: t('erp.inventory.warehouses') },
     { key: 'movements', label: t('erp.inventory.movements') },
-    { key: 'transfers', label: t('erp.inventory.transfers') },
+    { key: 'categories', label: locale === 'ar' ? 'تصنيفات المنتجات' : 'Product categories' },
     { key: 'adjustments', label: t('erp.inventory.adjustments') },
     { key: 'reorder', label: t('erp.inventory.reorder') },
   ];
@@ -101,7 +101,7 @@ function InventoryInner() {
       {tab === 'spare-parts' ? <ProductsTab canManage={canItem} sparePartsOnly /> : null}
       {tab === 'warehouses' ? <WarehousesTab canManage={canWarehouse} /> : null}
       {tab === 'movements' ? <MovementsTab canManage={canMove} /> : null}
-      {tab === 'transfers' ? <TransfersTab canManage={canTransfer} /> : null}
+      {tab === 'categories' ? <ProductCategoriesTab canManage={canItem} /> : null}
       {tab === 'adjustments' ? <AdjustmentsTab canManage={canAdjust} /> : null}
       {tab === 'reorder' ? <ReorderTab /> : null}
     </div>
@@ -1112,6 +1112,91 @@ function RecordMovementModal({
         </Field>
       </div>
     </Modal>
+  );
+}
+
+function ProductCategoriesTab({ canManage }: { canManage: boolean }) {
+  const { t, locale } = useUi();
+  const categories = useAsync(() => api.managedProductCategories(), []);
+  const allCategories = useAsync(() => api.productCategories(), []);
+  const [name, setName] = useState('');
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    const next = name.trim();
+    if (!next) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (editing) await api.renameProductCategory(editing.id, next);
+      else await api.createProductCategory(next);
+      setEditing(null);
+      setName('');
+      await Promise.all([categories.reload(), allCategories.reload()]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
+        <p className="oryx-panel-title m-0">{locale === 'ar' ? 'تصنيفات المنتجات وقطع الغيار' : 'Product and spare-parts categories'}</p>
+      </div>
+      {canManage ? (
+        <div className="flex flex-wrap items-end gap-3 border-b border-[var(--border)] p-4">
+          <Field label={editing ? (locale === 'ar' ? 'تعديل التصنيف' : 'Rename category') : (locale === 'ar' ? 'تصنيف جديد' : 'New category')}>
+            <input className="oryx-input" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} data-testid="category-name" placeholder={locale === 'ar' ? 'مثال: قطع غيار' : 'e.g. Spare Parts'} />
+          </Field>
+          <Button variant="primary" disabled={busy || !name.trim()} onClick={() => void save()} data-testid="save-product-category">
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+          {editing ? <Button onClick={() => { setEditing(null); setName(''); }}>{t('common.cancel')}</Button> : null}
+        </div>
+      ) : null}
+      {error ? <ErrorBanner message={error} /> : null}
+      {categories.error ? <ErrorBanner message={categories.error} onRetry={categories.reload} /> : null}
+      {categories.loading ? <Skeleton height={100} /> : (
+        <TableShell>
+          <thead><tr><th>{locale === 'ar' ? 'التصنيف' : 'Category'}</th><th>{locale === 'ar' ? 'عدد المنتجات' : 'Products'}</th><th>{t('common.actions')}</th></tr></thead>
+          <tbody>
+            {(categories.data?.items ?? []).map((item) => (
+              <tr key={item.id} data-testid={`category-row-${item.id}`}>
+                <td>{item.name}</td>
+                <td className="tabular-nums">{item.productCount}</td>
+                <td>
+                  {canManage ? <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => { setEditing({ id: item.id, name: item.name }); setName(item.name); }} data-testid={`edit-category-${item.id}`}>{t('common.edit')}</Button>
+                    <Button size="sm" variant="danger" onClick={async () => {
+                      if (!window.confirm(t('common.deleteConfirm'))) return;
+                      try {
+                        await api.deleteProductCategory(item.id);
+                        await Promise.all([categories.reload(), allCategories.reload()]);
+                      } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
+                    }} data-testid={`delete-category-${item.id}`}>{t('common.delete')}</Button>
+                  </div> : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
+      )}
+      <p className="oryx-muted p-4 text-xs">
+        {locale === 'ar'
+          ? 'التصنيفات مرتبطة بالمنتجات وقطع الغيار. إعادة تسمية تصنيف مسجل تحدّث المنتجات المرتبطة به؛ لا يمكن حذف تصنيف مستخدم.'
+          : 'Categories connect products and spare parts. Renaming a managed category updates linked products; categories in use cannot be deleted.'}
+      </p>
+      {(allCategories.data?.items ?? []).filter((name) => !(categories.data?.items ?? []).some((item) => item.name === name)).length > 0 ? (
+        <div className="px-4 pb-4 text-xs">
+          {locale === 'ar' ? 'تصنيفات موجودة في المنتجات (يمكن تسجيلها هنا لإدارتها): ' : 'Existing product categories (register to manage): '}
+          {(allCategories.data?.items ?? []).filter((name) => !(categories.data?.items ?? []).some((item) => item.name === name)).join('، ')}
+        </div>
+      ) : null}
+    </Card>
   );
 }
 
