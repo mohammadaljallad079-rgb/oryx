@@ -1,6 +1,6 @@
 import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
-import { QUANTITY_SCALE, fromQuantity, lineAmountMinor, sumMinor } from '@oryx/shared';
+import { QUANTITY_SCALE, fromQuantity, lineAmountMinor, resolveEffectivePermissions, sumMinor } from '@oryx/shared';
 import type { StockMovementSource, StockMovementType } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -523,6 +523,16 @@ export class InventoryService {
     const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
     if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    const openingQuantity = dto.openingQuantity ?? 0;
+    if (openingQuantity > 0) {
+      if (!dto.openingWarehouseId || dto.trackStock === false || dto.type === 'SERVICE') {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Opening stock requires a tracked product and a warehouse.');
+      }
+      if (!resolveEffectivePermissions(principal).permissions.includes('erp.inventory.movement.manage')) {
+        throw forbidden(ERROR_CODES.FORBIDDEN, 'Opening stock requires inventory movement permission.');
+      }
+      await this.assertWarehouse(companyId, dto.openingWarehouseId);
+    }
     const dup = await this.prisma.product.findUnique({ where: { companyId_sku: { companyId, sku: sku } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `SKU ${sku} already exists.`);
     if ((dto.isPublished ?? false) && !dto.partCategoryKey) {
@@ -531,7 +541,8 @@ export class InventoryService {
         'A product needs a spare-parts category before it can be published to the store.',
       );
     }
-    const product = await this.prisma.product.create({
+    const product = await this.posting.withTransaction(async (tx) => {
+      const created = await tx.product.create({
       data: {
         companyId,
         sku: sku,
@@ -562,6 +573,22 @@ export class InventoryService {
         compareAtPriceMinor: dto.compareAtPriceMinor ?? null,
         imageUrl: dto.imageUrl ?? null,
       },
+    });
+      if (openingQuantity > 0 && dto.openingWarehouseId) {
+        await this.recordMovement(tx, {
+          companyId,
+          warehouseId: dto.openingWarehouseId,
+          productId: created.id,
+          movementType: 'RECEIPT',
+          quantity: openingQuantity,
+          unitCostMinor: dto.costPriceMinor ?? 0,
+          source: 'MANUAL',
+          memo: 'Opening stock on product creation',
+          occurredAt: new Date(),
+          actorUserId: actor.userId,
+        });
+      }
+      return created;
     });
     await this.audit.record({
       actorUserId: actor.userId,
