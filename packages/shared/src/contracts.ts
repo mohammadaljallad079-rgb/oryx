@@ -769,6 +769,8 @@ export interface WarehouseDto {
 export interface ProductDto {
   id: string;
   sku: string;
+  /** Live on-hand quantity, scaled by 10^4; scoped to the selected warehouse when filtered. */
+  onHandQuantity?: number;
   nameEn: string;
   nameAr: string;
   type: 'PRODUCT' | 'SERVICE';
