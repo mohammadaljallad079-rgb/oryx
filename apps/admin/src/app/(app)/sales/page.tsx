@@ -316,7 +316,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
-  const [invoiceAttachment, setInvoiceAttachment] = useState<File | null>(null);
+  const [invoiceAttachments, setInvoiceAttachments] = useState<File[]>([]);
   // Preserve the saved invoice between retries when its attachment upload fails.
   const savedInvoiceId = useRef<string | null>(null);
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
@@ -334,7 +334,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.sales.invoices')}</p>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => { savedInvoiceId.current = null; setInvoiceAttachment(null); setEditingInvoice(null); setOpen(true); }} data-testid="new-invoice">
+          <Button variant="primary" size="sm" onClick={() => { savedInvoiceId.current = null; setInvoiceAttachments([]); setEditingInvoice(null); setOpen(true); }} data-testid="new-invoice">
             <Icon name="plus" size={16} />
             {t('erp.sales.newInvoice')}
           </Button>
@@ -379,7 +379,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     {canManage && inv.status === 'DRAFT' ? (
                       <>
-                        <Button size="sm" variant="ghost" onClick={() => { savedInvoiceId.current = null; setInvoiceAttachment(null); setEditingInvoice(inv); setOpen(true); }} data-testid={`edit-invoice-${inv.invoiceNumber}`}>
+                        <Button size="sm" variant="ghost" onClick={() => { savedInvoiceId.current = null; setInvoiceAttachments([]); setEditingInvoice(inv); setOpen(true); }} data-testid={`edit-invoice-${inv.invoiceNumber}`}>
                           <Icon name="edit" size={14} />
                           {t('common.edit')}
                         </Button>
@@ -430,10 +430,10 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         showWarehouse
         dueDateField="dueDate"
         settlement
-        attachmentFile={invoiceAttachment}
-        onAttachmentFileChange={setInvoiceAttachment}
+        attachmentFiles={invoiceAttachments}
+        onAttachmentFilesChange={setInvoiceAttachments}
         testIdPrefix="invoice"
-        onClose={() => { setOpen(false); setInvoiceAttachment(null); savedInvoiceId.current = null; }}
+        onClose={() => { setOpen(false); setInvoiceAttachments([]); savedInvoiceId.current = null; }}
         onSubmit={async (payload) => {
           let invoiceId = savedInvoiceId.current;
           if (!invoiceId) {
@@ -446,9 +446,12 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
             }
             savedInvoiceId.current = invoiceId;
           }
-          if (invoiceAttachment) {
-            await api.uploadAttachment('SALES_INVOICE', invoiceId, invoiceAttachment, 'OFFICIAL');
-            setInvoiceAttachment(null);
+          // Upload pending files one at a time. Successfully uploaded files are
+          // removed from the retry queue so a failed later upload cannot create
+          // duplicate attachment rows or a second invoice on retry.
+          for (const attachment of invoiceAttachments) {
+            await api.uploadAttachment('SALES_INVOICE', invoiceId, attachment, 'OFFICIAL');
+            setInvoiceAttachments((pending) => pending.filter((file) => file !== attachment));
           }
           if (payload.post !== false) setAutoPreviewId(invoiceId);
           await list.reload();
@@ -2186,6 +2189,8 @@ function DocumentModal({
   reasonField,
   attachmentFile,
   onAttachmentFileChange,
+  attachmentFiles,
+  onAttachmentFilesChange,
   dueDateField,
   settlement,
   testIdPrefix,
@@ -2227,6 +2232,8 @@ function DocumentModal({
   reasonField?: boolean;
   attachmentFile?: File | null;
   onAttachmentFileChange?: (file: File | null) => void;
+  attachmentFiles?: File[];
+  onAttachmentFilesChange?: (files: File[]) => void;
   /**
    * Which date field the printed template renders beyond the document date:
    * an invoice prints a due date, a quotation a validity date, an order none.
@@ -2666,6 +2673,36 @@ function DocumentModal({
                 <option value="BANK_TRANSFER">{t('erp.sales.refundBankTransfer')}</option>
                 <option value="CARD">{t('erp.sales.refundCard')}</option>
               </select>
+            </Field>
+          ) : null}
+          {onAttachmentFilesChange ? (
+            <Field label={t('attachments.title')}>
+              <input
+                type="file"
+                multiple
+                className="oryx-input w-full"
+                accept={ATTACHMENT_ACCEPT}
+                onChange={(e) => {
+                  const selected = Array.from(e.target.files ?? []);
+                  if (selected.length) onAttachmentFilesChange([...(attachmentFiles ?? []), ...selected]);
+                  e.target.value = '';
+                }}
+                data-testid={`${testIdPrefix}-attachment`}
+              />
+              {(attachmentFiles ?? []).length > 0 ? (
+                <ul className="mt-2 flex flex-col gap-1">
+                  {(attachmentFiles ?? []).map((file, index) => (
+                    <li key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate">{file.name}</span>
+                      <button type="button" className="oryx-btn oryx-btn--ghost shrink-0"
+                        onClick={() => onAttachmentFilesChange((attachmentFiles ?? []).filter((_, i) => i !== index))}
+                        aria-label={locale === 'ar' ? `إزالة ${file.name}` : `Remove ${file.name}`}>
+                        <Icon name="close" size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </Field>
           ) : null}
           {onAttachmentFileChange ? (
