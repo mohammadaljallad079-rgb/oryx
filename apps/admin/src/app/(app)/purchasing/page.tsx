@@ -753,28 +753,96 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
   const debouncedSearch = useDebounced(search, 300);
   const list = useAsync(() => api.goodsReceipts({ search: debouncedSearch || undefined, status: status || undefined }), [debouncedSearch, status]);
   const orders = useAsync(() => api.purchaseOrders({ status: 'APPROVED' }), []);
+  const warehouses = useAsync(() => api.warehouses(), []);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+
+  const receiveSelectedOrder = async () => {
+    if (!selectedOrderId) return;
+    setReceiptBusy(true);
+    setReceiptError(null);
+    try {
+      await api.createGoodsReceipt({
+        purchaseOrderId: selectedOrderId,
+        receivedAt: new Date().toISOString(),
+        ...(warehouseId ? { warehouseId } : {}),
+      });
+      setReceiptOpen(false);
+      setSelectedOrderId('');
+      setWarehouseId('');
+      await Promise.all([list.reload(), orders.reload()]);
+    } catch (e) {
+      setReceiptError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setReceiptBusy(false);
+    }
+  };
 
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.purchasing.receipts')}</p>
-        {canManage && (orders.data?.items.length ?? 0) > 0 ? (
+        {canManage ? (
           <Button
             variant="primary"
             size="sm"
-            data-testid="receive-first-order"
-            onClick={async () => {
-              const order = orders.data!.items[0];
-              await api.createGoodsReceipt({ purchaseOrderId: order.id, receivedAt: new Date().toISOString() });
-              await list.reload();
-              await orders.reload();
-            }}
+            data-testid="open-goods-receipt"
+            onClick={() => { setReceiptError(null); setReceiptOpen(true); }}
           >
             <Icon name="plus" size={16} />
             {t('erp.purchasing.receiveGoods')}
           </Button>
         ) : null}
       </div>
+      <Modal
+        open={receiptOpen}
+        title={t('erp.purchasing.receiveGoods')}
+        onClose={() => { if (!receiptBusy) setReceiptOpen(false); }}
+        footer={
+          <>
+            <Button disabled={receiptBusy} onClick={() => setReceiptOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" disabled={receiptBusy || !selectedOrderId} onClick={() => void receiveSelectedOrder()} data-testid="save-goods-receipt">
+              {receiptBusy ? t('common.loading') : t('erp.purchasing.receiveGoods')}
+            </Button>
+          </>
+        }
+      >
+        {receiptError ? <ErrorBanner message={receiptError} /> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('erp.purchasing.orders')} required>
+            <EntityPicker
+              value={selectedOrderId || null}
+              options={(orders.data?.items ?? []).map((o) => ({
+                value: o.id,
+                label: o.orderNumber ?? o.id,
+                hint: o.supplierNameEn ?? undefined,
+              }))}
+              onChange={(value) => setSelectedOrderId(value ?? '')}
+              placeholder={t('common.select')}
+              testId="goods-receipt-order"
+            />
+          </Field>
+          <Field label={t('erp.inventory.warehouse')}>
+            <EntityPicker
+              value={warehouseId || null}
+              options={(warehouses.data?.items ?? []).map((w) => ({ value: w.id, label: `${w.code} — ${w.nameEn}` }))}
+              onChange={(value) => setWarehouseId(value ?? '')}
+              placeholder={t('common.select')}
+              emptyLabel={t('common.none')}
+              testId="goods-receipt-warehouse"
+            />
+          </Field>
+        </div>
+        <p className="oryx-muted mt-3 text-xs">
+          {t('erp.purchasing.receipts')}: {t('erp.purchasing.orders')} — {t('erp.inventory.warehouse')}
+        </p>
+        {(orders.data?.items.length ?? 0) === 0 && !orders.loading ? (
+          <ErrorBanner message={t('erp.purchasing.emptyOrders')} />
+        ) : null}
+      </Modal>
       <PurchasingListFilters
         search={search} onSearch={setSearch} status={status} onStatus={setStatus}
         statuses={(list.data?.items ?? []).map((item) => item.status)}
