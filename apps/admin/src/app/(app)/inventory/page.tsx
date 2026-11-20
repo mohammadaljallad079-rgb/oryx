@@ -563,6 +563,8 @@ function EditProductModal({
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [productImage, setProductImage] = useState<File | null>(null);
+  const [detailsSaved, setDetailsSaved] = useState(false);
   const [form, setForm] = useState({
     nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15', isActive: true,
     barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
@@ -571,6 +573,8 @@ function EditProductModal({
   useEffect(() => {
     if (!product) return;
     setError(null);
+    setProductImage(null);
+    setDetailsSaved(false);
     setForm({
       nameEn: product.nameEn,
       nameAr: product.nameAr,
@@ -593,7 +597,7 @@ function EditProductModal({
     setBusy(true);
     setError(null);
     try {
-      await api.updateProduct(product.id, {
+      if (!detailsSaved) await api.updateProduct(product.id, {
         nameEn: form.nameEn,
         nameAr: form.nameAr,
         unit: form.unit,
@@ -607,6 +611,15 @@ function EditProductModal({
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
       });
+      setDetailsSaved(true);
+      if (productImage) {
+        const imageData = new FormData();
+        imageData.append('file', productImage);
+        imageData.append('altEn', form.nameEn.trim() || form.nameAr.trim());
+        imageData.append('altAr', form.nameAr.trim() || form.nameEn.trim());
+        await api.uploadProductImage(product.id, imageData);
+        setProductImage(null);
+      }
       await onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
@@ -664,6 +677,14 @@ function EditProductModal({
         <Field label={t('erp.inventory.reorderQuantity')}>
           <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm({ ...form, reorderQuantity: e.target.value })} />
         </Field>
+      </div>
+      <div className="mt-4 rounded-xl border border-[var(--border)] p-3" data-testid="edit-product-inline-image">
+        <Field label={t('erp.inventory.images')}>
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif"
+            className="oryx-input" data-testid="edit-product-inline-image-file"
+            onChange={(e) => setProductImage(e.target.files?.[0] ?? null)} />
+        </Field>
+        {productImage ? <p className="oryx-muted m-0 mt-2 text-xs">{productImage.name}</p> : null}
       </div>
       <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
         <input
