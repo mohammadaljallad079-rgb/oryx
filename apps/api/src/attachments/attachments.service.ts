@@ -123,6 +123,11 @@ export class AttachmentsService {
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase order not found.');
       return;
     }
+    if (entityType === 'PURCHASE_RETURN') {
+      const found = await this.prisma.purchaseReturn.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase return not found.');
+      return;
+    }
     if (entityType === 'JOURNAL_ENTRY') {
       const found = await this.prisma.journalEntry.findFirst({ where: { id: entityId, companyId } });
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Journal entry not found.');
