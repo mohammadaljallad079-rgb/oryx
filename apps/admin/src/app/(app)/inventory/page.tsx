@@ -449,6 +449,7 @@ function ProductsTab({ canManage, sparePartsOnly = false }: { canManage: boolean
               <th>{t('erp.inventory.barcode')}</th>
               <th>{t('erp.inventory.category')}</th>
               <th>{t('erp.inventory.unit')}</th>
+              <th>{t('erp.inventory.totalQty')}</th>
               <th>{t('erp.inventory.salesPrice')}</th>
               <th>{t('erp.inventory.costPrice')}</th>
               <th>{t('erp.inventory.taxRate')}</th>
@@ -469,6 +470,9 @@ function ProductsTab({ canManage, sparePartsOnly = false }: { canManage: boolean
                 </td>
                 <td className="text-[12.5px]">{p.category ?? '—'}</td>
                 <td className="text-[12.5px]">{p.unit}</td>
+                <td className="tabular-nums text-[12.5px]" data-testid={`product-on-hand-${p.sku}`}>
+                  {p.trackStock && p.type !== 'SERVICE' ? qty(p.onHandQuantity ?? 0) : '—'}
+                </td>
                 <td className="tabular-nums text-[12.5px]">{money(p.salesPriceMinor)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(p.costPriceMinor)}</td>
                 <td className="text-[12.5px]">{(p.taxRateBp / 100).toFixed(2)}%</td>
