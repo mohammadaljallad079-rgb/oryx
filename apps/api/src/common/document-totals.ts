@@ -13,10 +13,13 @@ export interface PricedLineInput {
   /** Fixed discount in minor units; when set, takes precedence over legacy percent. */
   discountAmountMinor?: number;
   taxPercentBp?: number;
+  /** Preserve the actual VAT amount of an original posted invoice on a linked return. */
+  taxAmountMinor?: number;
 }
 
-export interface PricedLine extends Required<Omit<PricedLineInput, 'discountAmountMinor'>> {
+export interface PricedLine extends Required<Omit<PricedLineInput, 'discountAmountMinor' | 'taxAmountMinor'>> {
   discountAmountMinor?: number;
+  taxAmountMinor?: number;
   lineSubtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
@@ -61,12 +64,15 @@ export function computeDocumentTotals(
       : Math.min(lineSubtotalMinor, Math.max(0, line.discountAmountMinor));
     // Company policy: VAT is based on the original extended price; the
     // discount reduces the final payable amount only, not the tax base.
-    const taxMinor = basisPointsOfMinor(lineSubtotalMinor, taxPercentBp);
+    const taxMinor = line.taxAmountMinor === undefined
+      ? basisPointsOfMinor(lineSubtotalMinor, taxPercentBp)
+      : Math.max(0, line.taxAmountMinor);
     return {
       quantity: line.quantity,
       unitPriceMinor: line.unitPriceMinor,
       discountPercentBp,
       discountAmountMinor: line.discountAmountMinor,
+      taxAmountMinor: line.taxAmountMinor,
       taxPercentBp,
       lineSubtotalMinor,
       discountMinor,
