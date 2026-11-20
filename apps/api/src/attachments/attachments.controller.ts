@@ -62,6 +62,8 @@ export class AttachmentsController {
   @RequireAnyPermission(
     'erp.sales.invoice.manage',
     'erp.sales.order.manage',
+    'erp.sales.credit_note.manage',
+    'erp.purchasing.return.manage',
     'erp.accounting.payment.manage',
     'erp.hr.write',
     'erp.purchasing.write',
@@ -145,6 +147,8 @@ export class AttachmentsController {
   @Delete(':entityType/:entityId/:attachmentId')
   @RequireAnyPermission(
     'erp.sales.invoice.manage',
+    'erp.sales.credit_note.manage',
+    'erp.purchasing.return.manage',
     'erp.accounting.payment.manage',
     'erp.hr.write',
     'erp.purchasing.write',

@@ -607,6 +607,9 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string | null>(null);
   const [returnCustomerId, setReturnCustomerId] = useState('');
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
+  // A credit note may already be posted when a subsequent file upload fails.
+  // Retrying the form must upload to that existing note, never post a second return.
+  const [createdCreditNoteId, setCreatedCreditNoteId] = useState<string | null>(null);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
   const list = useAsync(() => api.creditNotes({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
@@ -631,6 +634,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
     setOpen(false);
     setRelatedInvoiceId(null);
     setReturnCustomerId('');
+    setCreatedCreditNoteId(null);
   };
 
   return (
@@ -736,9 +740,14 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         testIdPrefix="credit-note"
         onClose={closeModal}
         onSubmit={async (payload) => {
-          const created = await api.createCreditNote(payload);
+          let noteId = createdCreditNoteId;
+          if (!noteId) {
+            const created = await api.createCreditNote(payload);
+            noteId = created.id;
+            setCreatedCreditNoteId(noteId);
+          }
           await list.reload();
-          return created.id;
+          return noteId;
         }}
       />
     </Card>
@@ -2616,7 +2625,11 @@ function DocumentModal({
           </Field>
         </div>
       </section>
-      {!initialDocument ? (
+      {/*
+        A credit note is always a creation form even when it is prefilled from
+        the invoice it reverses, so its attachment area must still render.
+      */}
+      {!initialDocument || reasonField ? (
         <div className="mt-4 border-t border-[var(--border)] pt-4">
           <PendingAttachments files={pending} onChange={setPending} canManage />
         </div>

@@ -1,11 +1,11 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
-import { minorToInput, money, toMinorInput, toQuantityInput, todayIso } from '@/lib/erp-format';
+import { minorToInput, money, qty, toMinorInput, toQuantityInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
 import { AttachmentsPanel, PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
@@ -29,7 +29,7 @@ import {
   TableShell,
   type SearchableOption,
 } from '@/components/ui';
-import type { PurchaseDocumentDto, RequisitionDto, SupplierDto, WarehouseDto } from '@oryx/shared';
+import { type PurchaseDocumentDto, type RequisitionDto, type SupplierDto, type WarehouseDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'orders' | 'requisitions' | 'receipts' | 'invoices' | 'returns' | 'suppliers';
 
@@ -68,7 +68,7 @@ function useTaxOptions(companyId: string | null | undefined): {
   };
 }
 
-const TAB_KEYS = ['dashboard', 'orders', 'requisitions', 'receipts', 'invoices', 'returns', 'suppliers'] as const;
+const TAB_KEYS = ['dashboard', 'requisitions', 'orders', 'receipts', 'invoices', 'returns', 'suppliers'] as const;
 
 export default function PurchasingPage() {
   return (
@@ -85,8 +85,8 @@ function PurchasingInner() {
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.purchasing.dashboard') },
-    { key: 'orders', label: t('erp.purchasing.orders') },
     { key: 'requisitions', label: t('erp.purchasing.requisitions') },
+    { key: 'orders', label: t('erp.purchasing.orders') },
     { key: 'receipts', label: t('erp.purchasing.receipts') },
     { key: 'invoices', label: t('erp.purchasing.invoices') },
     { key: 'returns', label: t('erp.purchasing.returns') },
@@ -120,7 +120,7 @@ function PurchasingInner() {
 
       {tab === 'dashboard' ? <ModuleDashboard moduleKey="purchasing_procurement" /> : null}
       {tab === 'orders' ? <OrdersTab canManage={can('erp.purchasing.order.manage')} /> : null}
-      {tab === 'requisitions' ? <RequisitionsTab canManage={can('erp.purchasing.requisition.manage')} /> : null}
+      {tab === 'requisitions' ? <RequisitionsTab canManage={can('erp.purchasing.requisition.manage')} onConverted={() => setTab('orders')} /> : null}
       {tab === 'receipts' ? <ReceiptsTab canManage={can('erp.purchasing.receipt.manage')} /> : null}
       {tab === 'invoices' ? <InvoicesTab canManage={can('erp.purchasing.invoice.manage')} /> : null}
       {tab === 'returns' ? <ReturnsTab canManage={can('erp.purchasing.return.manage')} /> : null}
@@ -234,6 +234,7 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
                       sourceType="Supplier"
                       sourceId={s.id}
                       type="SUPPLIER_STATEMENT"
+                      iconsOnly
                       permissions={['erp.purchasing.read', 'erp.accounting.read']}
                     />
                   </div>
@@ -368,7 +369,7 @@ function PurchaseDocumentPreview({
 
 // ---------------------------------------------------------------- requisitions
 
-function RequisitionsTab({ canManage }: { canManage: boolean }) {
+function RequisitionsTab({ canManage, onConverted }: { canManage: boolean; onConverted: () => void }) {
   const { companyId } = useAuth();
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
@@ -447,6 +448,7 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
                         if (!supplierId) return;
                         await api.convertRequisition(r.id, supplierId);
                         await list.reload();
+                        onConverted();
                       }}
                     >
                       {t('erp.purchasing.convert')}
@@ -547,6 +549,7 @@ function RequisitionModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={t('erp.purchasing.newRequisition')}
       onClose={onClose}
       footer={
@@ -670,6 +673,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
                       sourceType="PurchaseOrder"
                       sourceId={o.id}
                       type="PURCHASE_ORDER"
+                      iconsOnly
                       permissions={['erp.purchasing.read']}
                     />
                   </div>
@@ -894,28 +898,96 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
   const debouncedSearch = useDebounced(search, 300);
   const list = useAsync(() => api.goodsReceipts({ search: debouncedSearch || undefined, status: status || undefined }), [debouncedSearch, status]);
   const orders = useAsync(() => api.purchaseOrders({ status: 'APPROVED' }), []);
+  const warehouses = useAsync(() => api.warehouses(), []);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+
+  const receiveSelectedOrder = async () => {
+    if (!selectedOrderId) return;
+    setReceiptBusy(true);
+    setReceiptError(null);
+    try {
+      await api.createGoodsReceipt({
+        purchaseOrderId: selectedOrderId,
+        receivedAt: new Date().toISOString(),
+        ...(warehouseId ? { warehouseId } : {}),
+      });
+      setReceiptOpen(false);
+      setSelectedOrderId('');
+      setWarehouseId('');
+      await Promise.all([list.reload(), orders.reload()]);
+    } catch (e) {
+      setReceiptError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setReceiptBusy(false);
+    }
+  };
 
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.purchasing.receipts')}</p>
-        {canManage && (orders.data?.items.length ?? 0) > 0 ? (
+        {canManage ? (
           <Button
             variant="primary"
             size="sm"
-            data-testid="receive-first-order"
-            onClick={async () => {
-              const order = orders.data!.items[0];
-              await api.createGoodsReceipt({ purchaseOrderId: order.id, receivedAt: new Date().toISOString() });
-              await list.reload();
-              await orders.reload();
-            }}
+            data-testid="open-goods-receipt"
+            onClick={() => { setReceiptError(null); setReceiptOpen(true); }}
           >
             <Icon name="plus" size={16} />
             {t('erp.purchasing.receiveGoods')}
           </Button>
         ) : null}
       </div>
+      <Modal
+        open={receiptOpen}
+        title={t('erp.purchasing.receiveGoods')}
+        onClose={() => { if (!receiptBusy) setReceiptOpen(false); }}
+        footer={
+          <>
+            <Button disabled={receiptBusy} onClick={() => setReceiptOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" disabled={receiptBusy || !selectedOrderId} onClick={() => void receiveSelectedOrder()} data-testid="save-goods-receipt">
+              {receiptBusy ? t('common.loading') : t('erp.purchasing.receiveGoods')}
+            </Button>
+          </>
+        }
+      >
+        {receiptError ? <ErrorBanner message={receiptError} /> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('erp.purchasing.orders')} required>
+            <EntityPicker
+              value={selectedOrderId || null}
+              options={(orders.data?.items ?? []).map((o) => ({
+                value: o.id,
+                label: o.orderNumber ?? o.id,
+                hint: o.supplierNameEn ?? undefined,
+              }))}
+              onChange={(value) => setSelectedOrderId(value ?? '')}
+              placeholder={t('common.select')}
+              testId="goods-receipt-order"
+            />
+          </Field>
+          <Field label={t('erp.inventory.warehouse')}>
+            <EntityPicker
+              value={warehouseId || null}
+              options={(warehouses.data?.items ?? []).map((w) => ({ value: w.id, label: `${w.code} — ${w.nameEn}` }))}
+              onChange={(value) => setWarehouseId(value ?? '')}
+              placeholder={t('common.select')}
+              emptyLabel={t('common.none')}
+              testId="goods-receipt-warehouse"
+            />
+          </Field>
+        </div>
+        <p className="oryx-muted mt-3 text-xs">
+          {t('erp.purchasing.receipts')}: {t('erp.purchasing.orders')} — {t('erp.inventory.warehouse')}
+        </p>
+        {(orders.data?.items.length ?? 0) === 0 && !orders.loading ? (
+          <ErrorBanner message={t('erp.purchasing.emptyOrders')} />
+        ) : null}
+      </Modal>
       <PurchasingListFilters
         search={search} onSearch={setSearch} status={status} onStatus={setStatus}
         statuses={(list.data?.items ?? []).map((item) => item.status)}
@@ -974,6 +1046,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<PurchaseDocumentDto | null>(null);
+  const [sourceOrder, setSourceOrder] = useState<PurchaseDocumentDto | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const debouncedSearch = useDebounced(search, 300);
@@ -988,12 +1061,36 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.purchasing.invoices')}</p>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-supplier-invoice">
+          <Button variant="primary" size="sm" onClick={() => { setSourceOrder(null); setOpen(true); }} data-testid="new-supplier-invoice">
             <Icon name="plus" size={16} />
             {t('erp.purchasing.newInvoice')}
           </Button>
         ) : null}
       </div>
+
+      {canManage && (purchaseOrders.data?.items ?? []).some((o) => ['APPROVED', 'PARTIALLY_RECEIVED', 'RECEIVED'].includes(o.status)) ? (
+        <div className="border-b border-[var(--border)] p-4" data-testid="supplier-invoice-source-orders">
+          <p className="oryx-panel-title m-0 mb-2">
+            {t('erp.purchasing.orders')} — {t('erp.purchasing.invoices')}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {(purchaseOrders.data?.items ?? [])
+              .filter((o) => ['APPROVED', 'PARTIALLY_RECEIVED', 'RECEIVED'].includes(o.status))
+              .map((order) => (
+                <Button
+                  key={order.id}
+                  size="sm"
+                  variant="ghost"
+                  data-testid={`invoice-from-order-${order.orderNumber}`}
+                  onClick={() => { setSourceOrder(order); setOpen(true); }}
+                >
+                  <Icon name="plus" size={14} />
+                  {order.orderNumber} — {order.supplierNameEn}
+                </Button>
+              ))}
+          </div>
+        </div>
+      ) : null}
       <PurchasingListFilters
         search={search} onSearch={setSearch} status={status} onStatus={setStatus}
         statuses={(list.data?.items ?? []).map((item) => item.status)}
@@ -1038,6 +1135,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                       sourceType="SupplierInvoice"
                       sourceId={i.id}
                       type="PURCHASE_INVOICE"
+                      iconsOnly
                       permissions={['erp.purchasing.read']}
                     />
                   </div>
@@ -1052,12 +1150,13 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         suppliers={suppliers.data?.items ?? []}
         branches={branches.data?.items ?? []}
         purchaseOrders={purchaseOrders.data?.items ?? []}
+        initialOrder={sourceOrder}
         onSupplierCreated={suppliers.reload}
         products={products.data?.items ?? []}
         onProductCreated={products.reload}
         taxOptions={taxOptions}
         onTaxCreated={reloadTaxOptions}
-        onClose={() => setOpen(false)}
+        onClose={() => { setOpen(false); setSourceOrder(null); }}
         onCreated={list.reload}
       />
       {preview ? (
@@ -1068,6 +1167,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
 }
 
 function SupplierInvoiceModal({
+  initialOrder,
   taxOptions,
   onTaxCreated,
   open,
@@ -1084,6 +1184,7 @@ function SupplierInvoiceModal({
   suppliers: SupplierDto[];
   branches: Array<{ id: string; code: string; nameEn: string }>;
   purchaseOrders: Array<{ id: string; orderNumber?: string; supplierNameEn?: string; status?: string }>;
+  initialOrder?: PurchaseDocumentDto | null;
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
   onProductCreated?: () => Promise<void> | void;
   taxOptions: SearchableOption[];
@@ -1107,6 +1208,30 @@ function SupplierInvoiceModal({
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
   const [pending, setPending] = useState<File[]>([]);
+
+  // The order becomes visible in the invoice tab immediately after approval,
+  // but supplier invoice number is supplied by the vendor, not invented by ORYX.
+  // Prefill the order's quantities/prices; posting still requires a deliberate save.
+  useEffect(() => {
+    if (!open || !initialOrder) return;
+    setSupplierId(initialOrder.supplierId);
+    setPurchaseOrderId(initialOrder.id);
+    setCurrency(initialOrder.currency);
+    setLines((initialOrder.lines as Array<{
+      productId?: string | null;
+      description?: string;
+      quantity?: number;
+      unitCostMinor?: number;
+      taxPercentBp?: number;
+    }>).map((l) => ({
+      ...emptyLine(),
+      productId: l.productId ?? '',
+      description: l.description ?? '',
+      quantity: qty(l.quantity ?? 10000),
+      unitCost: minorToInput(l.unitCostMinor ?? 0, initialOrder.currency),
+      taxPercent: String((l.taxPercentBp ?? 0) / 100),
+    })));
+  }, [open, initialOrder]);
 
   const submit = async () => {
     setBusy(true);
@@ -1289,6 +1414,7 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
                       sourceType="PurchaseReturn"
                       sourceId={r.id}
                       type="PURCHASE_RETURN"
+                      iconsOnly
                       permissions={['erp.purchasing.read']}
                     />
                   </div>
@@ -1354,27 +1480,39 @@ function PurchaseReturnModal({
   const [reason, setReason] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
   const [pending, setPending] = useState<File[]>([]);
+  // If the return was posted but uploading its supporting files failed, retry
+  // only the uploads. Never create/post a second return or stock movement.
+  const [createdReturnId, setCreatedReturnId] = useState<string | null>(null);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      const created = await api.createPurchaseReturn({
-        supplierId,
-        warehouseId,
-        returnDate: new Date(returnDate).toISOString(),
-        ...(reason.trim() ? { reason: reason.trim() } : {}),
-        lines: lines.map((l) => ({
-          productId: l.productId,
-          description: l.description || 'Item',
-          quantity: Number(l.quantity) || 1,
-          unitCostMinor: toMinorInput(l.unitCost),
-          taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
-        })),
-      });
-      if (pending.length) await uploadPendingAttachments('PURCHASE_RETURN', created.id, pending);
+      let returnId = createdReturnId;
+      if (!returnId) {
+        const created = await api.createPurchaseReturn({
+          supplierId,
+          warehouseId,
+          returnDate: new Date(returnDate).toISOString(),
+          ...(reason.trim() ? { reason: reason.trim() } : {}),
+          lines: lines.map((l) => ({
+            productId: l.productId,
+            description: l.description || 'Item',
+            quantity: Number(l.quantity) || 1,
+            unitCostMinor: toMinorInput(l.unitCost),
+            taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
+          })),
+        });
+        returnId = created.id;
+        setCreatedReturnId(returnId);
+      }
+      if (pending.length) {
+        await uploadPendingAttachments('PURCHASE_RETURN', returnId, pending);
+        setPending([]);
+      }
       await onCreated();
       onClose();
+      setCreatedReturnId(null);
       setReason('');
       setLines([emptyLine()]);
     } catch (e) {
@@ -1387,6 +1525,7 @@ function PurchaseReturnModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={t('erp.purchasing.newReturn')}
       onClose={onClose}
       footer={
@@ -1508,8 +1647,8 @@ function CostLineEditor({
   return (
     <div className="flex flex-col gap-2">
       {lines.map((line, i) => (
-        <div key={i} className="grid grid-cols-12 gap-2">
-          <div className="col-span-4">
+        <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-6 xl:grid-cols-12 xl:items-start">
+          <div className="min-w-0 sm:col-span-3 xl:col-span-4">
             <EntityPicker
               value={line.productId || null}
               options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
@@ -1530,27 +1669,27 @@ function CostLineEditor({
             />
           </div>
           <input
-            className="oryx-input col-span-3"
+            className="oryx-input min-w-0 sm:col-span-3 xl:col-span-3"
             placeholder={t('erp.accounting.description')}
             value={line.description}
             onChange={(e) => update(i, { description: e.target.value })}
             data-testid={`${testIdPrefix}-description-${i}`}
           />
           <input
-            className="oryx-input col-span-1"
+            className="oryx-input min-w-0 sm:col-span-2 xl:col-span-1"
             placeholder={t('erp.inventory.quantity')}
             value={line.quantity}
             onChange={(e) => update(i, { quantity: e.target.value })}
             data-testid={`${testIdPrefix}-quantity-${i}`}
           />
           <input
-            className="oryx-input col-span-2"
+            className="oryx-input min-w-0 sm:col-span-2 xl:col-span-2"
             placeholder={costLabel}
             value={line.unitCost}
             onChange={(e) => update(i, { unitCost: e.target.value })}
             data-testid={`${testIdPrefix}-cost-${i}`}
           />
-          <div className="col-span-1">
+          <div className="min-w-0 sm:col-span-2 xl:col-span-1">
             <TaxPicker
               value={line.taxId || null}
               options={taxOptions}
@@ -1565,7 +1704,7 @@ function CostLineEditor({
               onCreated={onTaxCreated}
             />
           </div>
-          <Button size="sm" variant="ghost" className="col-span-1" disabled={lines.length <= 1} onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>
+          <Button size="sm" variant="ghost" className="sm:col-span-2 xl:col-span-1" disabled={lines.length <= 1} onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>
             <Icon name="close" size={14} />
           </Button>
         </div>

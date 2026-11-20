@@ -23,7 +23,7 @@ describe('official print layout regressions', () => {
     const footer = officialFooterTemplate(issuer);
     expect(footer).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
     expect(footer).not.toContain('صفحة <span class="pageNumber">');
-    expect(footer).toContain('top:2pt;direction:ltr');
+    expect(footer).toContain('direction:ltr;unicode-bidi:isolate');
   });
 
   it('keeps English-only page numbers for generic and inspection document footers', () => {
@@ -77,16 +77,19 @@ describe('official print layout regressions', () => {
       expect(html).toContain('class="of-badge"');
       expect(html).toContain('VEHICLE INSPECTION EXPERTS');
     }
-    expect(receipt).toContain('سند قبض');
+    expect(receipt).not.toContain('class="of-title-ar"');
+    expect(receipt).toContain('class="of-title-en" lang="en" dir="ltr">RECEIPT');
     expect(receipt).toContain('RECEIPT #');
     expect(receipt).toContain('RCPT-001');
     expect(receipt).toContain('Receipt Date');
     expect(receipt).toContain('Customer / Payer');
-    expect(voucher).toContain('سند صرف');
+    expect(voucher).not.toContain('class="of-title-ar"');
+    expect(voucher).toContain('class="of-title-en" lang="en" dir="ltr">VOUCHER');
     expect(voucher).toContain('VOUCHER #');
     expect(voucher).toContain('PV-002');
     expect(voucher).toContain('Payment Date');
     expect(voucher).toContain('Supplier / Payee');
+    expect(invoice).toContain('class="of-title-ar" lang="ar" dir="rtl">فاتورة');
     expect(invoice).toContain('INV-003');
     expect(invoice).toContain('Customer Name');
   });
@@ -106,6 +109,12 @@ describe('official footer contact visibility contract', () => {
     const html = officialFooterTemplate(issuer);
     expect(html).toContain('height:40pt');
     expect(html).toContain('border-top:0.75px solid #94a3b8');
+    expect(html).toContain('text-align:right;font-size:6.5pt');
+    expect(html).toContain('data-contact-group="right"');
+    expect(html).toContain('justify-content:space-between;gap:14pt');
+    expect(html).not.toContain('grid-template-columns:repeat(3,minmax(0,1fr))');
+    expect(html).not.toContain('text-overflow:ellipsis');
+    expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
   });
   it('renders every configured phone, email, website and address in the printable footer', () => {
     const fixture: DocumentIssuer = {
@@ -121,10 +130,64 @@ describe('official footer contact visibility contract', () => {
       expect(html).toContain(value);
     }
     expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
+    const pagePosition = html.indexOf('Page <span class="pageNumber">');
+    const contactPosition = html.indexOf('data-contact-group="right"');
+    expect(pagePosition).toBeGreaterThan(-1);
+    expect(contactPosition).toBeGreaterThan(pagePosition);
+    expect(html).toContain('data-contact="phone"');
+    expect(html).toContain('data-contact="email"');
+    expect(html).toContain('data-contact="website"');
   });
   it('does not fabricate contact details when company settings are empty', () => {
     const html = officialFooterTemplate(issuer);
     expect(html).not.toContain('service@oryxbhr.com');
     expect(html).not.toContain('+973 37702020');
+  });
+});
+
+describe('sales invoice line amount contract', () => {
+  it('prints quantity times unit price before VAT or discount, keeping tax in the totals', () => {
+    const payload: FinancialDocumentPayload = {
+      kind: 'FINANCIAL',
+      titleEn: 'Tax Invoice',
+      titleAr: 'فاتورة ضريبية',
+      documentNumber: 'INV-TEST',
+      documentDate: '2026-11-20',
+      dueDate: null,
+      status: 'POSTED',
+      counterparty: {
+        nameEn: 'Customer', nameAr: 'عميل', code: 'C-1', taxNumber: null,
+        email: null, phone: null, addressLine: null, city: null, countryCode: null,
+      },
+      lines: [{
+        description: 'Product',
+        quantity: 10000,
+        unitPriceMinor: 28000,
+        discountMinor: 0,
+        taxMinor: 2800,
+        lineTotalMinor: 30800,
+        taxPercentBp: 1000,
+      }],
+      subtotalMinor: 28000,
+      discountMinor: 0,
+      taxMinor: 2800,
+      totalMinor: 30800,
+      paidMinor: 0,
+      balanceMinor: 30800,
+      currency: 'BHD',
+      notes: null,
+      payment: null,
+      statement: null,
+      journal: null,
+    };
+    const html = renderOfficialFinancialHtml({
+      issuer, payload, documentNumber: 'INV-TEST',
+      issuedAt: new Date('2026-11-20T12:00:00Z'),
+      verification: null, baseCss: '',
+    });
+    expect(html).toContain('class="of-c-amt num">28.000');
+    expect(html).toContain('Tax 10%');
+    expect(html).toContain('30.800');
+    expect(html).not.toContain('class="of-c-amt num">25.200');
   });
 });

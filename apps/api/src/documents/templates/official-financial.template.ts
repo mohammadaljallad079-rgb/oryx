@@ -1,4 +1,5 @@
 import { docStamp, esc, escMultiline, money, moneyPlain, quantity, countryName } from './html.util';
+import { lineAmountMinor } from '@oryx/shared';
 import { oryxLogoMark } from './oryx-logo.asset';
 import { CHROME_CSS, watermarkSizePt } from './chrome';
 import { DOCUMENT_LATIN_STACK } from '../pdf/document-fonts.service';
@@ -260,9 +261,12 @@ export function verificationStrip(verification: DocumentVerification | null): st
 /** The centred bilingual document title (reference y 79.7 / 93.9). */
 function titleBlock(payload: FinancialDocumentPayload): string {
   const title = documentTitle(payload);
+  // Cash receipt/payment vouchers have a single English heading; invoices and
+  // the other documents keep their existing bilingual approved layout.
+  const englishOnly = /receipt|voucher/i.test(payload.titleEn) && !/pos/i.test(payload.titleEn);
   return `
   <div class="of-title">
-    <div class="of-title-ar" lang="ar" dir="rtl">${esc(title.ar)}</div>
+    ${englishOnly ? '' : `<div class="of-title-ar" lang="ar" dir="rtl">${esc(title.ar)}</div>`}
     <div class="of-title-en" lang="en" dir="ltr">${esc(title.en)}</div>
   </div>`;
 }
@@ -385,7 +389,7 @@ function lineTable(
         <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
         <td class="of-c-price num">${esc(moneyPlain(line.unitPriceMinor, payload.currency))}</td>
         <td class="of-c-tax">${esc(taxLabel(line.taxPercentBp))}</td>
-        <td class="of-c-amt num">${esc(money(line.lineTotalMinor - line.taxMinor, payload.currency, locale))}</td>
+        <td class="of-c-amt num">${esc(money(lineAmountMinor(line.quantity, line.unitPriceMinor), payload.currency, locale))}</td>
       </tr>`;
     })
     .join('');
