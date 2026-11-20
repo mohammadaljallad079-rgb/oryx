@@ -15,6 +15,7 @@ import {
   sumMinor,
   type RoundingMode,
   DEFAULT_COMPANY_PAYMENT_METHODS,
+  ATTACHMENT_ACCEPT,
   type CompanyPaymentMethodSetting,
 } from '@oryx/shared';
 import { Icon } from '@/components/icons';
@@ -601,6 +602,10 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string | null>(null);
   const [returnCustomerId, setReturnCustomerId] = useState('');
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
+  const [returnAttachment, setReturnAttachment] = useState<File | null>(null);
+  // A credit note may already be posted when a subsequent file upload fails.
+  // Retrying the form must upload to that existing note, never post a second return.
+  const [createdCreditNoteId, setCreatedCreditNoteId] = useState<string | null>(null);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
   const list = useAsync(() => api.creditNotes({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
@@ -625,6 +630,8 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
     setOpen(false);
     setRelatedInvoiceId(null);
     setReturnCustomerId('');
+    setReturnAttachment(null);
+    setCreatedCreditNoteId(null);
   };
 
   return (
@@ -728,9 +735,20 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         showRestock
         reasonField
         testIdPrefix="credit-note"
+        attachmentFile={returnAttachment}
+        onAttachmentFileChange={setReturnAttachment}
         onClose={closeModal}
         onSubmit={async (payload) => {
-          await api.createCreditNote(payload);
+          let noteId = createdCreditNoteId;
+          if (!noteId) {
+            const created = await api.createCreditNote(payload);
+            noteId = created.id;
+            setCreatedCreditNoteId(noteId);
+          }
+          if (returnAttachment) {
+            await api.uploadAttachment('CREDIT_NOTE', noteId, returnAttachment, 'OFFICIAL');
+            setReturnAttachment(null);
+          }
           await list.reload();
         }}
       />
@@ -2110,6 +2128,8 @@ function DocumentModal({
   showWarehouse,
   showRestock,
   reasonField,
+  attachmentFile,
+  onAttachmentFileChange,
   dueDateField,
   settlement,
   testIdPrefix,
@@ -2149,6 +2169,8 @@ function DocumentModal({
    * the template actually prints it.
    */
   reasonField?: boolean;
+  attachmentFile?: File | null;
+  onAttachmentFileChange?: (file: File | null) => void;
   /**
    * Which date field the printed template renders beyond the document date:
    * an invoice prints a due date, a quotation a validity date, an order none.
@@ -2588,6 +2610,18 @@ function DocumentModal({
                 <option value="BANK_TRANSFER">{t('erp.sales.refundBankTransfer')}</option>
                 <option value="CARD">{t('erp.sales.refundCard')}</option>
               </select>
+            </Field>
+          ) : null}
+          {reasonField && onAttachmentFileChange ? (
+            <Field label={t('attachments.title')}>
+              <input
+                type="file"
+                className="oryx-input w-full"
+                accept={ATTACHMENT_ACCEPT}
+                onChange={(e) => onAttachmentFileChange(e.target.files?.[0] ?? null)}
+                data-testid={`${testIdPrefix}-attachment`}
+              />
+              {attachmentFile ? <span className="oryx-muted text-xs">{attachmentFile.name}</span> : null}
             </Field>
           ) : null}
           <Field label={t('common.notes')}>
