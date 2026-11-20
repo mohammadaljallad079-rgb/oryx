@@ -1253,13 +1253,31 @@ function AdjustmentsTab({ canManage }: { canManage: boolean }) {
 }
 
 function ReorderTab() {
-  const { t } = useUi();
-  const alerts = useAsync<{ items: ReorderAlertDto[] }>(() => api.reorderAlerts(), []);
+  const { t, locale } = useUi();
+  const [warehouseId, setWarehouseId] = useState('');
+  const warehouses = useAsync(() => api.warehouses(), []);
+  const alerts = useAsync<{ items: ReorderAlertDto[] }>(
+    () => api.reorderAlerts({ warehouseId: warehouseId || undefined }),
+    [warehouseId],
+  );
 
   return (
     <Card>
-      <div className="border-b border-[var(--border)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.inventory.reorder')}</p>
+        <label className="min-w-[210px]">
+          <span className="oryx-label">{t('erp.inventory.warehouse')}</span>
+          <select className="oryx-select" value={warehouseId}
+            onChange={(event) => setWarehouseId(event.target.value)}
+            data-testid="reorder-warehouse-filter">
+            <option value="">{locale === 'ar' ? 'جميع المستودعات' : 'All warehouses'}</option>
+            {(warehouses.data?.items ?? []).map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {locale === 'ar' ? warehouse.nameAr || warehouse.nameEn : warehouse.nameEn || warehouse.nameAr}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       {alerts.error ? <div className="p-4"><ErrorBanner message={alerts.error} onRetry={alerts.reload} /></div> : null}
       {alerts.loading ? <div className="p-4"><Skeleton height={120} /></div> : (alerts.data?.items.length ?? 0) === 0 ? (

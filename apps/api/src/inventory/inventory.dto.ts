@@ -217,6 +217,18 @@ export class CreateProductDto {
   @IsBoolean()
   trackStock?: boolean;
 
+  /** Optional first receipt, scaled by 10^4, posted atomically with creation. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  openingQuantity?: number;
+
+  /** Required when openingQuantity is positive. */
+  @IsOptional()
+  @IsString()
+  openingWarehouseId?: string;
+
   @IsOptional()
   @IsString()
   salesAccountId?: string;

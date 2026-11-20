@@ -184,8 +184,12 @@ export class InventoryController {
   @Get('reorder-alerts')
   @RequireAnyPermission('erp.inventory.read', 'erp.inventory.valuation.read')
   @ApiOperation({ summary: 'Products at or below their reorder level' })
-  reorderAlerts(@Query('companyId') companyId: string | undefined, @CurrentPrincipal() p: RequestPrincipal) {
-    return this.inventory.reorderAlerts(p, companyId);
+  reorderAlerts(
+    @Query('companyId') companyId: string | undefined,
+    @Query('warehouseId') warehouseId: string | undefined,
+    @CurrentPrincipal() p: RequestPrincipal,
+  ) {
+    return this.inventory.reorderAlerts(p, companyId, warehouseId);
   }
 
   /**
