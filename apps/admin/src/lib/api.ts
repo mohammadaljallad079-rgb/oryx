@@ -882,6 +882,14 @@ export const api = {
   ) => request<Paginated<ProductDto>>(`/inventory/products?${toQuery(params)}`),
   productCategories: (companyId?: string) =>
     request<{ items: string[] }>(`/inventory/product-categories${companyId ? `?companyId=${companyId}` : ''}`),
+  managedProductCategories: () =>
+    request<{ items: Array<{ id: string; name: string; productCount: number }> }>('/inventory/product-categories/manage'),
+  createProductCategory: (name: string) =>
+    request<{ id: string; name: string }>('/inventory/product-categories', { method: 'POST', body: { name } }),
+  renameProductCategory: (id: string, name: string) =>
+    request<{ id: string; name: string }>(`/inventory/product-categories/${id}`, { method: 'PATCH', body: { name } }),
+  deleteProductCategory: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/inventory/product-categories/${id}`, { method: 'DELETE' }),
   createProduct: (body: Record<string, unknown>) =>
     request<ProductDto>('/inventory/products', { method: 'POST', body }),
   updateProduct: (id: string, body: Record<string, unknown>) =>
