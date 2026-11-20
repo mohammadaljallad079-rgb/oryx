@@ -3,7 +3,8 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useUi } from '@/lib/ui-context';
-import { customerApi, SERVICE_CATEGORIES, type AvailableDay, type AvailableSlot } from '@/lib/api';
+import { customerApi, IS_STATIC_PREVIEW, publicApi, SERVICE_CATEGORIES, type WebsiteCategory, type AvailableDay, type AvailableSlot } from '@/lib/api';
+import { useSiteContent } from '@/lib/site-content-context';
 import { messageOf, useAsync } from '@/lib/hooks';
 import { Alert, Button, Card, Field, StatusBadge, bookingTypeLabel, formatDate } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/premium';
@@ -36,6 +37,7 @@ export default function BookingsPage() {
 
 function BookingsContent() {
   const { t, locale } = useUi();
+  const { content } = useSiteContent();
   const params = useSearchParams();
 
   const bookings = useAsync(() => customerApi.bookings(), []);
@@ -43,6 +45,27 @@ function BookingsContent() {
 
   const initialCategory = params.get('category') ?? SERVICE_CATEGORIES[0].key;
   const [categoryKey, setCategoryKey] = useState<string>(initialCategory);
+  const [liveCategories, setLiveCategories] = useState<WebsiteCategory[]>([]);
+  useEffect(() => {
+    let active = true;
+    publicApi.website(locale).then((response) => {
+      if (active) setLiveCategories(response.categories);
+    }).catch(() => {
+      if (active) setLiveCategories([]);
+    });
+    return () => { active = false; };
+  }, [locale]);
+  const serviceOptions = IS_STATIC_PREVIEW
+    ? SERVICE_CATEGORIES.map((category) => ({ key: category.key, nameAr: category.nameAr, nameEn: category.nameEn }))
+    : liveCategories;
+  const whatsapp = content.contact.whatsapp.replace(/\D/g, '');
+  const selectedService = serviceOptions.find((category) => category.key === categoryKey);
+  const serviceName = selectedService
+    ? (locale === 'ar' ? selectedService.nameAr : selectedService.nameEn) || selectedService.nameEn || selectedService.nameAr
+    : categoryKey;
+  const whatsappMessage = locale === 'ar'
+    ? `مرحباً، أرغب بحجز ${serviceName} بتاريخ ${date}. يرجى تأكيد الموعد المتاح.`
+    : `Hello, I would like to book ${serviceName} on ${date}. Please confirm availability.`;
   const [bookingType, setBookingType] = useState<'INSPECTION' | 'MAINTENANCE' | 'PROVIDER_SERVICE'>(
     'INSPECTION',
   );
@@ -206,7 +229,7 @@ function BookingsContent() {
               value={categoryKey}
               onChange={(e) => setCategoryKey(e.target.value)}
             >
-              {SERVICE_CATEGORIES.map((category) => (
+              {serviceOptions.map((category) => (
                 <option key={category.key} value={category.key}>
                   {locale === 'ar' ? category.nameAr : category.nameEn}
                 </option>
@@ -305,7 +328,7 @@ function BookingsContent() {
                   );
                 })}
               </div>
-              <div style={{ marginTop: 18 }}>
+              <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                 <Button
                   variant="primary"
                   disabled={!chosen || busy}
@@ -314,6 +337,12 @@ function BookingsContent() {
                   <Icon name="check" size={16} />
                   {busy ? t('common.saving') : t('bookings.confirm')}
                 </Button>
+                {whatsapp && (
+                  <a className="oryx-btn" target="_blank" rel="noopener noreferrer"
+                    href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(whatsappMessage)}`}>
+                    <Icon name="phone" size={16} /> WhatsApp
+                  </a>
+                )}
               </div>
             </>
           )}
