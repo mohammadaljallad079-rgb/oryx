@@ -27,7 +27,7 @@ import {
   TableShell,
   type SearchableOption,
 } from '@/components/ui';
-import type { PurchaseDocumentDto, RequisitionDto, SupplierDto, WarehouseDto } from '@oryx/shared';
+import { ATTACHMENT_ACCEPT, type PurchaseDocumentDto, type RequisitionDto, type SupplierDto, type WarehouseDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'orders' | 'requisitions' | 'receipts' | 'invoices' | 'returns' | 'suppliers';
 
@@ -1235,26 +1235,40 @@ function PurchaseReturnModal({
   const [returnDate, setReturnDate] = useState(todayIso());
   const [reason, setReason] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const [attachment, setAttachment] = useState<File | null>(null);
+  // If the return was posted but uploading its supporting file failed, retry
+  // only the attachment. Never create/post a second return or stock movement.
+  const [createdReturnId, setCreatedReturnId] = useState<string | null>(null);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createPurchaseReturn({
-        supplierId,
-        warehouseId,
-        returnDate: new Date(returnDate).toISOString(),
-        ...(reason.trim() ? { reason: reason.trim() } : {}),
-        lines: lines.map((l) => ({
-          productId: l.productId,
-          description: l.description || 'Item',
-          quantity: Number(l.quantity) || 1,
-          unitCostMinor: toMinorInput(l.unitCost),
-          taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
-        })),
-      });
+      let returnId = createdReturnId;
+      if (!returnId) {
+        const created = await api.createPurchaseReturn({
+          supplierId,
+          warehouseId,
+          returnDate: new Date(returnDate).toISOString(),
+          ...(reason.trim() ? { reason: reason.trim() } : {}),
+          lines: lines.map((l) => ({
+            productId: l.productId,
+            description: l.description || 'Item',
+            quantity: Number(l.quantity) || 1,
+            unitCostMinor: toMinorInput(l.unitCost),
+            taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
+          })),
+        });
+        returnId = created.id;
+        setCreatedReturnId(returnId);
+      }
+      if (attachment) {
+        await api.uploadAttachment('PURCHASE_RETURN', returnId, attachment, 'OFFICIAL');
+        setAttachment(null);
+      }
       await onCreated();
       onClose();
+      setCreatedReturnId(null);
       setReason('');
       setLines([emptyLine()]);
     } catch (e) {
@@ -1336,6 +1350,15 @@ function PurchaseReturnModal({
       <div className="mt-4">
         <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-return-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
       </div>
+      <Field label={t('attachments.title')}>
+        <input
+          type="file"
+          className="oryx-input mt-3 w-full"
+          accept={ATTACHMENT_ACCEPT}
+          onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
+          data-testid="purchase-return-attachment"
+        />
+      </Field>
     </Modal>
   );
 }
