@@ -992,7 +992,7 @@ describe('ORYX ERP core (e2e)', () => {
       expect(session.status).toBe(201);
       sessionId = session.body.id;
 
-      // 1.00 × 100.00 = 100.00 gross, 10% off = 90.00 net, 15% VAT = 13.50.
+      // 1.00 × 100.00 = 100.00 gross, 15% VAT on 100.00 = 15.00, then 10% discount = 90.00 + 15.00.
       const sale = await erp<{ id: string; totalMinor: number; changeMinor: number }>('/sales/pos-sales', {
         method: 'POST',
         body: {
@@ -1013,19 +1013,19 @@ describe('ORYX ERP core (e2e)', () => {
         },
       });
       expect(sale.status).toBe(201);
-      expect(sale.body.totalMinor).toBe(10350);
+      expect(sale.body.totalMinor).toBe(10500);
 
       const posSale = await ctx.prisma.posSale.findUniqueOrThrow({ where: { id: sale.body.id } });
       expect(posSale.discountMinor).toBe(1000);
-      expect(posSale.taxMinor).toBe(1350);
-      expect(posSale.totalMinor).toBe(10350);
+      expect(posSale.taxMinor).toBe(1500);
+      expect(posSale.totalMinor).toBe(10500);
 
       const invoice = await ctx.prisma.salesInvoice.findUniqueOrThrow({
         where: { id: posSale.salesInvoiceId! },
       });
       expect(invoice.discountMinor).toBe(1000);
-      expect(invoice.taxMinor).toBe(1350);
-      expect(invoice.totalMinor).toBe(10350);
+      expect(invoice.taxMinor).toBe(1500);
+      expect(invoice.totalMinor).toBe(10500);
     });
 
     it('refuses a discount above 100%', async () => {
@@ -1053,7 +1053,7 @@ describe('ORYX ERP core (e2e)', () => {
     it('closes the discount session', async () => {
       const closed = await erp<{ status: string }>(`/sales/cashier-sessions/${sessionId}/close`, {
         method: 'POST',
-        body: { countedCashMinor: 10350 },
+        body: { countedCashMinor: 10500 },
       });
       expect(closed.body.status).toBe('CLOSED');
     });
