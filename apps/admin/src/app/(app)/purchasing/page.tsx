@@ -746,7 +746,11 @@ function PurchaseOrderModal({
 // ------------------------------------------------------------------ receipts
 
 function ReceiptsTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const [receiveOpen, setReceiveOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [receiving, setReceiving] = useState(false);
+  const [receiveError, setReceiveError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const debouncedSearch = useDebounced(search, 300);
@@ -757,17 +761,12 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.purchasing.receipts')}</p>
-        {canManage && (orders.data?.items.length ?? 0) > 0 ? (
+        {canManage ? (
           <Button
             variant="primary"
             size="sm"
             data-testid="receive-first-order"
-            onClick={async () => {
-              const order = orders.data!.items[0];
-              await api.createGoodsReceipt({ purchaseOrderId: order.id, receivedAt: new Date().toISOString() });
-              await list.reload();
-              await orders.reload();
-            }}
+            onClick={() => { setSelectedOrderId(''); setReceiveError(null); setReceiveOpen(true); }}
           >
             <Icon name="plus" size={16} />
             {t('erp.purchasing.receiveGoods')}
@@ -805,6 +804,58 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
+      <Modal
+        open={receiveOpen}
+        title={t('erp.purchasing.receiveGoods')}
+        onClose={() => { if (!receiving) setReceiveOpen(false); }}
+        footer={
+          <>
+            <Button variant="ghost" disabled={receiving} onClick={() => setReceiveOpen(false)}>{t('common.cancel')}</Button>
+            <Button
+              variant="primary"
+              disabled={receiving || !selectedOrderId}
+              data-testid="confirm-goods-receipt"
+              onClick={async () => {
+                if (!selectedOrderId) return;
+                setReceiving(true);
+                setReceiveError(null);
+                try {
+                  await api.createGoodsReceipt({ purchaseOrderId: selectedOrderId, receivedAt: new Date().toISOString() });
+                  await Promise.all([list.reload(), orders.reload()]);
+                  setReceiveOpen(false);
+                  setSelectedOrderId('');
+                } catch (error) {
+                  setReceiveError(error instanceof Error ? error.message : t('common.error'));
+                } finally {
+                  setReceiving(false);
+                }
+              }}
+            >{receiving ? t('common.loading') : t('erp.purchasing.receiveGoods')}</Button>
+          </>
+        }
+      >
+        {receiveError ? <ErrorBanner message={receiveError} /> : null}
+        <Field label={t('erp.purchasing.orders')} required>
+          <select
+            className="oryx-select w-full"
+            value={selectedOrderId}
+            onChange={(event) => setSelectedOrderId(event.target.value)}
+            data-testid="receipt-purchase-order"
+          >
+            <option value="">{t('common.select')}</option>
+            {(orders.data?.items ?? []).map((order) => (
+              <option key={order.id} value={order.id}>
+                {order.orderNumber} — {order.supplierNameEn} — {order.lines.length} {t('erp.accounting.lines')}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {(orders.data?.items.length ?? 0) === 0 ? (
+          <p className="oryx-faint mt-2 text-sm">
+            {locale === 'ar' ? 'لا توجد أوامر شراء معتمدة متاحة للاستلام.' : 'No approved purchase orders are available for receipt.'}
+          </p>
+        ) : null}
+      </Modal>
     </Card>
   );
 }
