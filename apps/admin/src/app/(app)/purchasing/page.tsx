@@ -1191,7 +1191,13 @@ function SupplierInvoiceModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <PurchaseFormNav prefix="supplier-invoice-form" sections={[
+        ['document-info', t('erp.sales.form.documentInfo')],
+        ['items', t('erp.sales.form.items')],
+        ['summary', t('erp.sales.form.summary')],
+      ]} />
+      <PurchaseFormSection prefix="supplier-invoice-form" section="document-info" title={t('erp.sales.form.documentInfo')} hint={t('erp.sales.form.autoNumber')}>
+        <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
           <EntityPicker
             value={supplierId || null}
@@ -1246,9 +1252,13 @@ function SupplierInvoiceModal({
           />
         </Field>
       </div>
-      <div className="mt-4">
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="supplier-invoice-form" section="items" title={t('erp.sales.form.items')} className="mt-3">
         <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="supplier-invoice-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
-      </div>
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="supplier-invoice-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
+        <PurchaseLineSummary lines={lines} currency={currency} prefix="supplier-invoice-form" />
+      </PurchaseFormSection>
     </Modal>
   );
 }
@@ -1436,7 +1446,13 @@ function PurchaseReturnModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <PurchaseFormNav prefix="purchase-return-form" sections={[
+        ['document-info', t('erp.sales.form.documentInfo')],
+        ['items', t('erp.sales.form.items')],
+        ['summary', t('erp.sales.form.summary')],
+      ]} />
+      <PurchaseFormSection prefix="purchase-return-form" section="document-info" title={t('erp.sales.form.documentInfo')} hint={t('erp.sales.form.autoNumber')}>
+        <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
           <EntityPicker
             value={supplierId || null}
@@ -1484,18 +1500,23 @@ function PurchaseReturnModal({
           <input className="oryx-input" value={reason} onChange={(e) => setReason(e.target.value)} data-testid="purchase-return-reason" />
         </Field>
       </div>
-      <div className="mt-4">
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="purchase-return-form" section="items" title={t('erp.sales.form.items')} className="mt-3">
         <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-return-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
-      </div>
-      <Field label={t('attachments.title')}>
-        <input
-          type="file"
-          className="oryx-input mt-3 w-full"
-          accept={ATTACHMENT_ACCEPT}
-          onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
-          data-testid="purchase-return-attachment"
-        />
-      </Field>
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="purchase-return-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div>
+            <Field label={t('attachments.title')}>
+              <input type="file" className="oryx-input w-full" accept={ATTACHMENT_ACCEPT}
+                onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
+                data-testid="purchase-return-attachment" />
+              {attachment ? <span className="oryx-muted text-xs">{attachment.name}</span> : null}
+            </Field>
+          </div>
+          <PurchaseLineSummary lines={lines} prefix="purchase-return-form" />
+        </div>
+      </PurchaseFormSection>
     </Modal>
   );
 }
