@@ -721,6 +721,25 @@ export class PurchasingService {
 
     const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
+      // Serialise invoices for this supplier before checking the external invoice
+      // number. A browser retry or simultaneous requests must not accrue AP
+      // and VAT twice for the same supplier document.
+      await tx.$queryRawUnsafe(
+        'SELECT id FROM "Supplier" WHERE id = $1 AND "companyId" = $2 FOR UPDATE',
+        dto.supplierId,
+        companyId,
+      );
+      const existing = await tx.supplierInvoice.findFirst({
+        where: {
+          companyId,
+          supplierId: dto.supplierId,
+          supplierInvoiceNumber: dto.supplierInvoiceNumber.trim(),
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This supplier invoice number was already recorded for this supplier.');
+      }
       const totals = computePurchaseTotals(dto.lines);
       const invoiceDate = new Date(dto.invoiceDate);
       const invoiceNumber = await this.sequences.next(tx, companyId, 'supplierInvoice');
@@ -747,7 +766,7 @@ export class PurchasingService {
           companyId,
           branchId: dto.branchId ?? null,
           invoiceNumber,
-          supplierInvoiceNumber: dto.supplierInvoiceNumber,
+          supplierInvoiceNumber: dto.supplierInvoiceNumber.trim(),
           supplierId: dto.supplierId,
           purchaseOrderId: dto.purchaseOrderId ?? null,
           status: 'DRAFT',
