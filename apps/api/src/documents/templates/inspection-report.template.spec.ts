@@ -682,14 +682,16 @@ describe('exterior inspection PDF table layout regression', () => {
       verification: null,
       baseCss: '',
     });
-    const exteriorTable = html.match(/<table class="items items--three-results">[\\s\\S]*?<\\/table>/);
-    expect(exteriorTable).not.toBeNull();
-    expect(exteriorTable?.[0]).toContain('خارجية السيارة');
-    expect(exteriorTable?.[0]).toContain('Exterior Car');
+    const exteriorStart = html.indexOf('<table class="items items--three-results">');
+    const exteriorEnd = html.indexOf('</table>', exteriorStart);
+    const exteriorTable = exteriorStart >= 0 && exteriorEnd > exteriorStart ? html.slice(exteriorStart, exteriorEnd + 8) : '';
+    expect(exteriorTable).not.toBe('');
+    expect(exteriorTable).toContain('خارجية السيارة');
+    expect(exteriorTable).toContain('Exterior Car');
     expect(html).toContain('لا يوجد ما يستدعي الملاحظة');
     expect(html).toContain('Nothing to report');
     // The approved statement stays directly below, never over the result rows.
-    expect(html).toMatch(/<\\/table>\\s*<div class="no-findings">لا يوجد ما يستدعي الملاحظة/);
+    expect(html.indexOf('<div class="no-findings">لا يوجد ما يستدعي الملاحظة', exteriorEnd)).toBeGreaterThan(exteriorEnd);
     // Prevent auto-sized Arabic/English columns or see-through artwork from
     // corrupting the exterior table in Chromium's PDF rendering.
     expect(html).toContain('.items{ width:100%; table-layout:fixed; border-collapse:collapse; direction:rtl; background:#fff; }');
