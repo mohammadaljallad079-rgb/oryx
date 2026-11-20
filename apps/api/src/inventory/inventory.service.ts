@@ -423,6 +423,24 @@ export class InventoryService {
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 200, 500);
 
+    // Fetch the live stock-level totals for just the products being returned.
+    // A warehouse filter scopes displayed quantities even when there is no
+    // stock-status filter. Services and unstocked products correctly show zero.
+    const withOnHand = async <T extends { id: string }>(products: T[]) => {
+      if (!products.length) return [] as Array<T & { onHandQuantity: number }>;
+      const levels = await this.prisma.stockLevel.groupBy({
+        by: ['productId'],
+        where: {
+          companyId,
+          productId: { in: products.map((product) => product.id) },
+          ...(query.warehouseId ? { warehouseId: query.warehouseId } : {}),
+        },
+        _sum: { quantity: true },
+      });
+      const amounts = new Map(levels.map((level) => [level.productId, level._sum.quantity ?? 0]));
+      return products.map((product) => ({ ...product, onHandQuantity: amounts.get(product.id) ?? 0 }));
+    };
+
     // An exact barcode (a scanner emits the whole code) is resolved on its own,
     // so a code that also looks like a SKU or a name fragment is never widened
     // into an ambiguous list. The fuzzy `search` keeps its broader meaning.
@@ -433,7 +451,7 @@ export class InventoryService {
         orderBy: { sku: 'asc' },
         take: pageSize,
       });
-      const items = rows.map(toProductDto);
+      const items = await withOnHand(rows.map(toProductDto));
       return { items, total: items.length, page: 1, pageSize };
     }
 
@@ -476,7 +494,7 @@ export class InventoryService {
         this.prisma.product.findMany({ where, orderBy: { sku: 'asc' }, skip: (page - 1) * pageSize, take: pageSize }),
         this.prisma.product.count({ where }),
       ]);
-      return { items: rows.map(toProductDto), total, page, pageSize };
+      return { items: await withOnHand(rows.map(toProductDto)), total, page, pageSize };
     }
 
     const all = await this.prisma.product.findMany({
@@ -495,7 +513,7 @@ export class InventoryService {
       if (stockStatus === 'low') return onHand > 0 && p.reorderLevel > 0 && onHand <= p.reorderLevel;
       return onHand > 0 && (p.reorderLevel <= 0 || onHand > p.reorderLevel);
     });
-    const items = matching.slice((page - 1) * pageSize, page * pageSize).map(toProductDto);
+    const items = await withOnHand(matching.slice((page - 1) * pageSize, page * pageSize).map(toProductDto));
     return { items, total: matching.length, page, pageSize };
   }
 
