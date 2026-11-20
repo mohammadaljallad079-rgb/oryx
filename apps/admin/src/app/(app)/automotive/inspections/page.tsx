@@ -7,6 +7,8 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
 import { minorToInput, money, toMinorInput } from '@/lib/erp-format';
 import { EntitySelect } from '@/components/entity-select';
+import { EntityPicker } from '@/components/inline-create';
+import { CustomerModal } from '@/components/customer-modal';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -373,13 +375,27 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       {error ? <ErrorBanner message={error} /> : null}
       <div className="flex flex-col gap-3">
         <Field label={t('inspection.selectCustomer')} required>
-          <EntitySelect
-            catalogue="customer"
-            allowCreate
+          <EntityPicker
             value={customerId || null}
+            options={(customers.data?.items ?? []).map((c: CustomerDto) => ({
+              value: c.id,
+              label: `${c.code} — ${c.nameEn || c.nameAr || c.code}`,
+              hint: c.phone ?? undefined,
+            }))}
             onChange={(v) => { setCustomerId(v ?? ''); setVehicleId(''); }}
             placeholder={t('common.select')}
             testId="job-customer"
+            createLabel={t('erp.sales.newCustomer')}
+            reloadOptions={customers.reload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <CustomerModal
+                open
+                customer={null}
+                onClose={closeCreate}
+                onCreated={() => { /* selection happens in onSaved */ }}
+                onSaved={(created) => void onSaved(created.id)}
+              />
+            )}
           />
         </Field>
 
