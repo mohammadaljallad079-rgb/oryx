@@ -146,7 +146,7 @@ export function Modal({
    * panels and a five-column item table to mirror the printed page, and `pos`
    * for a true edge-to-edge terminal that owns the whole viewport.
    */
-  size?: 'default' | 'full' | 'document' | 'pos';
+  size?: 'default' | 'form' | 'full' | 'document' | 'pos';
 }) {
   const { t } = useUi();
   const idRef = useRef<symbol>(Symbol('oryx-modal'));
@@ -237,7 +237,9 @@ export function Modal({
         className={`oryx-modal ${
           size === 'full'
             ? 'oryx-modal--full'
-            : size === 'document'
+            : size === 'form'
+              ? 'oryx-modal--form'
+              : size === 'document'
               ? 'oryx-modal--document'
               : size === 'pos'
                 ? 'oryx-modal--pos'
@@ -253,12 +255,12 @@ export function Modal({
           <h2 className="m-0 text-[16px] font-bold">{title}</h2>
           <button
             type="button"
-            className="oryx-btn oryx-btn--ghost flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] shadow-sm hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
+            className="oryx-modal-close flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] shadow-sm hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
             onClick={onClose}
             title={t('common.closeLabel')}
             aria-label={t('common.closeLabel')}
           >
-            <Icon name="close" size={24} />
+            <span aria-hidden="true" className="text-[28px] font-semibold leading-none">&times;</span>
           </button>
         </div>
         <div className={size === 'pos' ? 'flex min-h-0 flex-1 flex-col' : 'px-5 py-4'}>{children}</div>
