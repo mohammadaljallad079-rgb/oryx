@@ -963,7 +963,7 @@ export class InventoryService {
   }
 
   async reorderAlerts(principal: RequestPrincipal, companyIdInput?: string, warehouseId?: string) {
-    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal, companyIdInput);
+    const { companyId } = await this.context.resolveCompanyScope(principal, companyIdInput);
     if (warehouseId) {
       await this.assertWarehouse(companyId, warehouseId);
     }
