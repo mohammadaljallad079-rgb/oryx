@@ -962,11 +962,18 @@ export class InventoryService {
     };
   }
 
-  async reorderAlerts(principal: RequestPrincipal, companyIdInput?: string) {
-    const { companyId } = await this.context.resolveCompanyScope(principal, companyIdInput);
+  async reorderAlerts(principal: RequestPrincipal, companyIdInput?: string, warehouseId?: string) {
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal, companyIdInput);
+    if (warehouseId) {
+      await this.assertWarehouse(companyId, warehouseId);
+    }
     const products = await this.prisma.product.findMany({
       where: { companyId, isActive: true, trackStock: true, reorderLevel: { gt: 0 } },
-      include: { levels: true },
+      include: {
+        levels: {
+          where: warehouseId ? { warehouseId } : undefined,
+        },
+      },
     });
     // A newly entered product is not yet stock that needs replenishing.
     // Only products with a real warehouse stock position participate; a
