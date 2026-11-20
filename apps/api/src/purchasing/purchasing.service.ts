@@ -301,6 +301,13 @@ export class PurchasingService {
         unitCostMinor: l.estimatedUnitCostMinor,
         taxPercentBp: 0,
       }));
+      // Conversion writes purchase-order lines without going through createOrder.
+      // Apply the same product uniqueness rule so later receipt allocations
+      // cannot silently update the first matching line twice.
+      const lineProducts = lineInputs.flatMap((line) => line.productId ? [line.productId] : []);
+      if (new Set(lineProducts).size !== lineProducts.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Combine repeated products before converting the requisition.');
+      }
       const totals = computePurchaseTotals(lineInputs);
       const orderNumber = await this.sequences.next(tx, companyId, 'purchaseOrder');
       const order = await tx.purchaseOrder.create({
