@@ -465,7 +465,7 @@ function CreateCompanyModal({
     setBusy(true);
     setError(null);
     try {
-      const res = await api.createCompany({
+      await api.createCompany({
         code: '',
         nameEn: form.nameEn.trim() || form.nameAr.trim(),
         nameAr: form.nameAr.trim() || form.nameEn.trim(),
