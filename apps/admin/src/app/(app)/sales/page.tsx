@@ -485,6 +485,8 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
+  const [quotationAttachments, setQuotationAttachments] = useState<File[]>([]);
+  const [savedQuotationId, setSavedQuotationId] = useState<string | null>(null);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
   const list = useAsync(() => api.quotations({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
@@ -582,6 +584,7 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
                 permissions={['erp.sales.read', 'erp.accounting.read']} iconsOnly />
             </div>
             <InvoiceLineBreakdown document={detail} />
+            <AttachmentsPanel entityType="QUOTATION" entityId={detail.id} canManage={canManage} />
           </div>
         ) : null}
       </Modal>
@@ -599,10 +602,22 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
         dueDateField="validUntil"
         settlement
         testIdPrefix="quotation"
-        onClose={() => setOpen(false)}
+        attachmentFiles={quotationAttachments}
+        onAttachmentFilesChange={setQuotationAttachments}
+        onClose={() => { setOpen(false); setQuotationAttachments([]); setSavedQuotationId(null); }}
         onSubmit={async (payload) => {
-          await api.createQuotation(payload);
+          let quoteId = savedQuotationId;
+          if (!quoteId) {
+            const created = await api.createQuotation(payload);
+            quoteId = created.id;
+            setSavedQuotationId(quoteId);
+          }
+          for (const attachment of quotationAttachments) {
+            await api.uploadAttachment('QUOTATION', quoteId, attachment, 'OFFICIAL');
+            setQuotationAttachments((pending) => pending.filter((file) => file !== attachment));
+          }
           await list.reload();
+          setSavedQuotationId(null);
         }}
       />
     </Card>
@@ -618,7 +633,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string | null>(null);
   const [returnCustomerId, setReturnCustomerId] = useState('');
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
-  const [returnAttachment, setReturnAttachment] = useState<File | null>(null);
+  const [returnAttachments, setReturnAttachments] = useState<File[]>([]);
   // A credit note may already be posted when a subsequent file upload fails.
   // Retrying the form must upload to that existing note, never post a second return.
   const [createdCreditNoteId, setCreatedCreditNoteId] = useState<string | null>(null);
@@ -646,7 +661,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
     setOpen(false);
     setRelatedInvoiceId(null);
     setReturnCustomerId('');
-    setReturnAttachment(null);
+    setReturnAttachments([]);
     setCreatedCreditNoteId(null);
   };
 
@@ -751,8 +766,8 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         showRestock
         reasonField
         testIdPrefix="credit-note"
-        attachmentFile={returnAttachment}
-        onAttachmentFileChange={setReturnAttachment}
+        attachmentFiles={returnAttachments}
+        onAttachmentFilesChange={setReturnAttachments}
         onClose={closeModal}
         onSubmit={async (payload) => {
           let noteId = createdCreditNoteId;
@@ -761,9 +776,9 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
             noteId = created.id;
             setCreatedCreditNoteId(noteId);
           }
-          if (returnAttachment) {
-            await api.uploadAttachment('CREDIT_NOTE', noteId, returnAttachment, 'OFFICIAL');
-            setReturnAttachment(null);
+          for (const attachment of returnAttachments) {
+            await api.uploadAttachment('CREDIT_NOTE', noteId, attachment, 'OFFICIAL');
+            setReturnAttachments((pending) => pending.filter((file) => file !== attachment));
           }
           await list.reload();
         }}
