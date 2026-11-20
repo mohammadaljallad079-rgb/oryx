@@ -514,7 +514,7 @@ function itemsTable(
         : 'غير متوفر<span class="ltr">N/A</span>';
   return `
   <div class="itable avoid-break">
-    <table class="items">
+    <table class="items ${withNa ? 'items--three-results' : 'items--two-results'}">
       <thead>
         <tr>
           <th class="c-item">${esc(titleAr)}<span class="ltr">${esc(titleEn)}</span></th>
@@ -935,6 +935,23 @@ export const INSPECTION_REPORT_CSS = `
   .itable{ border:1px solid #334e68; border-top:none; }
   .itable-head{ background:#1b375a; color:#fff; font-size:9pt; font-weight:700; padding:3px 9px; border-bottom:1px solid #334e68; }
   .itable-head .ltr{ margin-inline-start:7px; font-size:7.6pt; color:#cbd5e1; font-weight:400; }
+  /* Bilingual checklists must own their columns. Without fixed layout the three
+   * result columns squeeze the Arabic/English labels into overlapping cells. */
+  .items{ width:100%; table-layout:fixed; border-collapse:collapse; direction:rtl; background:#fff; }
+  .items--three-results .c-item{ width:64%; }
+  .items--three-results .c-res{ width:12%; }
+  .items--two-results .c-item{ width:64%; }
+  .items--two-results .c-res{ width:18%; }
+  .items th,.items td{ box-sizing:border-box; overflow-wrap:anywhere; }
+  .items .item-ar,.items .item-en{ white-space:normal; overflow-wrap:anywhere; unicode-bidi:isolate; }
+  .items .item-ar{ direction:rtl; text-align:right; }
+  .items .item-en{ direction:ltr; text-align:left; }
+  .items .c-res{ text-align:center; vertical-align:middle; white-space:nowrap; }
+  .items .c-res .mark{ vertical-align:middle; }
+  .cabin .itable{ position:relative; z-index:1; background:#fff; }
+  .cabin .items tbody td{ background:#fff; }
+  .cabin .no-findings{ position:relative; z-index:1; background:#fff; padding:3px 5px; font-size:7pt; line-height:1.15; }
+  .cabin .no-findings .ltr{ display:block; direction:ltr; margin-top:2px; }
   .items th,.items td{ border-bottom:1px solid var(--line); border-inline-end:1px solid var(--line); padding:3px 5px; font-size:7.2pt; line-height:1.28; vertical-align:middle; }
   /* The checklist heading is the table's own header row: navy bar, white text,
    * the bilingual title in the item column and the Pass/Fail/N-A labels over the
@@ -946,7 +963,7 @@ export const INSPECTION_REPORT_CSS = `
   .items thead th.c-item .ltr{ display:inline; margin-inline-start:6px; }
   .items th:last-child,.items td:last-child{ border-inline-end:none; }
   .items tr:last-child td{ border-bottom:none; }
-  .c-item{ width:33%; }
+  .c-item{ width:64%; }
   .c-res{ text-align:center; }
   .item-ar{ display:block; font-size:7.1pt; line-height:1.04; color:var(--ink); }
   .item-en{ display:block; font-size:5.9pt; line-height:1.04; color:var(--muted); }
