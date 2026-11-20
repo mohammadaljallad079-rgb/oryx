@@ -1020,6 +1020,7 @@ function PosSaleModal({
   const { companyId, can } = useAuth();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [catalogLayout, setCatalogLayout] = useState<'grid' | 'list'>('grid');
   const debouncedSearch = useDebounced(search, 250);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerId, setCustomerId] = useState('');
@@ -1089,6 +1090,8 @@ function PosSaleModal({
     setError(null);
     setNotice(null);
     setSearch('');
+    setCategory('');
+    setCatalogLayout('grid');
     setCart([]);
     setPaid('');
     setCameraOpen(false);
@@ -1104,6 +1107,10 @@ function PosSaleModal({
 
   const addProduct = useCallback(
     (product: PosProductDto) => {
+      if (product.trackStock && product.stockStatus === 'OUT') {
+        setNotice(t('erp.sales.pos.outOfStock'));
+        return;
+      }
       setNotice(null);
       setCart((prev) => {
         const existing = prev.find((l) => l.productId === product.id);
@@ -1126,7 +1133,7 @@ function PosSaleModal({
         return [...prev, line];
       });
     },
-    [locale],
+    [locale, t],
   );
 
   // A scanner types the barcode and presses Enter. The lookup is immediate and
@@ -1287,7 +1294,7 @@ function PosSaleModal({
         </p>
       ) : null}
 
-      <div className="oryx-pos oryx-pos--premium oryx-pos--workspace-v4 oryx-pos--new-cashier" data-testid="pos-premium-workstation">
+      <div className="oryx-pos oryx-pos--premium oryx-pos--workspace-v4 oryx-pos--new-cashier oryx-pos--cashier-v5" data-testid="pos-premium-workstation">
         <header className="oryx-pos__quickbar" data-testid="pos-command-bar">
           <div className="oryx-pos__quickbar-heading">
             <span className="oryx-pos__quickbar-mark"><Icon name="cart" size={19} /></span>
@@ -1336,6 +1343,12 @@ function PosSaleModal({
                 data-testid="pos-search"
               />
             </div>
+            {search.trim() ? (
+              <Button size="sm" variant="ghost" onClick={() => { setSearch(''); scanRef.current?.focus(); }}
+                data-testid="pos-search-clear" aria-label={locale === 'ar' ? 'مسح البحث' : 'Clear search'}>
+                <Icon name="close" size={17} />
+              </Button>
+            ) : null}
             <Button size="sm" variant="ghost" onClick={() => setCameraOpen(value => !value)}
               data-testid="pos-camera-toggle" aria-label={locale === 'ar' ? 'مسح بالكاميرا' : 'Scan with camera'}>
               <Icon name="camera" size={18} />
@@ -1344,6 +1357,25 @@ function PosSaleModal({
             <Button variant="ghost" onClick={() => void catalog.reload()} aria-label={t('common.refresh')}>
               <Icon name="refresh" size={18} />
             </Button>
+          </div>
+
+          <div className="oryx-pos__viewbar" data-testid="pos-viewbar">
+            <span className="oryx-pos__viewbar-result">
+              <Icon name="package" size={15} />
+              {catalog.loading ? t('common.loading') : `${items.length} ${locale === 'ar' ? 'منتج متاح للعرض' : 'products found'}`}
+            </span>
+            <div className="oryx-pos__viewbar-actions" role="group" aria-label={locale === 'ar' ? 'طريقة عرض المنتجات' : 'Product display'}>
+              <button type="button" className={catalogLayout === 'grid' ? 'is-active' : ''}
+                onClick={() => setCatalogLayout('grid')} aria-pressed={catalogLayout === 'grid'} data-testid="pos-view-grid">
+                <Icon name="grid" size={16} />
+                {locale === 'ar' ? 'بطاقات' : 'Cards'}
+              </button>
+              <button type="button" className={catalogLayout === 'list' ? 'is-active' : ''}
+                onClick={() => setCatalogLayout('list')} aria-pressed={catalogLayout === 'list'} data-testid="pos-view-list">
+                <Icon name="list" size={16} />
+                {locale === 'ar' ? 'قائمة' : 'List'}
+              </button>
+            </div>
           </div>
 
           <PosCameraScanner open={cameraOpen} onClose={() => setCameraOpen(false)}
@@ -1359,7 +1391,7 @@ function PosSaleModal({
           ) : items.length === 0 ? (
             <EmptyState title={t('common.empty')} hint={t('erp.sales.pos.notFound')} />
           ) : (
-            <div className="oryx-pos__grid" data-testid="pos-grid" role="list" aria-label={locale === 'ar' ? 'المنتجات المتاحة' : 'Available products'}>
+            <div className={`oryx-pos__grid ${catalogLayout === 'list' ? 'oryx-pos__grid--list' : ''}`} data-testid="pos-grid" role="list" aria-label={locale === 'ar' ? 'المنتجات المتاحة' : 'Available products'}>
               {items.map((p) => (
                 <div key={p.id} className="flex min-w-0 flex-col gap-1">
                   <PosProductTile product={p} onAdd={() => addProduct(p)} selectedQuantity={cart.find((line) => line.productId === p.id)?.quantity ?? 0} />
@@ -1425,7 +1457,16 @@ function PosSaleModal({
           </div>
 
           {cart.length === 0 ? (
-            <p className="oryx-pos__empty m-0">{t('erp.sales.pos.emptyCart')}</p>
+            <div className="oryx-pos__empty oryx-pos__empty--onboarding" data-testid="pos-cart-empty">
+              <span className="oryx-pos__empty-art"><Icon name="cart" size={33} /></span>
+              <strong>{t('erp.sales.pos.emptyCart')}</strong>
+              <span>{locale === 'ar' ? 'اختر منتجًا من البطاقات أو امسح باركوده ليظهر هنا فورًا.' : 'Tap a product or scan its barcode. Items appear here instantly.'}</span>
+              <button type="button" className="oryx-btn oryx-btn--sm"
+                onClick={() => scanRef.current?.focus()} data-testid="pos-focus-products">
+                <Icon name="search" size={15} />
+                {locale === 'ar' ? 'البدء بإضافة منتجات' : 'Find products'}
+              </button>
+            </div>
           ) : (
             <div className="oryx-pos__lines" ref={cartListRef} data-testid="pos-cart-lines">
               {cart.map((l) => (
@@ -1506,7 +1547,10 @@ function PosSaleModal({
               <span className="tabular-nums">{money(totals.totalMinor)}</span>
             </div>
 
-            <span className="oryx-label">{t('erp.sales.pos.payment')}</span>
+            <div className="oryx-pos__payment-title">
+              <span className="oryx-label"><Icon name="check" size={15} /> {t('erp.sales.pos.payment')}</span>
+              <span>{locale === 'ar' ? 'اختر وسيلة التحصيل' : 'Select payment method'}</span>
+            </div>
             <div className="oryx-pos__pay" role="group" aria-label={t('erp.sales.pos.payment')}>
               {paymentOptions.filter((m) => m.isActive && m.useInPos && m.accountingMethod !== 'CREDIT').map((m) => (
                 <button
