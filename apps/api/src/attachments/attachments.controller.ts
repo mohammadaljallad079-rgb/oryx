@@ -50,7 +50,7 @@ export class AttachmentsController {
   @Post(':entityType/:entityId')
   @RequireAnyPermission(
     'erp.sales.invoice.manage',
-    'erp.sales.quotation.manage',
+    'erp.sales.order.manage',
     'erp.sales.credit_note.manage',
     'erp.purchasing.return.manage',
     'erp.accounting.payment.manage',
@@ -113,7 +113,7 @@ export class AttachmentsController {
   @Delete(':entityType/:entityId/:attachmentId')
   @RequireAnyPermission(
     'erp.sales.invoice.manage',
-    'erp.sales.quotation.manage',
+    'erp.sales.order.manage',
     'erp.sales.credit_note.manage',
     'erp.purchasing.return.manage',
     'erp.accounting.payment.manage',
