@@ -196,6 +196,10 @@ export function ProductModal({
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [productImage, setProductImage] = useState<File | null>(null);
+  // Save the product id immediately, so retrying a failed image upload cannot
+  // create a duplicate product or assign another automatic SKU.
+  const [createdProduct, setCreatedProduct] = useState<ProductDto | null>(null);
   const [form, setForm] = useState({
     sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
     barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
@@ -204,6 +208,8 @@ export function ProductModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setProductImage(null);
+    setCreatedProduct(null);
     setForm({
       sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
       barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
@@ -214,7 +220,7 @@ export function ProductModal({
     setBusy(true);
     setError(null);
     try {
-      const saved = await api.createProduct({
+      const saved = createdProduct ?? await api.createProduct({
         sku: form.sku,
         nameEn: form.nameEn.trim() || form.nameAr.trim(),
         nameAr: form.nameAr.trim() || form.nameEn.trim(),
@@ -229,6 +235,15 @@ export function ProductModal({
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
       });
+      setCreatedProduct(saved);
+      if (productImage) {
+        const imageData = new FormData();
+        imageData.append('file', productImage);
+        imageData.append('altEn', form.nameEn.trim() || form.nameAr.trim());
+        imageData.append('altAr', form.nameAr.trim() || form.nameEn.trim());
+        await api.uploadProductImage(saved.id, imageData);
+        setProductImage(null);
+      }
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -289,6 +304,17 @@ export function ProductModal({
         <Field label={t('erp.inventory.reorderQuantity')}>
           <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm((prev) => ({ ...prev, reorderQuantity: e.target.value }))} />
         </Field>
+      </div>
+      <div className="mt-4 rounded-xl border border-[var(--border)] p-3" data-testid="product-inline-image">
+        <Field label={t('erp.inventory.images')}>
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif"
+            className="oryx-input" data-testid="product-inline-image-file"
+            onChange={(e) => setProductImage(e.target.files?.[0] ?? null)} />
+        </Field>
+        {productImage ? <p className="oryx-muted m-0 mt-2 text-xs">{productImage.name}</p> : null}
+        {createdProduct ? <p className="oryx-muted m-0 mt-2 text-xs">
+          {t('erp.inventory.sku')}: {createdProduct.sku}
+        </p> : null}
       </div>
       <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
         <input
