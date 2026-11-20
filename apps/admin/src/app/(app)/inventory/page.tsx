@@ -568,6 +568,7 @@ function EditProductModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<File[]>([]);
+  const categoryOptions = useAsync(() => api.productCategories(), []);
   const [form, setForm] = useState({
     nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15', isActive: true,
     barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
@@ -670,7 +671,10 @@ function EditProductModal({
           <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="edit-product-barcode" />
         </Field>
         <Field label={t('erp.inventory.category')}>
-          <input className="oryx-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="edit-product-category" />
+          <input className="oryx-input" list="edit-product-category-options" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="edit-product-category" />
+          <datalist id="edit-product-category-options">
+            {(categoryOptions.data?.items ?? ['Spare Parts']).map((name) => <option key={name} value={name} />)}
+          </datalist>
         </Field>
         <Field label={t('erp.inventory.reorderLevel')}>
           <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="edit-product-reorder-level" />
