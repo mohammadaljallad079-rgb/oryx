@@ -514,7 +514,14 @@ function RequisitionModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
-      <Field label={t('erp.purchasing.supplier')}>
+      <PurchaseFormNav prefix="requisition-form" sections={[
+        ['supplier-info', t('erp.purchasing.supplier')],
+        ['items', t('erp.sales.form.items')],
+        ['summary', t('erp.sales.form.summary')],
+      ]} />
+      <PurchaseFormSection prefix="requisition-form" section="supplier-info" title={t('erp.purchasing.supplier')}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('erp.purchasing.supplier')}>
         <EntityPicker
           value={supplierId || null}
           options={suppliers.map((s) => ({ value: s.id, label: `${s.code} — ${s.nameEn}`, hint: s.phone ?? undefined }))}
@@ -534,9 +541,14 @@ function RequisitionModal({
           )}
         />
       </Field>
-      <div className="mt-4">
+        </div>
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="requisition-form" section="items" title={t('erp.sales.form.items')} className="mt-3">
         <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="requisition-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.estimatedCost')} />
-      </div>
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="requisition-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
+        <PurchaseLineSummary lines={lines} estimated prefix="requisition-form" />
+      </PurchaseFormSection>
     </Modal>
   );
 }
@@ -726,7 +738,13 @@ function PurchaseOrderModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <PurchaseFormNav prefix="purchase-order-form" sections={[
+        ['document-info', t('erp.sales.form.documentInfo')],
+        ['items', t('erp.sales.form.items')],
+        ['summary', t('erp.sales.form.summary')],
+      ]} />
+      <PurchaseFormSection prefix="purchase-order-form" section="document-info" title={t('erp.sales.form.documentInfo')} hint={t('erp.sales.form.autoNumber')}>
+        <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
           <EntityPicker
             value={supplierId || null}
@@ -803,9 +821,13 @@ function PurchaseOrderModal({
           />
         </Field>
       </div>
-      <div className="mt-4">
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="purchase-order-form" section="items" title={t('erp.sales.form.items')} className="mt-3">
         <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-order-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
-      </div>
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="purchase-order-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
+        <PurchaseLineSummary lines={lines} currency={currency} prefix="purchase-order-form" />
+      </PurchaseFormSection>
     </Modal>
   );
 }
