@@ -66,7 +66,7 @@ function useTaxOptions(companyId: string | null | undefined): {
   };
 }
 
-const TAB_KEYS = ['dashboard', 'orders', 'requisitions', 'receipts', 'invoices', 'returns', 'suppliers'] as const;
+const TAB_KEYS = ['dashboard', 'requisitions', 'orders', 'receipts', 'invoices', 'returns', 'suppliers'] as const;
 
 export default function PurchasingPage() {
   return (
@@ -83,8 +83,8 @@ function PurchasingInner() {
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.purchasing.dashboard') },
-    { key: 'orders', label: t('erp.purchasing.orders') },
     { key: 'requisitions', label: t('erp.purchasing.requisitions') },
+    { key: 'orders', label: t('erp.purchasing.orders') },
     { key: 'receipts', label: t('erp.purchasing.receipts') },
     { key: 'invoices', label: t('erp.purchasing.invoices') },
     { key: 'returns', label: t('erp.purchasing.returns') },
@@ -436,6 +436,7 @@ function RequisitionModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={t('erp.purchasing.newRequisition')}
       onClose={onClose}
       footer={
@@ -1193,6 +1194,7 @@ function PurchaseReturnModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={t('erp.purchasing.newReturn')}
       onClose={onClose}
       footer={
@@ -1311,8 +1313,8 @@ function CostLineEditor({
   return (
     <div className="flex flex-col gap-2">
       {lines.map((line, i) => (
-        <div key={i} className="grid grid-cols-12 gap-2">
-          <div className="col-span-4">
+        <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-6 xl:grid-cols-12 xl:items-start">
+          <div className="min-w-0 sm:col-span-3 xl:col-span-4">
             <EntityPicker
               value={line.productId || null}
               options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
@@ -1333,27 +1335,27 @@ function CostLineEditor({
             />
           </div>
           <input
-            className="oryx-input col-span-3"
+            className="oryx-input min-w-0 sm:col-span-3 xl:col-span-3"
             placeholder={t('erp.accounting.description')}
             value={line.description}
             onChange={(e) => update(i, { description: e.target.value })}
             data-testid={`${testIdPrefix}-description-${i}`}
           />
           <input
-            className="oryx-input col-span-1"
+            className="oryx-input min-w-0 sm:col-span-2 xl:col-span-1"
             placeholder={t('erp.inventory.quantity')}
             value={line.quantity}
             onChange={(e) => update(i, { quantity: e.target.value })}
             data-testid={`${testIdPrefix}-quantity-${i}`}
           />
           <input
-            className="oryx-input col-span-2"
+            className="oryx-input min-w-0 sm:col-span-2 xl:col-span-2"
             placeholder={costLabel}
             value={line.unitCost}
             onChange={(e) => update(i, { unitCost: e.target.value })}
             data-testid={`${testIdPrefix}-cost-${i}`}
           />
-          <div className="col-span-1">
+          <div className="min-w-0 sm:col-span-2 xl:col-span-1">
             <TaxPicker
               value={line.taxId || null}
               options={taxOptions}
@@ -1368,7 +1370,7 @@ function CostLineEditor({
               onCreated={onTaxCreated}
             />
           </div>
-          <Button size="sm" variant="ghost" className="col-span-1" disabled={lines.length <= 1} onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>
+          <Button size="sm" variant="ghost" className="sm:col-span-2 xl:col-span-1" disabled={lines.length <= 1} onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>
             <Icon name="close" size={14} />
           </Button>
         </div>
