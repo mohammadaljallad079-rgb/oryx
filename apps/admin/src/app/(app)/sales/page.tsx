@@ -112,7 +112,7 @@ interface CartLine {
  *
  * This is the shared `document-totals` algorithm re-expressed on the client:
  * the line subtotal is a single half-up rounding of quantity × price, the
- * discount and tax are each a single half-up rounding of the running amount, and
+ * tax is computed on the original line value before subtracting discounts, and
  * the subtotal is the sum of the rounded line subtotals rather than a re-rounded
  * aggregate. Mirroring the server here is deliberate — the till shows the exact
  * figure that will be posted, and `subtotal − discount + tax + rounding = total`
@@ -133,8 +133,8 @@ function computePosTotals(
     const lineSubtotalMinor = lineAmountMinor(l.quantity * 10000, l.unitPriceMinor);
     const discountMinor = Math.min(lineSubtotalMinor, Math.max(0, l.discountAmountMinor));
     const net = lineSubtotalMinor - discountMinor;
-    const taxMinor = basisPointsOfMinor(net, l.taxPercentBp);
-    return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
+    const taxMinor = basisPointsOfMinor(lineSubtotalMinor, l.taxPercentBp);
+    return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: lineSubtotalMinor + taxMinor - discountMinor };
   });
   const subtotalMinor = sumMinor(priced.map((l) => l.lineSubtotalMinor));
   const discountMinor = sumMinor(priced.map((l) => l.discountMinor));
@@ -1902,8 +1902,8 @@ function priceDraftLine(line: LineDraft, currency?: string) {
   const lineSubtotalMinor = lineAmountMinor(quantity, unitPriceMinor);
   const discountMinor = Math.min(lineSubtotalMinor, Math.max(0, discountAmountMinor));
   const net = lineSubtotalMinor - discountMinor;
-  const taxMinor = basisPointsOfMinor(net, taxPercentBp);
-  return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
+  const taxMinor = basisPointsOfMinor(lineSubtotalMinor, taxPercentBp);
+  return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: lineSubtotalMinor + taxMinor - discountMinor };
 }
 
 function computeDraftTotals(
