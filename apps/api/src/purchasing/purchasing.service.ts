@@ -857,20 +857,29 @@ export class PurchasingService {
         if (totals.taxMinor > 0) {
           journalLines.push({ accountId: vatInput, debit: totals.taxMinor });
         }
-        const journal = await this.posting.postJournal(tx, {
-          companyId,
-          branchId: invoice.branchId,
-          entryDate: invoiceDate,
-          memo: `Supplier invoice ${invoiceNumber}`,
-          sourceType: 'SUPPLIER_INVOICE',
-          sourceId: invoice.id,
-          actorUserId: actor.userId,
-          lines: journalLines,
-        });
-        await tx.supplierInvoice.update({
-          where: { id: invoice.id },
-          data: { status: 'POSTED', journalEntryId: journal.id, postedAt: new Date() },
-        });
+        // A fully accrued receipt with no VAT needs no second journal. Mark
+        // the invoice posted rather than trying to create a zero-value entry.
+        if (apIncrease === 0 && netToAccrue === 0 && totals.taxMinor === 0) {
+          await tx.supplierInvoice.update({
+            where: { id: invoice.id },
+            data: { status: 'POSTED', postedAt: new Date() },
+          });
+        } else {
+          const journal = await this.posting.postJournal(tx, {
+            companyId,
+            branchId: invoice.branchId,
+            entryDate: invoiceDate,
+            memo: `Supplier invoice ${invoiceNumber}`,
+            sourceType: 'SUPPLIER_INVOICE',
+            sourceId: invoice.id,
+            actorUserId: actor.userId,
+            lines: journalLines,
+          });
+          await tx.supplierInvoice.update({
+            where: { id: invoice.id },
+            data: { status: 'POSTED', journalEntryId: journal.id, postedAt: new Date() },
+          });
+        }
       }
 
       const fresh = await tx.supplierInvoice.findUniqueOrThrow({
