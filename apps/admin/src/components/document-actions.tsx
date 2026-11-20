@@ -107,7 +107,7 @@ function attachmentEntityFor(sourceType: DocumentSourceType): AttachmentEntityTy
   return null;
 }
 
-export function DocumentActions({ sourceType, sourceId, type, permissions, autoOpenOnMount = false, iconsOnly = false }: DocumentActionsProps) {
+export function DocumentActions({ sourceType, sourceId, type, permissions, autoOpenOnMount = false, iconsOnly = true }: DocumentActionsProps) {
   const { t, locale } = useUi();
   const { canAny } = useAuth();
 
