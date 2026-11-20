@@ -320,6 +320,12 @@ export class InventoryService {
       favorites,
       customerOrderLines,
       returnLines,
+      requisitionLines,
+      receiptLines,
+      supplierInvoiceLines,
+      purchaseReturnLines,
+      transferLines,
+      adjustmentLines,
     ] = await Promise.all([
       this.prisma.stockLevel.count({ where: { productId: id } }),
       this.prisma.stockMovement.count({ where: { productId: id } }),
@@ -336,6 +342,12 @@ export class InventoryService {
       this.prisma.favorite.count({ where: { productId: id } }),
       this.prisma.customerOrderLine.count({ where: { productId: id } }),
       this.prisma.customerOrderReturnLine.count({ where: { productId: id } }),
+      this.prisma.purchaseRequisitionLine.count({ where: { productId: id } }),
+      this.prisma.goodsReceiptLine.count({ where: { productId: id } }),
+      this.prisma.supplierInvoiceLine.count({ where: { productId: id } }),
+      this.prisma.purchaseReturnLine.count({ where: { productId: id } }),
+      this.prisma.stockTransferLine.count({ where: { productId: id } }),
+      this.prisma.stockAdjustmentLine.count({ where: { productId: id } }),
     ]);
 
     const blocking =
@@ -349,7 +361,13 @@ export class InventoryService {
       reservationLines +
       partRefs +
       customerOrderLines +
-      returnLines;
+      returnLines +
+      requisitionLines +
+      receiptLines +
+      supplierInvoiceLines +
+      purchaseReturnLines +
+      transferLines +
+      adjustmentLines;
     if (blocking > 0) {
       throw conflict(
         ERROR_CODES.RESOURCE_CONFLICT,
@@ -387,13 +405,17 @@ export class InventoryService {
     const warehouse = await this.prisma.warehouse.findFirst({ where: { id, companyId } });
     if (!warehouse) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Warehouse not found.');
 
-    const [movements, levelsWithStock, transfersFrom, transfersTo] = await Promise.all([
+    const [movements, levelsWithStock, transfersFrom, transfersTo, adjustments, purchaseOrders, receipts, returns] = await Promise.all([
       this.prisma.stockMovement.count({ where: { warehouseId: id } }),
       this.prisma.stockLevel.count({ where: { warehouseId: id, quantity: { not: 0 } } }),
       this.prisma.stockTransfer.count({ where: { fromWarehouseId: id } }),
       this.prisma.stockTransfer.count({ where: { toWarehouseId: id } }),
+      this.prisma.stockAdjustment.count({ where: { companyId, warehouseId: id } }),
+      this.prisma.purchaseOrder.count({ where: { companyId, warehouseId: id } }),
+      this.prisma.goodsReceipt.count({ where: { companyId, warehouseId: id } }),
+      this.prisma.purchaseReturn.count({ where: { companyId, warehouseId: id } }),
     ]);
-    if (movements + levelsWithStock + transfersFrom + transfersTo > 0) {
+    if (movements + levelsWithStock + transfersFrom + transfersTo + adjustments + purchaseOrders + receipts + returns > 0) {
       throw conflict(
         ERROR_CODES.RESOURCE_CONFLICT,
         'This warehouse holds stock or movement history and cannot be deleted. Deactivate it instead.',
