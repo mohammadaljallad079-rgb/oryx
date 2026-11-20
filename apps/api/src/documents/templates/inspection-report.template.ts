@@ -838,7 +838,7 @@ export const INSPECTION_REPORT_CSS = `
   /* The approved cover prints the vehicle photograph as a wide band across the
    * middle of the page, bleeding past the side margins. Measured from the
    * reference: the band spans y184-549 of an 842pt sheet, i.e. 365pt tall. */
-  .vphoto{ --vphoto-h:250px; position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
+  .vphoto{ --vphoto-h:275px; position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
   /* The approved cover bleeds the photograph to the paper edges. A negative
    * margin, or a wider in-flow box, enlarges the printable area and shifts every
    * other element on the sheet sideways. The band is therefore painted with an
@@ -847,8 +847,8 @@ export const INSPECTION_REPORT_CSS = `
    * the page. */
   .vphoto--bleed{ margin-inline:0; border-radius:0; border-inline:none; height:var(--vphoto-h); }
   .vphoto--bleed .vphoto-img{ position:absolute; top:0; inset-inline:-12mm;
-    width:calc(100% + 24mm); height:var(--vphoto-h); object-fit:cover; }
-  .vphoto-img{ width:100%; height:var(--vphoto-h); object-fit:cover; display:block; }
+    width:calc(100% + 24mm); height:var(--vphoto-h); object-fit:contain; }
+  .vphoto-img{ width:100%; height:var(--vphoto-h); object-fit:contain; display:block; }
   /* With no attached photograph the cover keeps the reference's blank band
    * (y184-549) empty: no illustration, no placeholder text. The band is drawn at
    * the reference's height so the vehicle information and the terms block land
@@ -872,7 +872,7 @@ export const INSPECTION_REPORT_CSS = `
    * cards: the Arabic column on the right at 8pt and the English column on the
    * left at 6pt (measured y524-660 of page 1). The banner is forced LTR so the
    * English always leads on the left regardless of the document direction. */
-  .terms{ margin-top:10px; }
+  .terms{ margin-top:16px; }
   .terms-banner{ display:flex; direction:ltr; align-items:center; justify-content:space-between;
     background:#0f2b48; color:#fff; padding:3px 10px; font-size:10pt; font-weight:700; }
   .terms-banner-en{ text-align:left; }
