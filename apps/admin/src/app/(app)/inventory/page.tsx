@@ -746,9 +746,7 @@ function ProductImagesModal({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [altEn, setAltEn] = useState('');
-  const [altAr, setAltAr] = useState('');
+
 
   const load = useCallback(async () => {
     if (!product) return;
@@ -767,32 +765,8 @@ function ProductImagesModal({
     if (product) void load();
     else {
       setImages([]);
-      setFile(null);
-      setAltEn('');
-      setAltAr('');
     }
   }, [product, load]);
-
-  async function upload() {
-    if (!product || !file) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      if (altEn) form.append('altEn', altEn);
-      if (altAr) form.append('altAr', altAr);
-      await api.uploadProductImage(product.id, form);
-      setFile(null);
-      setAltEn('');
-      setAltAr('');
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function promote(imageId: string) {
     if (!product) return;
@@ -856,32 +830,6 @@ function ProductImagesModal({
           ))}
         </div>
       )}
-      {canManage ? (
-        <div className="border-t border-[var(--border)] pt-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={t('erp.inventory.file')}>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/avif"
-                className="oryx-input"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                data-testid="product-image-file"
-              />
-            </Field>
-            <Field label={`${t('common.name')} (EN)`}>
-              <input className="oryx-input" value={altEn} onChange={(e) => setAltEn(e.target.value)} data-testid="product-image-alt-en" />
-            </Field>
-            <Field label={`${t('common.name')} (AR)`}>
-              <input className="oryx-input" value={altAr} onChange={(e) => setAltAr(e.target.value)} data-testid="product-image-alt-ar" />
-            </Field>
-          </div>
-          <div className="mt-3 flex justify-end">
-            <Button variant="primary" size="sm" disabled={busy || !file} onClick={() => void upload()} data-testid="upload-product-image">
-              {busy ? t('common.loading') : t('erp.inventory.uploadImage')}
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </Modal>
   );
 }
