@@ -13,10 +13,13 @@ export interface PricedLineInput {
   /** Fixed discount in minor units; when set, takes precedence over legacy percent. */
   discountAmountMinor?: number;
   taxPercentBp?: number;
+  /** Preserve the actual VAT amount of an original posted invoice on a linked return. */
+  taxAmountMinor?: number;
 }
 
-export interface PricedLine extends Required<Omit<PricedLineInput, 'discountAmountMinor'>> {
+export interface PricedLine extends Required<Omit<PricedLineInput, 'discountAmountMinor' | 'taxAmountMinor'>> {
   discountAmountMinor?: number;
+  taxAmountMinor?: number;
   lineSubtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
@@ -40,7 +43,7 @@ export interface DocumentTotals {
  * are deterministic and reproducible: the same input always yields the same
  * minor-unit totals on the API, in the UI and in a report. The subtotal is the
  * sum of the rounded line subtotals (not a re-rounded aggregate), which is what
- * makes `subtotal - discount + tax === total` hold exactly.
+ * makes `subtotal + tax - discount === total` hold exactly.
  *
  * When `roundingMode` is not `NONE` the line total is snapped to the nearest
  * whole (or half) major unit and the small difference is reported as
@@ -59,18 +62,22 @@ export function computeDocumentTotals(
     const discountMinor = line.discountAmountMinor === undefined
       ? basisPointsOfMinor(lineSubtotalMinor, discountPercentBp)
       : Math.min(lineSubtotalMinor, Math.max(0, line.discountAmountMinor));
-    const net = lineSubtotalMinor - discountMinor;
-    const taxMinor = basisPointsOfMinor(net, taxPercentBp);
+    // Company policy: VAT is based on the original extended price; the
+    // discount reduces the final payable amount only, not the tax base.
+    const taxMinor = line.taxAmountMinor === undefined
+      ? basisPointsOfMinor(lineSubtotalMinor, taxPercentBp)
+      : Math.max(0, line.taxAmountMinor);
     return {
       quantity: line.quantity,
       unitPriceMinor: line.unitPriceMinor,
       discountPercentBp,
       discountAmountMinor: line.discountAmountMinor,
+      taxAmountMinor: line.taxAmountMinor,
       taxPercentBp,
       lineSubtotalMinor,
       discountMinor,
       taxMinor,
-      lineTotalMinor: net + taxMinor,
+      lineTotalMinor: lineSubtotalMinor + taxMinor - discountMinor,
     };
   });
 

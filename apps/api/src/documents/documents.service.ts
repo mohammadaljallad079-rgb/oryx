@@ -1955,12 +1955,15 @@ function percentLine(l: {
   quantity: number;
   unitPriceMinor: number;
   discountPercentBp: number;
+  discountMinor?: number;
   taxPercentBp: number;
   lineTotalMinor: number;
 }, skus: Map<string, string> = new Map()) {
   const gross = lineAmountMinor(l.quantity, l.unitPriceMinor);
-  const discount = basisPointsOfMinor(gross, l.discountPercentBp);
-  const tax = basisPointsOfMinor(gross - discount, l.taxPercentBp);
+  // Use persisted amounts so newly issued and historical documents both print
+  // their original VAT/discount without being silently repriced by a new policy.
+  const discount = l.discountMinor ?? basisPointsOfMinor(gross, l.discountPercentBp);
+  const tax = l.lineTotalMinor - gross + discount;
   return {
     ...splitLineDescription(l.description),
     sku: l.productId ? skus.get(l.productId) ?? null : null,
