@@ -111,7 +111,7 @@ function InventoryInner() {
 }
 
 function ValuationTab() {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const valuation = useAsync<{ rows: ValuationRowDto[]; totalValueMinor: number; totalQuantity: number }>(
     () => api.inventoryValuation(),
     [],
@@ -152,7 +152,7 @@ function ValuationTab() {
           <tbody>
             {valuation.data!.rows.map((r) => (
               <tr key={`${r.warehouseId}-${r.productId}`} data-testid={`valuation-row-${r.sku}`}>
-                <td className="text-[12.5px]">{r.warehouseCode}</td>
+                <td className="text-[12.5px]">{r.warehouseCode === '—' ? (locale === 'ar' ? 'بدون حركة مخزون' : 'Not yet stocked') : r.warehouseCode}</td>
                 <td className="font-mono text-[12px]">{r.sku}</td>
                 <td>{r.nameEn}</td>
                 <td className="tabular-nums text-[12.5px]">{qty(r.quantity)}</td>
@@ -565,6 +565,7 @@ function EditProductModal({
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [productImage, setProductImage] = useState<File | null>(null);
   const [form, setForm] = useState({
     nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15', isActive: true,
     barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
@@ -573,6 +574,7 @@ function EditProductModal({
   useEffect(() => {
     if (!product) return;
     setError(null);
+    setProductImage(null);
     setForm({
       nameEn: product.nameEn,
       nameAr: product.nameAr,
@@ -609,6 +611,14 @@ function EditProductModal({
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
       });
+      if (productImage) {
+        const imageData = new FormData();
+        imageData.append('file', productImage);
+        imageData.append('altEn', form.nameEn.trim() || form.nameAr.trim());
+        imageData.append('altAr', form.nameAr.trim() || form.nameEn.trim());
+        await api.uploadProductImage(product.id, imageData);
+        setProductImage(null);
+      }
       await onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
@@ -687,6 +697,14 @@ function EditProductModal({
         />
         {t('common.active')}
       </label>
+      <div className="mt-4 rounded-xl border border-[var(--border)] p-3" data-testid="edit-product-inline-image">
+        <Field label={t('erp.inventory.images')}>
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif"
+            className="oryx-input" data-testid="edit-product-inline-image-file"
+            onChange={(e) => setProductImage(e.target.files?.[0] ?? null)} />
+        </Field>
+        {productImage ? <p className="oryx-muted m-0 mt-2 text-xs">{productImage.name}</p> : null}
+      </div>
       {product ? (
         <div className="mt-4 border-t border-[var(--border)] pt-4">
           <AttachmentsPanel entityType="PRODUCT" entityId={product.id} canManage categorised />
