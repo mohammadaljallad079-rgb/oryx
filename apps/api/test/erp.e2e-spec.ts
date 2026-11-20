@@ -1124,11 +1124,11 @@ describe('ORYX ERP core (e2e)', () => {
         },
       });
       expect(req.status).toBe(201);
-      const approved = await erp(`/purchasing/requisitions/${req.body.id}/approve`, {
+      const approved = await erp<{ status: string }>(`/purchasing/requisitions/${req.body.id}/approve`, {
         method: 'POST',
         body: {},
       });
-      expect(approved.status).toBe(201);
+      expect(approved.body.status).toBe('APPROVED');
       const convert = await erp<{ code: string }>(`/purchasing/requisitions/${req.body.id}/convert`, {
         method: 'POST',
         body: { supplierId },
