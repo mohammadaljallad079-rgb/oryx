@@ -426,7 +426,6 @@ function CreateCompanyModal({
   const [plans, setPlans] = useState<PlanDto[]>([]);
   const [managerOptions, setManagerOptions] = useState<Array<{ id: string; email: string; fullNameEn: string; fullNameAr: string }>>([]);
   const [managerSearch, setManagerSearch] = useState('');
-  const [managerMode, setManagerMode] = useState<'existing' | 'invite'>('existing');
   const [managerLoading, setManagerLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -438,9 +437,6 @@ function CreateCompanyModal({
     industry: '',
     planId: '',
     adminUserId: '',
-    adminEmail: '',
-    adminFullNameEn: '',
-    adminFullNameAr: '',
   });
 
   useEffect(() => {
@@ -469,29 +465,15 @@ function CreateCompanyModal({
     setBusy(true);
     setError(null);
     try {
-      const res = await api.createCompany({
+      await api.createCompany({
         code: '',
         nameEn: form.nameEn.trim() || form.nameAr.trim(),
         nameAr: form.nameAr.trim() || form.nameEn.trim(),
         type: form.type,
         industry: form.industry || undefined,
         planId: form.planId || undefined,
-        adminUserId: managerMode === 'existing' ? form.adminUserId || undefined : undefined,
+        adminUserId: form.adminUserId || undefined,
       });
-
-      // Invite the first company administrator if an email was supplied.
-      if (managerMode === 'invite' && form.adminEmail && res.company?.id) {
-        const roles = await api.listRoles(res.company.id);
-        const adminRole = roles.find((r) => r.code === 'company_admin') ?? roles[0];
-        if (adminRole) {
-          await api.inviteUser(res.company.id, {
-            email: form.adminEmail,
-            fullNameEn: form.adminFullNameEn || form.adminEmail,
-            fullNameAr: form.adminFullNameAr || form.adminEmail,
-            roleId: adminRole.id,
-          });
-        }
-      }
 
       await onCreated();
       setForm({
@@ -502,9 +484,6 @@ function CreateCompanyModal({
         industry: '',
         planId: '',
         adminUserId: '',
-    adminEmail: '',
-        adminFullNameEn: '',
-        adminFullNameAr: '',
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.error'));
@@ -517,6 +496,7 @@ function CreateCompanyModal({
     <Modal
       open={open}
       title={t('companies.createTitle')}
+      size="form"
       onClose={onClose}
       footer={
         <>
@@ -601,68 +581,21 @@ function CreateCompanyModal({
       <hr className="oryx-divider my-4" />
 
       <p className="oryx-panel-title m-0 mb-3">{locale === 'ar' ? 'مدير الشركة' : 'Company manager'}</p>
-      <div className="mb-3 flex flex-wrap gap-2">
-        <Button size="sm" variant={managerMode === 'existing' ? 'primary' : 'ghost'}
-          onClick={() => setManagerMode('existing')} data-testid="company-manager-existing">
-          {locale === 'ar' ? 'اختيار من قاعدة البيانات' : 'Choose existing user'}
-        </Button>
-        <Button size="sm" variant={managerMode === 'invite' ? 'primary' : 'ghost'}
-          onClick={() => setManagerMode('invite')} data-testid="company-manager-add">
-          <Icon name="plus" size={14} />
-          {locale === 'ar' ? 'إضافة مدير جديد' : 'Add new manager'}
-        </Button>
-      </div>
-      {managerMode === 'existing' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t('common.search')}>
-            <input className="oryx-input" value={managerSearch}
-              onChange={(e) => setManagerSearch(e.target.value)}
-              placeholder={locale === 'ar' ? 'ابحث بالاسم أو البريد الإلكتروني' : 'Search name or email'}
-              data-testid="company-manager-search" />
-          </Field>
-          <Field label={locale === 'ar' ? 'المستخدم الموجود' : 'Existing user'}>
-            <SearchableSelect
-              value={form.adminUserId || null}
-              options={managerOptions.map((manager) => ({
-                value: manager.id,
-                label: `${locale === 'ar' ? manager.fullNameAr || manager.fullNameEn : manager.fullNameEn || manager.fullNameAr} — ${manager.email}`,
-              }))}
-              onChange={(id) => setForm({ ...form, adminUserId: id ?? '' })}
-              placeholder={managerLoading
-                ? t('common.loading')
-                : locale === 'ar' ? 'اختر مدير الشركة' : 'Select a company manager'}
-              emptyLabel={t('common.none')}
-              testId="company-manager-existing-select"
-            />
-          </Field>
-        </div>
-      ) : (
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label={t('companies.adminEmail')}>
-          <input
-            className="oryx-input"
-            type="email"
-            value={form.adminEmail}
-            onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
-            data-testid="company-admin-email"
-          />
-        </Field>
-        <Field label={t('companies.adminNameEn')}>
-          <input
-            className="oryx-input"
-            value={form.adminFullNameEn}
-            onChange={(e) => setForm({ ...form, adminFullNameEn: e.target.value })}
-          />
-        </Field>
-        <Field label={t('companies.adminNameAr')}>
-          <input
-            className="oryx-input"
-            value={form.adminFullNameAr}
-            onChange={(e) => setForm({ ...form, adminFullNameAr: e.target.value })}
-          />
-        </Field>
-      </div>
-      )}
+      <Field label={locale === 'ar' ? 'اختر مدير الشركة من المستخدمين المسجلين' : 'Select a registered company manager'}>
+        <SearchableSelect
+          value={form.adminUserId || null}
+          options={managerOptions.map((manager) => ({
+            value: manager.id,
+            label: `${locale === 'ar' ? manager.fullNameAr || manager.fullNameEn : manager.fullNameEn || manager.fullNameAr} — ${manager.email}`,
+          }))}
+          onChange={(id) => setForm((prev) => ({ ...prev, adminUserId: id ?? '' }))}
+          onSearch={setManagerSearch}
+          loading={managerLoading}
+          placeholder={locale === 'ar' ? 'ابحث واختر من المستخدمين' : 'Search and select a registered user'}
+          emptyLabel={t('common.none')}
+          testId="company-manager-existing-select"
+        />
+      </Field>
     </Modal>
   );
 }
@@ -721,6 +654,7 @@ function EditCompanyModal({
     <Modal
       open={Boolean(company)}
       title={t('companies.editTitle')}
+      size="form"
       onClose={onClose}
       footer={
         <>

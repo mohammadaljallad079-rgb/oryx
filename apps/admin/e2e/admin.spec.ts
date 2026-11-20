@@ -114,7 +114,7 @@ test.describe('company and branch management', () => {
     await expect(page.getByTestId('company-row-DEMO-ALNOOR')).toBeVisible();
   });
 
-  test('super admin can provision a company with a plan and an admin invitation', async ({ page }) => {
+  test('super admin can provision a company and choose an existing registered manager', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');
     await page.goto('/companies');
@@ -125,8 +125,11 @@ test.describe('company and branch management', () => {
     await expect(page.getByTestId('company-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('company-name-en').fill(name);
     await page.getByTestId('company-name-ar').fill(`شركة اختبار ${suffix}`);
-    await page.getByTestId('company-manager-add').click();
-    await page.getByTestId('company-admin-email').fill(`admin-${suffix}@e2e.local`);
+    // Company manager is selected from registered users, not entered or invited
+    // through a separate form. Use the real searchable picker.
+    await expect(page.getByTestId('company-manager-existing-select')).toBeVisible();
+    await expect(page.getByTestId('company-manager-add')).toHaveCount(0);
+    await pickOption(page, 'company-manager-existing-select');
 
     // Pick the first real plan so the tenant gets entitlements. The plan
     // picker is a searchable combobox, so its options are read from the opened
