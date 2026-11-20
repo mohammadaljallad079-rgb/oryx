@@ -23,6 +23,15 @@ describe('VAT before sales discounts', () => {
     expect(priced.totalMinor).toBe(29_800);
   });
 
+  it('reverses historical VAT on the previously discounted base without changing policy for new documents', () => {
+    const linkedReturn = computeDocumentTotals([
+      { quantity: 10_000, unitPriceMinor: 28_000, discountAmountMinor: 1_000,
+        taxPercentBp: 1_000, taxAmountMinor: 2_700 },
+    ], 'NONE', 3);
+    expect(linkedReturn.taxMinor).toBe(2_700);
+    expect(linkedReturn.totalMinor).toBe(29_700);
+  });
+
   it('retains compatibility with legacy percentage discounts', () => {
     const priced = computeDocumentTotals([
       { quantity: 10_000, unitPriceMinor: 10_000, discountPercentBp: 1_000, taxPercentBp: 1_000 },
