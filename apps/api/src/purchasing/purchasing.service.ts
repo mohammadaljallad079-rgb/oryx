@@ -387,6 +387,13 @@ export class PurchasingService {
     await this.assertSupplier(companyId, dto.supplierId);
     if (dto.warehouseId) await this.assertWarehouse(companyId, dto.warehouseId);
 
+    // Receipt allocation is keyed by productId. Duplicate product lines on
+    // one PO would make quantityReceived ambiguous and permit over-receipt.
+    const orderProducts = dto.lines.flatMap((line) => line.productId ? [line.productId] : []);
+    if (new Set(orderProducts).size !== orderProducts.length) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Combine repeated products into one purchase-order line.');
+    }
+
     const companyCurrency = await this.context.companyCurrency(companyId);
     const totals = computePurchaseTotals(dto.lines);
     const order = await this.posting.withTransaction(async (tx) => {
@@ -495,6 +502,13 @@ export class PurchasingService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
     const result = await this.posting.withTransaction(async (tx) => {
+      // Serialise receipt allocation per order. Without this lock, concurrent
+      // transactions may both read the same remaining quantity and over-receive.
+      await tx.$queryRawUnsafe(
+        'SELECT id FROM "PurchaseOrder" WHERE id = $1 AND "companyId" = $2 FOR UPDATE',
+        dto.purchaseOrderId,
+        companyId,
+      );
       const order = await tx.purchaseOrder.findFirst({
         where: { id: dto.purchaseOrderId, companyId },
         include: { lines: true },
@@ -514,6 +528,12 @@ export class PurchasingService {
       // An explicit line is capped at what the order still owes, so a retried or
       // duplicated receipt cannot move stock (and accrue AP) twice for the same
       // ordered quantity.
+      if (dto.lines) {
+        const ids = dto.lines.map((line) => line.productId);
+        if (new Set(ids).size !== ids.length) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A goods receipt cannot repeat the same product in separate lines.');
+        }
+      }
       const receiptLines = dto.lines
         ? dto.lines.map((l) => {
             const orderLine = order.lines.find((ol) => ol.productId === l.productId);
@@ -703,6 +723,9 @@ export class PurchasingService {
       if (dto.purchaseOrderId) {
         const order = await tx.purchaseOrder.findFirst({ where: { id: dto.purchaseOrderId, companyId } });
         if (!order) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase order not found.');
+        if (order.supplierId !== dto.supplierId) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Supplier invoice supplier must match the purchase order.');
+        }
         const receipts = await tx.goodsReceipt.findMany({ where: { purchaseOrderId: order.id, status: 'POSTED' } });
         if (receipts.length > 0) alreadyAccrued = totals.subtotalMinor;
       }
@@ -832,6 +855,16 @@ export class PurchasingService {
     const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       await this.assertWarehouseTx(tx, companyId, dto.warehouseId);
+      if (dto.purchaseOrderId) {
+        const order = await tx.purchaseOrder.findFirst({
+          where: { id: dto.purchaseOrderId, companyId },
+          select: { supplierId: true },
+        });
+        if (!order) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase order not found.');
+        if (order.supplierId !== dto.supplierId) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Purchase return supplier must match the purchase order.');
+        }
+      }
       const totals = computePurchaseTotals(dto.lines);
       const returnDate = new Date(dto.returnDate);
       const returnNumber = await this.sequences.next(tx, companyId, 'purchaseReturn');
