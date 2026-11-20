@@ -56,12 +56,11 @@ test.describe('Execution 20 — inspection input form (close-up)', () => {
       // The inline create dialog the "+ add" action opens: the full customer
       // form, not a reduced stub.
       await page.getByTestId('job-customer-create').click();
-      // This picker intentionally uses the compact catalogue-create form rather
-      // than nesting the full standalone customer editor inside the inspection
-      // form. Assert its actual fields and capture the complete inline dialog.
-      await expect(page.getByTestId('job-customer-create-code')).toBeVisible();
-      await expect(page.getByTestId('job-customer-create-nameEn')).toBeVisible();
-      await expect(page.getByTestId('job-customer-create-nameAr')).toBeVisible();
+      // The inspection now uses the canonical full CustomerModal, including its
+      // automatic code and bilingual fields, not a reduced inline stub.
+      await expect(page.getByTestId('customer-code')).toBeVisible();
+      await expect(page.getByTestId('customer-name-en')).toBeVisible();
+      await expect(page.getByTestId('customer-name-ar')).toBeVisible();
       await shotEl(page.locator('.oryx-modal').last(), `form-05-inline-customer-create-ar-${theme}`);
     });
   }
