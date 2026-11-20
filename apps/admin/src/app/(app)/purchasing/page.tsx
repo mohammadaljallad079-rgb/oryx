@@ -823,7 +823,7 @@ function PurchaseOrderModal({
       </div>
       </PurchaseFormSection>
       <PurchaseFormSection prefix="purchase-order-form" section="items" title={t('erp.sales.form.items')} className="mt-3">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-order-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-order-line" currency={currency} onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
       </PurchaseFormSection>
       <PurchaseFormSection prefix="purchase-order-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
         <PurchaseLineSummary lines={lines} currency={currency} prefix="purchase-order-form" />
@@ -1254,7 +1254,7 @@ function SupplierInvoiceModal({
       </div>
       </PurchaseFormSection>
       <PurchaseFormSection prefix="supplier-invoice-form" section="items" title={t('erp.sales.form.items')} className="mt-3">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="supplier-invoice-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="supplier-invoice-line" currency={currency} onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
       </PurchaseFormSection>
       <PurchaseFormSection prefix="supplier-invoice-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
         <PurchaseLineSummary lines={lines} currency={currency} prefix="supplier-invoice-form" />
@@ -1531,6 +1531,7 @@ function CostLineEditor({
   onTaxCreated,
   testIdPrefix,
   costLabel,
+  currency = 'BHD',
   onProductCreated,
 }: {
   lines: LineDraft[];
@@ -1541,6 +1542,7 @@ function CostLineEditor({
   onTaxCreated?: () => Promise<void> | void;
   testIdPrefix: string;
   costLabel: string;
+  currency?: string;
   /** Reload the product list after one is created from a line picker. */
   onProductCreated?: () => Promise<void> | void;
 }) {
@@ -1559,7 +1561,7 @@ function CostLineEditor({
       ...next[i],
       productId,
       description: product ? product.nameEn : next[i].description,
-      unitCost: product ? minorToInput(product.costPriceMinor) : next[i].unitCost,
+      unitCost: product ? minorToInput(product.costPriceMinor, currency) : next[i].unitCost,
     };
     setLines(next);
   };
@@ -1570,7 +1572,7 @@ function CostLineEditor({
         <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 sm:grid-cols-6 xl:grid-cols-12 xl:items-start" data-testid={`${testIdPrefix}-row-${i}`}>
           <div className="col-span-full flex items-center justify-between text-xs font-semibold text-[var(--muted)]">
             <span>{t('erp.sales.form.items')} #{i + 1}</span>
-            <span className="tabular-nums">{money(Math.round((Number(line.quantity) || 0) * toMinorInput(line.unitCost)), 'BHD')}</span>
+            <span className="tabular-nums">{money(Math.round((Number(line.quantity) || 0) * toMinorInput(line.unitCost, currency)), currency)}</span>
           </div>
           <div className="min-w-0 sm:col-span-3 xl:col-span-4">
             <EntityPicker
