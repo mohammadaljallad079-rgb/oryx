@@ -317,6 +317,9 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
+  const [invoiceAttachment, setInvoiceAttachment] = useState<File | null>(null);
+  // Preserve the saved invoice between retries when its attachment upload fails.
+  const savedInvoiceId = useRef<string | null>(null);
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const [autoPreviewId, setAutoPreviewId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<SalesDocumentDto | null>(null);
@@ -332,7 +335,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.sales.invoices')}</p>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => { setEditingInvoice(null); setOpen(true); }} data-testid="new-invoice">
+          <Button variant="primary" size="sm" onClick={() => { savedInvoiceId.current = null; setInvoiceAttachment(null); setEditingInvoice(null); setOpen(true); }} data-testid="new-invoice">
             <Icon name="plus" size={16} />
             {t('erp.sales.newInvoice')}
           </Button>
@@ -377,7 +380,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     {canManage && inv.status === 'DRAFT' ? (
                       <>
-                        <Button size="sm" variant="ghost" onClick={() => { setEditingInvoice(inv); setOpen(true); }} data-testid={`edit-invoice-${inv.invoiceNumber}`}>
+                        <Button size="sm" variant="ghost" onClick={() => { savedInvoiceId.current = null; setInvoiceAttachment(null); setEditingInvoice(inv); setOpen(true); }} data-testid={`edit-invoice-${inv.invoiceNumber}`}>
                           <Icon name="edit" size={14} />
                           {t('common.edit')}
                         </Button>
@@ -428,18 +431,29 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         showWarehouse
         dueDateField="dueDate"
         settlement
+        attachmentFile={invoiceAttachment}
+        onAttachmentFileChange={setInvoiceAttachment}
         testIdPrefix="invoice"
-        onClose={() => setOpen(false)}
+        onClose={() => { setOpen(false); setInvoiceAttachment(null); savedInvoiceId.current = null; }}
         onSubmit={async (payload) => {
-          if (editingInvoice) {
-            await api.updateSalesInvoice(editingInvoice.id, payload);
-            if (payload.post !== false) setAutoPreviewId(editingInvoice.id);
-            setEditingInvoice(null);
-          } else {
-            const created = await api.createSalesInvoice(payload);
-            if (payload.post !== false) setAutoPreviewId(created.id);
+          let invoiceId = savedInvoiceId.current;
+          if (!invoiceId) {
+            if (editingInvoice) {
+              await api.updateSalesInvoice(editingInvoice.id, payload);
+              invoiceId = editingInvoice.id;
+            } else {
+              const created = await api.createSalesInvoice(payload);
+              invoiceId = created.id;
+            }
+            savedInvoiceId.current = invoiceId;
           }
+          if (invoiceAttachment) {
+            await api.uploadAttachment('SALES_INVOICE', invoiceId, invoiceAttachment, 'OFFICIAL');
+            setInvoiceAttachment(null);
+          }
+          if (payload.post !== false) setAutoPreviewId(invoiceId);
           await list.reload();
+          setEditingInvoice(null);
         }}
       />
       <Modal
@@ -454,7 +468,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
               <DocumentPrintActions kind="SALES_INVOICE" id={detail.id} compact />
             </div>
             <InvoiceLineBreakdown document={detail} />
-            <AttachmentsPanel entityType="SALES_INVOICE" entityId={detail.id} canManage={canManage} />
+            <AttachmentsPanel entityType="SALES_INVOICE" entityId={detail.id} canManage={false} />
           </div>
         ) : null}
       </Modal>
@@ -2656,7 +2670,7 @@ function DocumentModal({
               </select>
             </Field>
           ) : null}
-          {reasonField && onAttachmentFileChange ? (
+          {onAttachmentFileChange ? (
             <Field label={t('attachments.title')}>
               <input
                 type="file"
