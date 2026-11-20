@@ -1247,6 +1247,55 @@ describe('ORYX ERP core (e2e)', () => {
       expect(after.quantity).toBe(before.quantity);
     });
 
+    it('limits PO-linked supplier invoices to quantities actually received and not previously invoiced', async () => {
+      const order = await erp<{ id: string }>('/purchasing/orders', {
+        method: 'POST',
+        body: {
+          supplierId,
+          warehouseId,
+          approve: true,
+          orderDate: '2026-06-01',
+          lines: [{ productId, description: 'Partial receipt invoice test', quantity: 50000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(order.status).toBe(201);
+      const receipt = await erp('/purchasing/receipts', {
+        method: 'POST',
+        body: {
+          purchaseOrderId: order.body.id,
+          warehouseId,
+          receivedAt: new Date().toISOString(),
+          lines: [{ productId, quantity: 20000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(receipt.status).toBe(201);
+
+      const invoiceBody = (number: string, quantity: number) => ({
+        supplierId,
+        purchaseOrderId: order.body.id,
+        supplierInvoiceNumber: number,
+        invoiceDate: '2026-06-01',
+        lines: [{ productId, description: 'Partial receipt invoice test', quantity, unitCostMinor: 6000 }],
+      });
+      const excessive = await erp<{ code: string }>('/purchasing/supplier-invoices', {
+        method: 'POST', body: invoiceBody('PARTIAL-TOO-MUCH', 50000),
+      });
+      expect(excessive.status).toBe(400);
+      expect(excessive.body.code).toBe('purchasing.over_receipt');
+
+      const invoiced = await erp<{ status: string }>('/purchasing/supplier-invoices', {
+        method: 'POST', body: invoiceBody('PARTIAL-OK-1', 20000),
+      });
+      expect(invoiced.status).toBe(201);
+      expect(invoiced.body.status).toBe('POSTED');
+
+      const replayQuantity = await erp<{ code: string }>('/purchasing/supplier-invoices', {
+        method: 'POST', body: invoiceBody('PARTIAL-TOO-MUCH-2', 10000),
+      });
+      expect(replayQuantity.status).toBe(400);
+      expect(replayQuantity.body.code).toBe('purchasing.over_receipt');
+    });
+
     it('records a supplier invoice and pays it', async () => {
       const invoice = await erp<{ id: string; invoiceNumber: string; totalMinor: number; status: string }>(
         '/purchasing/supplier-invoices',
