@@ -563,7 +563,7 @@ function EditProductModal({
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [productImage, setProductImage] = useState<File | null>(null);
+  const [productImages, setProductImages] = useState<File[]>([]);
   const [form, setForm] = useState({
     nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15', isActive: true,
     barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
@@ -572,7 +572,7 @@ function EditProductModal({
   useEffect(() => {
     if (!product) return;
     setError(null);
-    setProductImage(null);
+    setProductImages([]);
     setForm({
       nameEn: product.nameEn,
       nameAr: product.nameAr,
@@ -609,13 +609,13 @@ function EditProductModal({
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
       });
-      if (productImage) {
+      for (const image of productImages) {
         const imageData = new FormData();
-        imageData.append('file', productImage);
+        imageData.append('file', image);
         imageData.append('altEn', form.nameEn.trim() || form.nameAr.trim());
         imageData.append('altAr', form.nameAr.trim() || form.nameEn.trim());
         await api.uploadProductImage(product.id, imageData);
-        setProductImage(null);
+        setProductImages((pending) => pending.filter((candidate) => candidate !== image));
       }
       await onSaved();
     } catch (e) {
@@ -677,11 +677,28 @@ function EditProductModal({
       </div>
       <div className="mt-4 rounded-xl border border-[var(--border)] p-3" data-testid="edit-product-inline-image">
         <Field label={t('erp.inventory.images')}>
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif"
+          <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif"
             className="oryx-input" data-testid="edit-product-inline-image-file"
-            onChange={(e) => setProductImage(e.target.files?.[0] ?? null)} />
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              setProductImages((pending) => [...pending, ...files]);
+              e.target.value = '';
+            }} />
         </Field>
-        {productImage ? <p className="oryx-muted m-0 mt-2 text-xs">{productImage.name}</p> : null}
+        {productImages.length > 0 ? (
+          <ul className="mt-2 flex flex-col gap-1">
+            {productImages.map((image, index) => (
+              <li key={`${image.name}-${image.lastModified}-${index}`} className="flex items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 truncate">{image.name}</span>
+                <button type="button" className="oryx-btn oryx-btn--ghost"
+                  aria-label={`Remove ${image.name}`}
+                  onClick={() => setProductImages((pending) => pending.filter((_, i) => i !== index))}>
+                  <Icon name="close" size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
       <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
         <input
@@ -729,9 +746,7 @@ function ProductImagesModal({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [altEn, setAltEn] = useState('');
-  const [altAr, setAltAr] = useState('');
+
 
   const load = useCallback(async () => {
     if (!product) return;
@@ -750,32 +765,8 @@ function ProductImagesModal({
     if (product) void load();
     else {
       setImages([]);
-      setFile(null);
-      setAltEn('');
-      setAltAr('');
     }
   }, [product, load]);
-
-  async function upload() {
-    if (!product || !file) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      if (altEn) form.append('altEn', altEn);
-      if (altAr) form.append('altAr', altAr);
-      await api.uploadProductImage(product.id, form);
-      setFile(null);
-      setAltEn('');
-      setAltAr('');
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function promote(imageId: string) {
     if (!product) return;
@@ -839,32 +830,6 @@ function ProductImagesModal({
           ))}
         </div>
       )}
-      {canManage ? (
-        <div className="border-t border-[var(--border)] pt-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={t('erp.inventory.file')}>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/avif"
-                className="oryx-input"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                data-testid="product-image-file"
-              />
-            </Field>
-            <Field label={`${t('common.name')} (EN)`}>
-              <input className="oryx-input" value={altEn} onChange={(e) => setAltEn(e.target.value)} data-testid="product-image-alt-en" />
-            </Field>
-            <Field label={`${t('common.name')} (AR)`}>
-              <input className="oryx-input" value={altAr} onChange={(e) => setAltAr(e.target.value)} data-testid="product-image-alt-ar" />
-            </Field>
-          </div>
-          <div className="mt-3 flex justify-end">
-            <Button variant="primary" size="sm" disabled={busy || !file} onClick={() => void upload()} data-testid="upload-product-image">
-              {busy ? t('common.loading') : t('erp.inventory.uploadImage')}
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </Modal>
   );
 }
