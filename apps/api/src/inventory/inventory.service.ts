@@ -529,7 +529,7 @@ export class InventoryService {
         throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Opening stock requires a tracked product and a warehouse.');
       }
       if (!resolveEffectivePermissions(principal).permissions.includes('erp.inventory.movement.manage')) {
-        throw forbidden(ERROR_CODES.FORBIDDEN, 'Opening stock requires inventory movement permission.');
+        throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'Opening stock requires inventory movement permission.');
       }
       await this.assertWarehouse(companyId, dto.openingWarehouseId);
     }
