@@ -1095,6 +1095,80 @@ describe('ORYX ERP core (e2e)', () => {
       expect(poApproved.body.status).toBe('APPROVED');
     });
 
+    it('rejects duplicate purchase-order product lines before creating a document', async () => {
+      const duplicate = await erp<{ code: string }>('/purchasing/orders', {
+        method: 'POST',
+        body: {
+          supplierId,
+          warehouseId,
+          orderDate: '2026-06-01',
+          lines: [
+            { productId, description: 'Widget A', quantity: 10000, unitCostMinor: 6000 },
+            { productId, description: 'Widget B', quantity: 10000, unitCostMinor: 6000 },
+          ],
+        },
+      });
+      expect(duplicate.status).toBe(400);
+      expect(duplicate.body.code).toBe('request.validation_failed');
+    });
+
+    it('rejects repeated product lines on receipts without changing stock or PO allocation', async () => {
+      const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      const duplicated = await erp<{ code: string }>('/purchasing/receipts', {
+        method: 'POST',
+        body: {
+          purchaseOrderId: orderId,
+          warehouseId,
+          receivedAt: new Date().toISOString(),
+          lines: [
+            { productId, quantity: 30000, unitCostMinor: 6000 },
+            { productId, quantity: 30000, unitCostMinor: 6000 },
+          ],
+        },
+      });
+      expect(duplicated.status).toBe(400);
+      expect(duplicated.body.code).toBe('request.validation_failed');
+      const after = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      expect(after.quantity).toBe(before.quantity);
+    });
+
+    it('rejects supplier-invoice and purchase-return links to a different supplier', async () => {
+      const other = await erp<{ id: string }>('/purchasing/suppliers', {
+        method: 'POST',
+        body: { nameEn: 'Other Supplier', nameAr: 'مورد آخر' },
+      });
+      expect(other.status).toBe(201);
+      const invoice = await erp<{ code: string }>('/purchasing/supplier-invoices', {
+        method: 'POST',
+        body: {
+          supplierId: other.body.id,
+          purchaseOrderId: orderId,
+          supplierInvoiceNumber: 'WRONG-SUPPLIER-PO',
+          invoiceDate: '2026-06-01',
+          lines: [{ productId, description: 'Widget', quantity: 10000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(invoice.status).toBe(400);
+      expect(invoice.body.code).toBe('request.validation_failed');
+
+      const ret = await erp<{ code: string }>('/purchasing/returns', {
+        method: 'POST',
+        body: {
+          supplierId: other.body.id,
+          purchaseOrderId: orderId,
+          warehouseId,
+          returnDate: '2026-06-01',
+          lines: [{ productId, description: 'Widget', quantity: 10000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(ret.status).toBe(400);
+      expect(ret.body.code).toBe('request.validation_failed');
+    });
+
     it('receives goods, increasing stock at the ordered cost', async () => {
       const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
         where: { warehouseId_productId: { warehouseId, productId } },
