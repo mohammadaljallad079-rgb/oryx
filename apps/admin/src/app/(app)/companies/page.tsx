@@ -496,6 +496,7 @@ function CreateCompanyModal({
     <Modal
       open={open}
       title={t('companies.createTitle')}
+      size="form"
       onClose={onClose}
       footer={
         <>
@@ -653,6 +654,7 @@ function EditCompanyModal({
     <Modal
       open={Boolean(company)}
       title={t('companies.editTitle')}
+      size="form"
       onClose={onClose}
       footer={
         <>
