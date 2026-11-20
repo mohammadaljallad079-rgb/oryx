@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -67,6 +67,69 @@ function useTaxOptions(companyId: string | null | undefined): {
 }
 
 const TAB_KEYS = ['dashboard', 'requisitions', 'orders', 'receipts', 'invoices', 'returns', 'suppliers'] as const;
+
+/**
+ * Purchasing uses the same document-form visual hierarchy as Sales, while each
+ * purchasing document retains its own fields and posting rules.
+ */
+function PurchaseFormNav({ prefix, sections }: { prefix: string; sections: Array<[string, string]> }) {
+  const { locale } = useUi();
+  return (
+    <nav className="oryx-doc-form__section-tabs" aria-label={locale === 'ar' ? 'أقسام نموذج المشتريات' : 'Purchase form sections'} data-testid={`${prefix}-section-tabs`}>
+      {sections.map(([id, label]) => (
+        <button key={id} type="button" className="oryx-doc-form__section-tab"
+          data-testid={`${prefix}-tab-${id}`}
+          onClick={() => document.querySelector(`[data-testid="${prefix}-${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function PurchaseFormSection({ prefix, section, title, hint, children, className = '' }: {
+  prefix: string; section: string; title: string; hint?: string; children: ReactNode; className?: string;
+}) {
+  return (
+    <section className={`oryx-doc-form__section ${className}`} data-testid={`${prefix}-${section}`}>
+      <div className="oryx-doc-form__section-head">
+        <span>{title}</span>
+        {hint ? <span className="text-[11px] font-semibold text-[var(--muted)]">{hint}</span> : null}
+      </div>
+      <div className="p-3">{children}</div>
+    </section>
+  );
+}
+
+function PurchaseLineSummary({ lines, currency = 'BHD', estimated = false, prefix }: {
+  lines: LineDraft[]; currency?: string; estimated?: boolean; prefix: string;
+}) {
+  const { locale, t } = useUi();
+  // This is only a preview. The API remains the authority for saved totals.
+  const subtotalMinor = lines.reduce((sum, l) => sum + Math.round((Number(l.quantity) || 0) * toMinorInput(l.unitCost, currency)), 0);
+  const taxMinor = estimated ? 0 : lines.reduce((sum, l) => {
+    const base = Math.round((Number(l.quantity) || 0) * toMinorInput(l.unitCost, currency));
+    return sum + Math.round(base * (Number(l.taxPercent) || 0) / 100);
+  }, 0);
+  return (
+    <div className="ms-auto w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3" data-testid={`${prefix}-totals`}>
+      <div className="flex justify-between gap-3 text-sm">
+        <span>{estimated ? (locale === 'ar' ? 'التكلفة التقديرية' : 'Estimated cost') : t('erp.sales.form.untaxedAmount')}</span>
+        <strong className="tabular-nums">{money(subtotalMinor, currency)}</strong>
+      </div>
+      {!estimated ? <>
+        <div className="mt-2 flex justify-between gap-3 text-sm">
+          <span>{t('erp.sales.form.tax')}</span><span className="tabular-nums">{money(taxMinor, currency)}</span>
+        </div>
+        <div className="mt-3 flex justify-between gap-3 border-t border-[var(--border)] pt-3 text-sm font-bold">
+          <span>{t('erp.sales.form.total')}</span><span className="tabular-nums">{money(subtotalMinor + taxMinor, currency)}</span>
+        </div>
+      </> : null}
+      <p className="oryx-faint m-0 mt-2 text-[11px]">{locale === 'ar' ? 'معاينة تقديرية؛ يعتمد المبلغ النهائي بعد الحفظ.' : 'Preview only; final amounts are confirmed on save.'}</p>
+    </div>
+  );
+}
+
 
 export default function PurchasingPage() {
   return (
@@ -451,7 +514,14 @@ function RequisitionModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
-      <Field label={t('erp.purchasing.supplier')}>
+      <PurchaseFormNav prefix="requisition-form" sections={[
+        ['supplier-info', t('erp.purchasing.supplier')],
+        ['items', t('erp.sales.form.items')],
+        ['summary', t('erp.sales.form.summary')],
+      ]} />
+      <PurchaseFormSection prefix="requisition-form" section="supplier-info" title={t('erp.purchasing.supplier')}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('erp.purchasing.supplier')}>
         <EntityPicker
           value={supplierId || null}
           options={suppliers.map((s) => ({ value: s.id, label: `${s.code} — ${s.nameEn}`, hint: s.phone ?? undefined }))}
@@ -471,9 +541,14 @@ function RequisitionModal({
           )}
         />
       </Field>
-      <div className="mt-4">
+        </div>
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="requisition-form" section="items" title={t('erp.sales.form.items')} className="mt-3">
         <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="requisition-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.estimatedCost')} />
-      </div>
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="requisition-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
+        <PurchaseLineSummary lines={lines} estimated prefix="requisition-form" />
+      </PurchaseFormSection>
     </Modal>
   );
 }
@@ -663,7 +738,13 @@ function PurchaseOrderModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <PurchaseFormNav prefix="purchase-order-form" sections={[
+        ['document-info', t('erp.sales.form.documentInfo')],
+        ['items', t('erp.sales.form.items')],
+        ['summary', t('erp.sales.form.summary')],
+      ]} />
+      <PurchaseFormSection prefix="purchase-order-form" section="document-info" title={t('erp.sales.form.documentInfo')} hint={t('erp.sales.form.autoNumber')}>
+        <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
           <EntityPicker
             value={supplierId || null}
@@ -740,9 +821,13 @@ function PurchaseOrderModal({
           />
         </Field>
       </div>
-      <div className="mt-4">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-order-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
-      </div>
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="purchase-order-form" section="items" title={t('erp.sales.form.items')} className="mt-3">
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-order-line" currency={currency} onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="purchase-order-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
+        <PurchaseLineSummary lines={lines} currency={currency} prefix="purchase-order-form" />
+      </PurchaseFormSection>
     </Modal>
   );
 }
@@ -1106,7 +1191,13 @@ function SupplierInvoiceModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <PurchaseFormNav prefix="supplier-invoice-form" sections={[
+        ['document-info', t('erp.sales.form.documentInfo')],
+        ['items', t('erp.sales.form.items')],
+        ['summary', t('erp.sales.form.summary')],
+      ]} />
+      <PurchaseFormSection prefix="supplier-invoice-form" section="document-info" title={t('erp.sales.form.documentInfo')} hint={t('erp.sales.form.autoNumber')}>
+        <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
           <EntityPicker
             value={supplierId || null}
@@ -1161,9 +1252,13 @@ function SupplierInvoiceModal({
           />
         </Field>
       </div>
-      <div className="mt-4">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="supplier-invoice-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
-      </div>
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="supplier-invoice-form" section="items" title={t('erp.sales.form.items')} className="mt-3">
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="supplier-invoice-line" currency={currency} onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="supplier-invoice-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
+        <PurchaseLineSummary lines={lines} currency={currency} prefix="supplier-invoice-form" />
+      </PurchaseFormSection>
     </Modal>
   );
 }
@@ -1351,7 +1446,13 @@ function PurchaseReturnModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <PurchaseFormNav prefix="purchase-return-form" sections={[
+        ['document-info', t('erp.sales.form.documentInfo')],
+        ['items', t('erp.sales.form.items')],
+        ['summary', t('erp.sales.form.summary')],
+      ]} />
+      <PurchaseFormSection prefix="purchase-return-form" section="document-info" title={t('erp.sales.form.documentInfo')} hint={t('erp.sales.form.autoNumber')}>
+        <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
           <EntityPicker
             value={supplierId || null}
@@ -1399,18 +1500,23 @@ function PurchaseReturnModal({
           <input className="oryx-input" value={reason} onChange={(e) => setReason(e.target.value)} data-testid="purchase-return-reason" />
         </Field>
       </div>
-      <div className="mt-4">
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="purchase-return-form" section="items" title={t('erp.sales.form.items')} className="mt-3">
         <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-return-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
-      </div>
-      <Field label={t('attachments.title')}>
-        <input
-          type="file"
-          className="oryx-input mt-3 w-full"
-          accept={ATTACHMENT_ACCEPT}
-          onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
-          data-testid="purchase-return-attachment"
-        />
-      </Field>
+      </PurchaseFormSection>
+      <PurchaseFormSection prefix="purchase-return-form" section="summary" title={t('erp.sales.form.summary')} className="mt-3">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div>
+            <Field label={t('attachments.title')}>
+              <input type="file" className="oryx-input w-full" accept={ATTACHMENT_ACCEPT}
+                onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
+                data-testid="purchase-return-attachment" />
+              {attachment ? <span className="oryx-muted text-xs">{attachment.name}</span> : null}
+            </Field>
+          </div>
+          <PurchaseLineSummary lines={lines} prefix="purchase-return-form" />
+        </div>
+      </PurchaseFormSection>
     </Modal>
   );
 }
@@ -1425,6 +1531,7 @@ function CostLineEditor({
   onTaxCreated,
   testIdPrefix,
   costLabel,
+  currency = 'BHD',
   onProductCreated,
 }: {
   lines: LineDraft[];
@@ -1435,6 +1542,7 @@ function CostLineEditor({
   onTaxCreated?: () => Promise<void> | void;
   testIdPrefix: string;
   costLabel: string;
+  currency?: string;
   /** Reload the product list after one is created from a line picker. */
   onProductCreated?: () => Promise<void> | void;
 }) {
@@ -1453,7 +1561,7 @@ function CostLineEditor({
       ...next[i],
       productId,
       description: product ? product.nameEn : next[i].description,
-      unitCost: product ? minorToInput(product.costPriceMinor) : next[i].unitCost,
+      unitCost: product ? minorToInput(product.costPriceMinor, currency) : next[i].unitCost,
     };
     setLines(next);
   };
@@ -1461,7 +1569,11 @@ function CostLineEditor({
   return (
     <div className="flex flex-col gap-2">
       {lines.map((line, i) => (
-        <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-6 xl:grid-cols-12 xl:items-start">
+        <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 sm:grid-cols-6 xl:grid-cols-12 xl:items-start" data-testid={`${testIdPrefix}-row-${i}`}>
+          <div className="col-span-full flex items-center justify-between text-xs font-semibold text-[var(--muted)]">
+            <span>{t('erp.sales.form.items')} #{i + 1}</span>
+            <span className="tabular-nums">{money(Math.round((Number(line.quantity) || 0) * toMinorInput(line.unitCost, currency)), currency)}</span>
+          </div>
           <div className="min-w-0 sm:col-span-3 xl:col-span-4">
             <EntityPicker
               value={line.productId || null}
@@ -1484,12 +1596,14 @@ function CostLineEditor({
           </div>
           <input
             className="oryx-input min-w-0 sm:col-span-3 xl:col-span-3"
+            aria-label={t('erp.accounting.description')}
             placeholder={t('erp.accounting.description')}
             value={line.description}
             onChange={(e) => update(i, { description: e.target.value })}
             data-testid={`${testIdPrefix}-description-${i}`}
           />
           <input
+            type="number" min="0.0001" step="any" inputMode="decimal" aria-label={t('erp.inventory.quantity')}
             className="oryx-input min-w-0 sm:col-span-2 xl:col-span-1"
             placeholder={t('erp.inventory.quantity')}
             value={line.quantity}
@@ -1497,6 +1611,7 @@ function CostLineEditor({
             data-testid={`${testIdPrefix}-quantity-${i}`}
           />
           <input
+            type="number" min="0" step="any" inputMode="decimal" aria-label={costLabel}
             className="oryx-input min-w-0 sm:col-span-2 xl:col-span-2"
             placeholder={costLabel}
             value={line.unitCost}
