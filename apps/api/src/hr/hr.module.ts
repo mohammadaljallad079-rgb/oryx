@@ -5,11 +5,12 @@ import { DocumentsModule } from '../documents/documents.module';
 import { HrController } from './hr.controller';
 import { HrExportService } from './hr-export.service';
 import { HrService } from './hr.service';
+import { EmployeeFileService } from './employee-file.service';
 
 @Module({
   imports: [ErpCommonModule, DocumentsModule, AttachmentsModule],
   controllers: [HrController],
-  providers: [HrService, HrExportService],
-  exports: [HrService],
+  providers: [HrService, HrExportService, EmployeeFileService],
+  exports: [HrService, EmployeeFileService],
 })
 export class HrModule {}

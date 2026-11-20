@@ -151,6 +151,126 @@ function categoryLabel(category: string, locale: string): string {
  * always re-read from the API after a change, so the panel reflects the stored
  * state rather than an optimistic guess.
  */
+/**
+ * Files chosen inside a create form, before the record exists.
+ *
+ * The user attaches from the same screen as the rest of the form; the caller
+ * uploads these files once the record has an id. Validation matches the
+ * uploader so a rejected file is named before the form is submitted rather than
+ * after.
+ */
+/**
+ * Upload files chosen inside a form once the record they belong to has an id.
+ *
+ * Sequential on purpose: a failure names the file it stopped on, and the
+ * record's own listing is the source of truth afterwards.
+ */
+export async function uploadPendingAttachments(
+  entityType: AttachmentEntityType,
+  entityId: string,
+  files: File[],
+  category?: string,
+): Promise<void> {
+  for (const file of files) {
+    await api.uploadAttachment(entityType, entityId, file, category);
+  }
+}
+
+export function PendingAttachments({
+  files,
+  onChange,
+  canManage,
+  disabled,
+}: {
+  files: File[];
+  onChange: (files: File[]) => void;
+  canManage: boolean;
+  disabled?: boolean;
+}) {
+  const { t } = useUi();
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const add = (selected: FileList | null) => {
+    const picked = Array.from(selected ?? []);
+    if (picked.length === 0) return;
+    for (const file of picked) {
+      if (!(ATTACHMENT_MIME_TYPES as readonly string[]).includes(file.type)) {
+        setError(t('attachments.unsupported'));
+        if (fileRef.current) fileRef.current.value = '';
+        return;
+      }
+      if (file.size > ATTACHMENT_MAX_BYTES) {
+        setError(t('attachments.tooLarge'));
+        if (fileRef.current) fileRef.current.value = '';
+        return;
+      }
+    }
+    setError(null);
+    onChange([...files, ...picked]);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  return (
+    <div data-testid="pending-attachments">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="oryx-label m-0 inline-flex items-center gap-1.5">
+          <Icon name="paperclip" size={15} />
+          {t('attachments.title')}
+        </span>
+        {canManage ? (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept={ATTACHMENT_ACCEPT}
+              className="hidden"
+              onChange={(e) => add(e.target.files)}
+              data-testid="pending-attach-input"
+            />
+            <Button size="sm" disabled={disabled} onClick={() => fileRef.current?.click()} data-testid="pending-attach">
+              <Icon name="plus" size={14} />
+              {t('attachments.attach')}
+            </Button>
+          </>
+        ) : null}
+      </div>
+      {error ? <div className="mb-2"><ErrorBanner message={error} /></div> : null}
+      {files.length === 0 ? (
+        <div>
+          <p className="oryx-faint m-0 text-[12px]">{t('attachments.empty')}</p>
+          <p className="oryx-faint m-0 mt-0.5 text-[11px]">{t('attachments.hint')}</p>
+        </div>
+      ) : (
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {files.map((file, index) => (
+            <li
+              key={`${file.name}-${index}`}
+              className="flex items-center justify-between gap-2 rounded-md border border-[var(--border)] px-2.5 py-1.5"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <Icon name="paperclip" size={14} />
+                <span className="truncate text-[12.5px] font-semibold">{file.name}</span>
+                <span className="oryx-faint shrink-0 text-[11px]">{humanSize(file.size)}</span>
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => onChange(files.filter((_, i) => i !== index))}
+                title={t('common.delete')}
+              >
+                <Icon name="close" size={14} />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function AttachmentsPanel({
   entityType,
   entityId,
@@ -390,7 +510,7 @@ export function AttachmentsPanel({
               className="h-[70vh] w-full rounded-md border border-[var(--border)]"
               data-testid="attachment-preview-content"
             />
-          ) : (
+          ) : preview.mime.startsWith('image/') ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={preview.url}
@@ -398,6 +518,32 @@ export function AttachmentsPanel({
               className="mx-auto max-h-[70vh] rounded-md"
               data-testid="attachment-preview-content"
             />
+          ) : (
+            // Word and Excel cannot render in a browser; the honest answer is
+            // to say so and offer the stored file rather than show a broken
+            // image element.
+            <div className="flex flex-col items-center gap-3 py-10" data-testid="attachment-preview-unrenderable">
+              <Icon name="paperclip" size={28} />
+              <p className="oryx-muted m-0 text-center text-[13px]">
+                {t('attachments.previewUnavailable')}
+              </p>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = preview.url;
+                  a.download = preview.name;
+                  a.rel = 'noopener';
+                  document.body.appendChild(a);
+                  a.click();
+                  window.setTimeout(() => a.remove(), 10_000);
+                }}
+              >
+                <Icon name="download" size={14} />
+                {t('attachments.download')}
+              </Button>
+            </div>
           )
         ) : null}
       </Modal>

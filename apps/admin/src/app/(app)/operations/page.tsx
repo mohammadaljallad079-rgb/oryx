@@ -8,6 +8,8 @@ import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
 import { EntityPicker } from '@/components/inline-create';
 import { ModuleDashboard } from '@/components/module-dashboard';
+import { AttachmentsPanel, PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
+import { RecordPreview } from '@/components/record-preview';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
@@ -94,6 +96,7 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<ProjectDto | null>(null);
+  const [preview, setPreview] = useState<ProjectDto | null>(null);
 
   const setStatus = async (row: ProjectDto, status: string) => {
     await api.updateOperationsProject(row.id, { status });
@@ -147,6 +150,15 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
                 <td><StatusBadge status={p.status} label={p.status} /></td>
                 <td>
                   <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${p.code}`}
+                      onClick={() => setPreview(p)}
+                      data-testid={`project-preview-${p.code}`}
+                    >
+                      <Icon name="eye" size={14} />
+                    </Button>
                     {canManage ? (
                       <>
                         <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${p.code}`} onClick={() => { setEditing(p); setOpen(true); }} data-testid={`project-edit-${p.code}`}>
@@ -181,6 +193,27 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
         onClose={() => { setOpen(false); setEditing(null); }}
         onSaved={list.reload}
       />
+      {preview ? (
+        <RecordPreview
+          open
+          title={`${preview.code} — ${preview.nameEn || preview.nameAr}`}
+          subtitle={preview.nameAr}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('common.code'), value: preview.code },
+            { label: `${t('common.name')} (EN)`, value: preview.nameEn || '—' },
+            { label: `${t('common.name')} (AR)`, value: preview.nameAr || '—' },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('context.branch'), value: preview.branchNameEn ?? preview.branchNameAr ?? '—' },
+            { label: t('erp.hr.departments'), value: preview.departmentNameEn ?? preview.departmentNameAr ?? '—' },
+            { label: t('erp.operations.startDate'), value: preview.startDate?.slice(0, 10) ?? '—' },
+            { label: t('erp.operations.endDate'), value: preview.endDate?.slice(0, 10) ?? '—' },
+            { label: t('erp.operations.tasksCount'), value: String(preview.taskCount ?? 0) },
+            { label: t('erp.operations.description'), value: preview.description ?? '—', wide: true },
+          ]}
+          attachment={{ entityType: 'PROJECT', entityId: preview.id, canManage }}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -207,10 +240,14 @@ function ProjectModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', startDate: '', endDate: '', description: '', branchId: '', departmentId: '', ownerUserId: '' });
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [pending, setPending] = useState<File[]>([]);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setSavedId(null);
+    setPending([]);
     setForm({
       code: project?.code ?? '',
       nameEn: project?.nameEn ?? '',
@@ -243,15 +280,24 @@ function ProjectModal({
       } else {
         saved = await api.createOperationsProject({ ...body, code: '' });
       }
+      // Files chosen in this form are uploaded once the record has an id, so
+      // attaching never needs a second screen.
+      if (!project && pending.length) await uploadPendingAttachments('PROJECT', saved.id, pending);
       await onSaved();
       onSavedRecord?.(saved);
-      onClose();
+      // A nested create from a picker closes at once so the picker can select
+      // the record; the standalone form stays open on the saved record so more
+      // attachments can still be added from the same screen.
+      if (onSavedRecord) onClose();
+      else setSavedId(saved.id);
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
 
   return (
     <Modal open={open} size="document" title={project ? t('erp.operations.editProject') : t('erp.operations.newProject')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-project">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+      footer={savedId
+        ? <Button variant="primary" onClick={onClose} data-testid="close-project">{t('common.close')}</Button>
+        : <><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-project">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required><input className="oryx-input" value={project?.code ?? ''} readOnly placeholder="Automatic / تلقائي" data-testid="project-code" /></Field>
@@ -270,6 +316,15 @@ function ProjectModal({
         </Field>
         <Field label={t('erp.operations.description')}><textarea className="oryx-input min-h-28" rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="project-description" /></Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        {savedId ? (
+          <AttachmentsPanel entityType="PROJECT" entityId={savedId} canManage categorised />
+        ) : project ? (
+          <AttachmentsPanel entityType="PROJECT" entityId={project.id} canManage categorised />
+        ) : (
+          <PendingAttachments files={pending} onChange={setPending} canManage />
+        )}
+      </div>
     </Modal>
   );
 }
@@ -279,6 +334,7 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
   const list = useAsync(() => api.workOrders(), []);
   const projects = useAsync(() => api.operationsProjects(), []);
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<WorkOrderDto | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const order = useAsync(() => (detail ? api.workOrder(detail) : Promise.resolve(null)), [detail]);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -331,6 +387,15 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
                 <td><StatusBadge status={w.status} label={w.status} /></td>
                 <td>
                   <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${w.orderNumber}`}
+                      onClick={() => setPreview(w)}
+                      data-testid={`work-order-preview-${w.orderNumber}`}
+                    >
+                      <Icon name="eye" size={14} />
+                    </Button>
                     <Button size="sm" onClick={() => setDetail(w.id)} data-testid={`view-work-order-${w.orderNumber}`}>{t('common.details')}</Button>
                     {canManage && w.status === 'OPEN' ? (
                       <Button size="sm" variant="primary" data-testid={`start-work-order-${w.orderNumber}`} onClick={async () => { await api.updateWorkOrder(w.id, { status: 'IN_PROGRESS' }); await list.reload(); }}>
@@ -380,6 +445,26 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
         </div>
       ) : null}
 
+      {preview ? (
+        <RecordPreview
+          open
+          title={`${preview.orderNumber} — ${preview.title}`}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('erp.operations.orderNumber'), value: preview.orderNumber },
+            { label: t('erp.operations.title'), value: preview.title },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('erp.crm.priority'), value: preview.priority },
+            { label: t('erp.operations.type'), value: preview.type },
+            { label: t('erp.operations.startDate'), value: preview.scheduledStartAt?.slice(0, 16).replace('T', ' ') ?? '—' },
+            { label: t('erp.operations.endDate'), value: preview.scheduledEndAt?.slice(0, 16).replace('T', ' ') ?? '—' },
+            { label: t('common.date'), value: preview.dueDate?.slice(0, 10) ?? '—' },
+            { label: t('erp.operations.checklist'), value: `${preview.checklist.filter((c) => c.isDone).length} / ${preview.checklist.length}` },
+            { label: t('erp.accounting.description'), value: preview.description ?? '—', wide: true },
+          ]}
+          attachment={{ entityType: 'WORK_ORDER', entityId: preview.id, canManage }}
+        />
+      ) : null}
       <CreateWorkOrderModal open={open} projects={projects.data?.items ?? []} onProjectCreated={projects.reload} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
@@ -400,13 +485,23 @@ function CreateWorkOrderModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
-  const { companyId } = useAuth();
+  const { companyId, canAny } = useAuth();
   const branches = useAsync(() => companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
   const users = useAsync(() => companyId ? api.listUsers(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
   const departments = useAsync(() => companyId ? api.hrDepartments({ companyId }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ title: '', description: '', projectId: '', type: 'GENERAL', priority: 'NORMAL', checklist: '', branchId: '', departmentId: '', assigneeUserId: '', scheduledStartAt: '', scheduledEndAt: '', dueDate: '' });
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [pending, setPending] = useState<File[]>([]);
+  const canAttach = canAny('erp.operations.write');
+
+  useEffect(() => {
+    if (!open) return;
+    setSavedId(null);
+    setPending([]);
+  }, [open]);
+
   const submit = async () => {
     setBusy(true); setError(null);
     try {
@@ -415,7 +510,7 @@ function CreateWorkOrderModal({
         .map((s) => s.trim())
         .filter(Boolean)
         .map((label) => ({ label }));
-      await api.createWorkOrder({
+      const created = await api.createWorkOrder({
         title: form.title,
         description: form.description || undefined,
         type: form.type || 'GENERAL',
@@ -429,8 +524,10 @@ function CreateWorkOrderModal({
         priority: form.priority,
         checklist: checklist.length > 0 ? checklist : undefined,
       });
+      if (pending.length) await uploadPendingAttachments('WORK_ORDER', created.id, pending);
       await onCreated();
-      onClose();
+      // Stay open so more attachments can be added from this same form.
+      setSavedId(created.id);
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
   return (
@@ -495,6 +592,13 @@ function CreateWorkOrderModal({
           <textarea className="oryx-input" rows={3} value={form.checklist} onChange={(e) => setForm({ ...form, checklist: e.target.value })} data-testid="work-order-checklist" />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        {savedId ? (
+          <AttachmentsPanel entityType="WORK_ORDER" entityId={savedId} canManage={canAttach} categorised />
+        ) : (
+          <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
+        )}
+      </div>
     </Modal>
   );
 }
@@ -503,6 +607,7 @@ function TasksTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.operationsTasks(), []);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<ProjectTaskDto | null>(null);
 
   const removeTask = async (id: string) => {
     if (!window.confirm(t('erp.operations.confirmDeleteTask'))) return;
@@ -544,6 +649,15 @@ function TasksTab({ canManage }: { canManage: boolean }) {
                 <td><StatusBadge status={task.status} label={task.status} /></td>
                 <td>
                   <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${t('print.preview')} ${task.title}`}
+                      onClick={() => setPreview(task)}
+                      data-testid={`task-preview-${task.id}`}
+                    >
+                      <Icon name="eye" size={14} />
+                    </Button>
                     {canManage && task.status !== 'DONE' ? (
                       <Button size="sm" onClick={async () => { await api.updateOperationsTask(task.id, { status: 'DONE' }); await list.reload(); }}>{t('erp.operations.complete')}</Button>
                     ) : null}
@@ -559,6 +673,22 @@ function TasksTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
+      {preview ? (
+        <RecordPreview
+          open
+          title={preview.title}
+          onClose={() => setPreview(null)}
+          fields={[
+            { label: t('erp.operations.title'), value: preview.title },
+            { label: t('common.status'), value: <StatusBadge status={preview.status} label={preview.status} /> },
+            { label: t('erp.crm.priority'), value: preview.priority },
+            { label: t('common.date'), value: preview.dueDate?.slice(0, 10) ?? '—' },
+            { label: t('erp.operations.complete'), value: preview.completedAt?.slice(0, 16).replace('T', ' ') ?? '—' },
+            { label: t('erp.operations.description'), value: preview.description ?? '—', wide: true },
+          ]}
+          attachment={{ entityType: 'PROJECT_TASK', entityId: preview.id, canManage }}
+        />
+      ) : null}
     </Card>
   );
 }

@@ -3,9 +3,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
+import { useAuth } from '@/lib/auth-context';
 import { toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Button, ErrorBanner, Field, Modal } from '@/components/ui';
 import { EntityPicker } from '@/components/inline-create';
+import { AttachmentsPanel, PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
+import { Icon } from '@/components/icons';
 import { CustomerModal } from '@/components/customer-modal';
 import type { EmployeeDto, ErpAccountDto, LeadDto, MarketplaceProviderDto, ProductDto, SupplierDto, VehicleDto } from '@oryx/shared';
 
@@ -34,8 +37,12 @@ export function SupplierModal({
   onSaved?: (saved: SupplierDto) => void;
 }) {
   const { t } = useUi();
+  const { canAny } = useAuth();
+  const canAttach = canAny('erp.purchasing.supplier.manage', 'erp.purchasing.write');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(supplier?.id ?? null);
+  const [pending, setPending] = useState<File[]>([]);
   const [form, setForm] = useState({
     code: '',
     kind: 'COMPANY' as 'COMPANY' | 'INDIVIDUAL',
@@ -55,6 +62,8 @@ export function SupplierModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setSavedId(supplier?.id ?? null);
+    setPending([]);
     setForm({
       code: supplier?.code ?? '',
       kind: supplier?.kind ?? 'COMPANY',
@@ -98,6 +107,7 @@ export function SupplierModal({
       const saved = supplier
         ? await api.updateSupplier(supplier.id, body)
         : await api.createSupplier({ ...body, code: form.code });
+      if (!supplier && pending.length) await uploadPendingAttachments('SUPPLIER', saved.id, pending);
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -176,6 +186,17 @@ export function SupplierModal({
           <input className="oryx-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} data-testid="supplier-notes" />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <p className="oryx-label mb-2 inline-flex items-center gap-1.5">
+          <Icon name="paperclip" size={15} />
+          {t('attachments.title')}
+        </p>
+        {savedId ? (
+          <AttachmentsPanel entityType="SUPPLIER" entityId={savedId} canManage={canAttach} categorised />
+        ) : (
+          <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
+        )}
+      </div>
     </Modal>
   );
 }
@@ -194,8 +215,11 @@ export function ProductModal({
   defaultCategory?: string;
 }) {
   const { t } = useUi();
+  const { canAny } = useAuth();
+  const canAttach = canAny('erp.inventory.item.manage', 'erp.inventory.write');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<File[]>([]);
   const [form, setForm] = useState({
     sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
     barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
@@ -204,6 +228,7 @@ export function ProductModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setPending([]);
     setForm({
       sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
       barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
@@ -229,6 +254,7 @@ export function ProductModal({
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
       });
+      if (pending.length) await uploadPendingAttachments('PRODUCT', saved.id, pending);
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -300,6 +326,9 @@ export function ProductModal({
         />
         {t('erp.inventory.trackStock')}
       </label>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
+      </div>
     </Modal>
   );
 }
@@ -392,8 +421,11 @@ export function VehicleModal({
   onSaved?: (saved: VehicleDto) => void;
 }) {
   const { t } = useUi();
+  const { canAny } = useAuth();
+  const canAttach = canAny('erp.vehicle.manage', 'erp.maintenance.write');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<File[]>([]);
   const [form, setForm] = useState({
     customerId: '', vin: '', plateNumber: '', make: '', model: '', modelYear: '2024', mileage: '0', color: '', registrationExpiresAt: '',
   });
@@ -401,6 +433,7 @@ export function VehicleModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setPending([]);
     setForm({
       customerId: defaultCustomerId ?? '',
       vin: '', plateNumber: '', make: '', model: '', modelYear: '2024', mileage: '0', color: '', registrationExpiresAt: '',
@@ -426,6 +459,7 @@ export function VehicleModal({
         color: form.color || undefined,
         registrationExpiresAt: form.registrationExpiresAt || undefined,
       });
+      if (pending.length) await uploadPendingAttachments('VEHICLE', created.id, pending);
       await onCreated();
       onSaved?.(created);
       onClose();
@@ -490,6 +524,9 @@ export function VehicleModal({
         <Field label={t('erp.automotive.color')}><input className="oryx-input" value={form.color} onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))} data-testid="vehicle-color" /></Field>
         <Field label={t('erp.automotive.registrationExpiresAt')}><input type="date" className="oryx-input" value={form.registrationExpiresAt} onChange={(e) => setForm((prev) => ({ ...prev, registrationExpiresAt: e.target.value }))} data-testid="vehicle-registration-expires" /></Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
+      </div>
     </Modal>
   );
 }
@@ -518,16 +555,21 @@ export function EmployeeModal({
   onSaved?: (saved: { id: string }) => void;
 }) {
   const { t } = useUi();
+  const { canAny } = useAuth();
+  const canAttach = canAny('erp.hr.write', 'erp.hr.employee.manage');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<File[]>([]);
   const [form, setForm] = useState({
     code: '', fullNameEn: '', fullNameAr: '', email: '', phone: '', secondaryPhone: '',
+    nationalId: '', dateOfBirth: '', gender: '', nationality: '',
     departmentId: '', hireDate: new Date().toISOString().slice(0, 10), terminationDate: '', addressLine: '', notes: '',
   });
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setPending([]);
     setForm({
       code: employee?.code ?? '',
       fullNameEn: employee?.fullNameEn ?? '',
@@ -535,6 +577,10 @@ export function EmployeeModal({
       email: employee?.email ?? '',
       phone: employee?.phone ?? '',
       secondaryPhone: employee?.secondaryPhone ?? '',
+      nationalId: (employee as { nationalId?: string | null } | null)?.nationalId ?? '',
+      dateOfBirth: (employee as { dateOfBirth?: string | null } | null)?.dateOfBirth?.slice(0, 10) ?? '',
+      gender: (employee as { gender?: string | null } | null)?.gender ?? '',
+      nationality: (employee as { nationality?: string | null } | null)?.nationality ?? '',
       departmentId: employee?.departmentId ?? '',
       hireDate: employee?.hireDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
       terminationDate: employee?.terminationDate?.slice(0, 10) ?? '',
@@ -553,6 +599,10 @@ export function EmployeeModal({
         email: form.email || undefined,
         phone: form.phone || undefined,
         secondaryPhone: form.secondaryPhone || undefined,
+        nationalId: form.nationalId || undefined,
+        dateOfBirth: form.dateOfBirth || undefined,
+        gender: form.gender || undefined,
+        nationality: form.nationality || undefined,
         departmentId: form.departmentId || undefined,
         addressLine: form.addressLine || undefined,
         notes: form.notes || undefined,
@@ -560,6 +610,9 @@ export function EmployeeModal({
       const saved = employee
         ? await api.updateEmployee(employee.id, { ...body, terminationDate: form.terminationDate || undefined })
         : await api.createEmployee({ ...body, code: form.code, hireDate: form.hireDate });
+      if (!employee && pending.length) {
+        await uploadPendingAttachments('EMPLOYEE', saved.id, pending);
+      }
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -639,6 +692,22 @@ export function EmployeeModal({
             <input type="date" className="oryx-input" value={form.terminationDate} onChange={(e) => setForm((prev) => ({ ...prev, terminationDate: e.target.value }))} data-testid="employee-termination-date" />
           </Field>
         )}
+        <Field label={t('erp.hr.nationalId')}>
+          <input className="oryx-input" value={form.nationalId} onChange={(e) => setForm((prev) => ({ ...prev, nationalId: e.target.value }))} data-testid="employee-national-id" />
+        </Field>
+        <Field label={t('erp.hr.dateOfBirth')}>
+          <input type="date" className="oryx-input" value={form.dateOfBirth} onChange={(e) => setForm((prev) => ({ ...prev, dateOfBirth: e.target.value }))} data-testid="employee-date-of-birth" />
+        </Field>
+        <Field label={t('erp.hr.gender')}>
+          <select className="oryx-select" value={form.gender} onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value }))} data-testid="employee-gender">
+            <option value="">{t('common.none')}</option>
+            <option value="MALE">{t('erp.hr.genderValue.MALE')}</option>
+            <option value="FEMALE">{t('erp.hr.genderValue.FEMALE')}</option>
+          </select>
+        </Field>
+        <Field label={t('erp.hr.nationality')}>
+          <input className="oryx-input" value={form.nationality} onChange={(e) => setForm((prev) => ({ ...prev, nationality: e.target.value }))} data-testid="employee-nationality" />
+        </Field>
         <Field label={t('common.address')}>
           <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm((prev) => ({ ...prev, addressLine: e.target.value }))} data-testid="employee-address" />
         </Field>
@@ -646,7 +715,13 @@ export function EmployeeModal({
           <input className="oryx-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} data-testid="employee-notes" />
         </Field>
       </div>
-      {employee && canManage !== undefined ? documentsSlot : null}
+      {employee ? (
+        canManage !== undefined ? documentsSlot : null
+      ) : (
+        <div className="mt-4 border-t border-[var(--border)] pt-4">
+          <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
+        </div>
+      )}
     </Modal>
   );
 }
@@ -665,13 +740,17 @@ export function LeadModal({
   onSaved?: (saved: LeadDto) => void;
 }) {
   const { t } = useUi();
+  const { canAny } = useAuth();
+  const canAttach = canAny('erp.crm.write', 'erp.crm.lead.manage');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<File[]>([]);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', contactName: '', email: '', phone: '', estimatedValue: '0.00', notes: '' });
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setPending([]);
     setForm({
       code: lead?.code ?? '',
       nameEn: lead?.nameEn ?? '',
@@ -698,6 +777,7 @@ export function LeadModal({
         notes: form.notes || undefined,
       };
       const saved = lead ? await api.updateLead(lead.id, body) : await api.createLead({ ...body, code: form.code });
+      if (pending.length) await uploadPendingAttachments('LEAD', saved.id, pending);
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -749,6 +829,9 @@ export function LeadModal({
         <Field label={t('common.notes')}>
           <input className="oryx-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} data-testid="lead-notes" />
         </Field>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <PendingAttachments files={pending} onChange={setPending} canManage={canAttach} />
       </div>
     </Modal>
   );

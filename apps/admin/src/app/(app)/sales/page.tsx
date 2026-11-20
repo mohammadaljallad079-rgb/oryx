@@ -15,11 +15,10 @@ import {
   sumMinor,
   type RoundingMode,
   DEFAULT_COMPANY_PAYMENT_METHODS,
-  ATTACHMENT_ACCEPT,
   type CompanyPaymentMethodSetting,
 } from '@oryx/shared';
 import { Icon } from '@/components/icons';
-import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
+import { AttachmentsPanel, DocumentPrintActions, PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import { CustomerModal } from '@/components/customer-modal';
@@ -431,15 +430,19 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         testIdPrefix="invoice"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
+          let savedId: string;
           if (editingInvoice) {
             await api.updateSalesInvoice(editingInvoice.id, payload);
             if (payload.post !== false) setAutoPreviewId(editingInvoice.id);
+            savedId = editingInvoice.id;
             setEditingInvoice(null);
           } else {
             const created = await api.createSalesInvoice(payload);
             if (payload.post !== false) setAutoPreviewId(created.id);
+            savedId = created.id;
           }
           await list.reload();
+          return savedId;
         }}
       />
       <Modal
@@ -566,6 +569,7 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
                 permissions={['erp.sales.read', 'erp.accounting.read']} iconsOnly />
             </div>
             <InvoiceLineBreakdown document={detail} />
+            <AttachmentsPanel entityType="QUOTATION" entityId={detail.id} canManage={canManage} />
           </div>
         ) : null}
       </Modal>
@@ -585,8 +589,9 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
         testIdPrefix="quotation"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
-          await api.createQuotation(payload);
+          const created = await api.createQuotation(payload);
           await list.reload();
+          return created.id;
         }}
       />
     </Card>
@@ -602,7 +607,6 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string | null>(null);
   const [returnCustomerId, setReturnCustomerId] = useState('');
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
-  const [returnAttachment, setReturnAttachment] = useState<File | null>(null);
   // A credit note may already be posted when a subsequent file upload fails.
   // Retrying the form must upload to that existing note, never post a second return.
   const [createdCreditNoteId, setCreatedCreditNoteId] = useState<string | null>(null);
@@ -630,7 +634,6 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
     setOpen(false);
     setRelatedInvoiceId(null);
     setReturnCustomerId('');
-    setReturnAttachment(null);
     setCreatedCreditNoteId(null);
   };
 
@@ -735,8 +738,6 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         showRestock
         reasonField
         testIdPrefix="credit-note"
-        attachmentFile={returnAttachment}
-        onAttachmentFileChange={setReturnAttachment}
         onClose={closeModal}
         onSubmit={async (payload) => {
           let noteId = createdCreditNoteId;
@@ -745,11 +746,8 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
             noteId = created.id;
             setCreatedCreditNoteId(noteId);
           }
-          if (returnAttachment) {
-            await api.uploadAttachment('CREDIT_NOTE', noteId, returnAttachment, 'OFFICIAL');
-            setReturnAttachment(null);
-          }
           await list.reload();
+          return noteId;
         }}
       />
     </Card>
@@ -2172,8 +2170,6 @@ function DocumentModal({
   showWarehouse,
   showRestock,
   reasonField,
-  attachmentFile,
-  onAttachmentFileChange,
   dueDateField,
   settlement,
   testIdPrefix,
@@ -2213,8 +2209,6 @@ function DocumentModal({
    * the template actually prints it.
    */
   reasonField?: boolean;
-  attachmentFile?: File | null;
-  onAttachmentFileChange?: (file: File | null) => void;
   /**
    * Which date field the printed template renders beyond the document date:
    * an invoice prints a due date, a quotation a validity date, an order none.
@@ -2231,7 +2225,8 @@ function DocumentModal({
   testIdPrefix: string;
   /** The single date property the target document DTO accepts. */
   onClose: () => void;
-  onSubmit: (payload: Record<string, unknown>) => Promise<void>;
+  /** Resolves with the saved document's id so files chosen here can be linked. */
+  onSubmit: (payload: Record<string, unknown>) => Promise<string | void>;
 }) {
   const { t, locale } = useUi();
   const { companyId, user } = useAuth();
@@ -2257,10 +2252,12 @@ function DocumentModal({
   const [salespersonName, setSalespersonName] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const [pending, setPending] = useState<File[]>([]);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setPending([]);
     setDocumentDate(initialDocument?.invoiceDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
     setCustomerId(initialDocument?.customerId ?? '');
     setWarehouseId(initialDocument?.warehouseId ?? '');
@@ -2381,7 +2378,12 @@ function DocumentModal({
         })),
       };
 
-      await onSubmit(payload);
+      const savedId = await onSubmit(payload);
+      // Files chosen in this form are linked once the document exists, so the
+      // operator never has to reopen it to attach the signed paperwork.
+      if (savedId && pending.length) {
+        await uploadPendingAttachments(documentEntityType(testIdPrefix), savedId, pending);
+      }
       onClose();
       setLines([emptyLine(company ? String(company.defaultTaxRateBp / 100) : '10')]);
       setCustomerId('');
@@ -2656,18 +2658,6 @@ function DocumentModal({
               </select>
             </Field>
           ) : null}
-          {reasonField && onAttachmentFileChange ? (
-            <Field label={t('attachments.title')}>
-              <input
-                type="file"
-                className="oryx-input w-full"
-                accept={ATTACHMENT_ACCEPT}
-                onChange={(e) => onAttachmentFileChange(e.target.files?.[0] ?? null)}
-                data-testid={`${testIdPrefix}-attachment`}
-              />
-              {attachmentFile ? <span className="oryx-muted text-xs">{attachmentFile.name}</span> : null}
-            </Field>
-          ) : null}
           <Field label={t('common.notes')}>
             <textarea
               className="oryx-input oryx-textarea"
@@ -2679,7 +2669,23 @@ function DocumentModal({
           </Field>
         </div>
       </section>
+      {/*
+        A credit note is always a creation form even when it is prefilled from
+        the invoice it reverses, so its attachment area must still render.
+      */}
+      {!initialDocument || reasonField ? (
+        <div className="mt-4 border-t border-[var(--border)] pt-4">
+          <PendingAttachments files={pending} onChange={setPending} canManage />
+        </div>
+      ) : null}
     </Modal>
   );
+}
+
+/** The attachment register that matches each sales document form. */
+function documentEntityType(prefix: string): 'SALES_INVOICE' | 'QUOTATION' | 'CREDIT_NOTE' {
+  if (prefix === 'credit-note') return 'CREDIT_NOTE';
+  if (prefix === 'quotation') return 'QUOTATION';
+  return 'SALES_INVOICE';
 }
 

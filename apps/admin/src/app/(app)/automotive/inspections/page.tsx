@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
 import { minorToInput, money, toMinorInput } from '@/lib/erp-format';
 import { EntitySelect } from '@/components/entity-select';
+import { AttachmentsPanel } from '@/components/document-print';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -840,6 +841,11 @@ function VehicleDocumentsModal({
           </TableShell>
         )}
       </div>
+      {vehicleId ? (
+        <div className="mt-4 border-t border-[var(--border)] pt-4">
+          <AttachmentsPanel entityType="VEHICLE" entityId={vehicleId} canManage={canManage} categorised />
+        </div>
+      ) : null}
     </Modal>
   );
 }

@@ -590,6 +590,8 @@ model Company {
   payslips            Payslip[]
   employeeAdvances    EmployeeAdvance[]
   advanceSettlements  AdvanceSettlement[]
+  employeePenalties   EmployeePenalty[]
+  employeeBonuses     EmployeeBonus[]
 
   leadSources            LeadSource[]
   leads                  Lead[]
@@ -3048,6 +3050,8 @@ model Employee {
    */
   secondaryPhone  String?
   nationalId      String?
+  /** Country of citizenship, free text so an operator can record any passport. */
+  nationality     String?
   /**
    * Optional link to a platform user account.
    */
@@ -3088,6 +3092,8 @@ model Employee {
   salaryStructures SalaryStructure[]
   payslips         Payslip[]
   advances         EmployeeAdvance[]
+  penalties        EmployeePenalty[]
+  bonuses          EmployeeBonus[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
@@ -3550,6 +3556,7 @@ model PayrollPeriod {
 
   company Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   runs    PayrollRun[]
+  bonuses EmployeeBonus[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
@@ -3622,6 +3629,7 @@ model Payslip {
   payrollRun PayrollRun    @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   lines      PayslipLine[]
+  bonuses    EmployeeBonus[]
 
   @@unique([payrollRunId, employeeId])
   @@index([companyId, employeeId])
@@ -3679,6 +3687,75 @@ model AdvanceSettlement {
   advance EmployeeAdvance @relation(fields: [advanceId], references: [id], onDelete: Cascade)
 
   @@index([companyId, advanceId])
+}
+
+/**
+ * A disciplinary action or monetary penalty recorded against an employee.
+ *
+ * The row is the audit trail: an action with `amountMinor = 0` is a warning or
+ * a written note, and one with an amount is a fine. Nothing here touches a
+ * payslip — a penalty is a record of a decision, and applying it to pay is a
+ * separate, explicit act so a past payslip is never rewritten.
+ */
+model EmployeePenalty {
+  id            String   @id @default(cuid())
+  companyId     String
+  employeeId    String
+  /** WARNING, FINE, SUSPENSION, TERMINATION_NOTICE or OTHER. */
+  actionType    String
+  reason        String
+  /** The date the decision takes effect. */
+  effectiveDate DateTime
+  /** Zero means the action carries no monetary amount. */
+  amountMinor   Int      @default(0)
+  currency      String   @default("BHD")
+  decidedByName String?
+  notes         String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId])
+  @@index([companyId, effectiveDate])
+}
+
+/**
+ * A bonus or incentive granted to an employee.
+ *
+ * `payslipId` is the single-use lock: an approved bonus with no payslip is
+ * pending, and the payroll run that pays it stamps the payslip id inside its own
+ * transaction. That is what makes a retried run unable to pay the same bonus
+ * twice, without a second "paid" flag to keep in step.
+ */
+model EmployeeBonus {
+  id          String    @id @default(cuid())
+  companyId   String
+  employeeId  String
+  /** BONUS, INCENTIVE, COMMISSION, OVERTIME_AWARD or OTHER. */
+  type        String    @default("BONUS")
+  reason      String
+  amountMinor Int
+  currency    String    @default("BHD")
+  /** The payroll period the bonus is payable in, when the grantor chose one. */
+  payPeriodId String?
+  approvedAt  DateTime?
+  /** Set once a payroll run has consumed the bonus; never cleared. */
+  payslipId   String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company   Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee  Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  payPeriod PayrollPeriod? @relation(fields: [payPeriodId], references: [id], onDelete: SetNull)
+  payslip   Payslip?       @relation(fields: [payslipId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, employeeId])
+  @@index([companyId, payslipId])
+  @@index([companyId, approvedAt])
 }
 
 // ============================================================================

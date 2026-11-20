@@ -10,6 +10,7 @@ import { EntitySelect } from '@/components/entity-select';
 import { EntityPicker } from '@/components/inline-create';
 import { CustomerModal } from '@/components/customer-modal';
 import { VehicleModal } from '@/components/entity-modals';
+import { AttachmentsPanel } from '@/components/document-print';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -751,6 +752,11 @@ function JobCardDetailModal({
           <AddLabourModal open={labourOpen} jobId={job.id} onClose={() => setLabourOpen(false)} onCreated={refresh} />
           <ReservePartsModal open={reserveOpen} jobId={job.id} onClose={() => setReserveOpen(false)} onCreated={refresh} />
         </>
+      ) : null}
+      {job ? (
+        <div className="mt-4 border-t border-[var(--border)] pt-4">
+          <AttachmentsPanel entityType="JOB_CARD" entityId={job.id} canManage={canManage} categorised />
+        </div>
       ) : null}
     </Modal>
   );
