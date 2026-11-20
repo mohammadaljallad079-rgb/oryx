@@ -1283,11 +1283,17 @@ describe('ORYX ERP core (e2e)', () => {
       expect(excessive.status).toBe(400);
       expect(excessive.body.code).toBe('purchasing.over_receipt');
 
-      const invoiced = await erp<{ status: string }>('/purchasing/supplier-invoices', {
+      const invoiced = await erp<{ id: string; status: string; journalEntryId: string | null }>('/purchasing/supplier-invoices', {
         method: 'POST', body: invoiceBody('PARTIAL-OK-1', 20000),
       });
       expect(invoiced.status).toBe(201);
       expect(invoiced.body.status).toBe('POSTED');
+      // Goods receipt has accrued the same net amount and no VAT is charged,
+      // so invoicing should not generate an unbalanced zero-value journal.
+      expect(invoiced.body.journalEntryId).toBeNull();
+      expect(await ctx.prisma.journalEntry.count({
+        where: { sourceType: 'SUPPLIER_INVOICE', sourceId: invoiced.body.id },
+      })).toBe(0);
 
       const replayQuantity = await erp<{ code: string }>('/purchasing/supplier-invoices', {
         method: 'POST', body: invoiceBody('PARTIAL-TOO-MUCH-2', 10000),
