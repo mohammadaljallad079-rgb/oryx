@@ -975,11 +975,10 @@ export class InventoryService {
         },
       },
     });
-    // A newly entered product is not yet stock that needs replenishing.
-    // Only products with a real warehouse stock position participate; a
-    // depleted item retains its zero-quantity StockLevel and still alerts.
+    // A product with no StockLevel records has zero on hand and must also
+    // alert when its configured reorder threshold is positive. This is true
+    // for the selected warehouse as well as the all-warehouses view.
     const alerts = products
-      .filter((p) => p.levels.length > 0)
       .map((p) => {
         const onHand = sumMinor(p.levels.map((l) => l.quantity));
         return {
