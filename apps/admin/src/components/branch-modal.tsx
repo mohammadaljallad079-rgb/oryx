@@ -87,6 +87,7 @@ export function CreateBranchModal({
     <Modal
       open={open}
       title={t('branches.new')}
+      size="form"
       onClose={onClose}
       footer={
         <>
