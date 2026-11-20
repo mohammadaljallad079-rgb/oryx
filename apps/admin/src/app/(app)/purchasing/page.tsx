@@ -1567,7 +1567,11 @@ function CostLineEditor({
   return (
     <div className="flex flex-col gap-2">
       {lines.map((line, i) => (
-        <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-6 xl:grid-cols-12 xl:items-start">
+        <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 sm:grid-cols-6 xl:grid-cols-12 xl:items-start" data-testid={`${testIdPrefix}-row-${i}`}>
+          <div className="col-span-full flex items-center justify-between text-xs font-semibold text-[var(--muted)]">
+            <span>{t('erp.sales.form.items')} #{i + 1}</span>
+            <span className="tabular-nums">{money(Math.round((Number(line.quantity) || 0) * toMinorInput(line.unitCost)), 'BHD')}</span>
+          </div>
           <div className="min-w-0 sm:col-span-3 xl:col-span-4">
             <EntityPicker
               value={line.productId || null}
@@ -1590,12 +1594,14 @@ function CostLineEditor({
           </div>
           <input
             className="oryx-input min-w-0 sm:col-span-3 xl:col-span-3"
+            aria-label={t('erp.accounting.description')}
             placeholder={t('erp.accounting.description')}
             value={line.description}
             onChange={(e) => update(i, { description: e.target.value })}
             data-testid={`${testIdPrefix}-description-${i}`}
           />
           <input
+            type="number" min="0.0001" step="any" inputMode="decimal" aria-label={t('erp.inventory.quantity')}
             className="oryx-input min-w-0 sm:col-span-2 xl:col-span-1"
             placeholder={t('erp.inventory.quantity')}
             value={line.quantity}
@@ -1603,6 +1609,7 @@ function CostLineEditor({
             data-testid={`${testIdPrefix}-quantity-${i}`}
           />
           <input
+            type="number" min="0" step="any" inputMode="decimal" aria-label={costLabel}
             className="oryx-input min-w-0 sm:col-span-2 xl:col-span-2"
             placeholder={costLabel}
             value={line.unitCost}
