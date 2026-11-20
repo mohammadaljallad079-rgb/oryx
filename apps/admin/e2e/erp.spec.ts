@@ -163,11 +163,15 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     const product = rows.body.items.find((item) => item.nameEn === `Opening Stock ${unique}`);
     expect(product).toBeTruthy();
 
-    const movements = await apiCall<{ items: Array<{ productId: string; warehouseId: string; quantity: number }> }>(
+    // StockMovementDto exposes the product SKU, not productId. Match the public
+    // contract and include the warehouse to avoid a false-negative assertion.
+    const movements = await apiCall<{ items: Array<{ sku: string; warehouseCode: string; quantity: number; memo: string | null }> }>(
       page, '/inventory/movements?page=1&pageSize=100',
     );
     expect(movements.status).toBe(200);
-    const opening = movements.body.items.filter((movement) => movement.productId === product!.id);
+    const opening = movements.body.items.filter((movement) =>
+      movement.sku === product!.sku && movement.memo === 'Opening stock on product creation',
+    );
     expect(opening).toHaveLength(1);
     expect(opening[0].quantity).toBe(30_000);
   });
