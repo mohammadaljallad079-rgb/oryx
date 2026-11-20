@@ -526,13 +526,82 @@ export class InventoryService {
    */
   async productCategories(principal: RequestPrincipal, companyIdQuery?: string) {
     const { companyId } = await this.context.resolveCompanyScope(principal, companyIdQuery);
-    const rows = await this.prisma.product.findMany({
-      where: { companyId, category: { not: null } },
-      distinct: ['category'],
-      select: { category: true },
-      orderBy: { category: 'asc' },
+    const [registered, used] = await Promise.all([
+      this.prisma.stockProductCategory.findMany({ where: { companyId }, orderBy: { name: 'asc' } }),
+      this.prisma.product.findMany({
+        where: { companyId, category: { not: null } },
+        distinct: ['category'],
+        select: { category: true },
+      }),
+    ]);
+    // Legacy product category strings continue to be available immediately.
+    const names = new Set<string>(['Spare Parts', ...registered.map((r) => r.name)]);
+    for (const item of used) if (item.category) names.add(item.category);
+    return { items: [...names].sort((a, b) => a.localeCompare(b)) };
+  }
+
+  async createProductCategory(nameInput: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const name = nameInput?.trim();
+    if (!name || name.length > 100) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Category name must be between 1 and 100 characters.');
+    const existing = await this.prisma.stockProductCategory.findUnique({
+      where: { companyId_name: { companyId, name } },
     });
-    return { items: rows.map((r) => r.category).filter((c): c is string => Boolean(c)) };
+    if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Category already exists.');
+    const category = await this.prisma.stockProductCategory.create({ data: { companyId, name } });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId,
+      action: 'inventory.product_category_created',
+      targetType: 'PRODUCT_CATEGORY', targetId: category.id, summary: `Created category ${name}`,
+    });
+    return category;
+  }
+
+  async renameProductCategory(id: string, nameInput: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const name = nameInput?.trim();
+    if (!name || name.length > 100) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Category name must be between 1 and 100 characters.');
+    const category = await this.prisma.stockProductCategory.findFirst({ where: { id, companyId } });
+    if (!category) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Category not found.');
+    if (category.name === name) return category;
+    const collision = await this.prisma.product.count({ where: { companyId, category: name } });
+    const exists = await this.prisma.stockProductCategory.findUnique({ where: { companyId_name: { companyId, name } } });
+    if (collision || exists) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Category name is already in use.');
+    const renamed = await this.prisma.$transaction(async (tx) => {
+      await tx.product.updateMany({ where: { companyId, category: category.name }, data: { category: name } });
+      return tx.stockProductCategory.update({ where: { id }, data: { name } });
+    });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId,
+      action: 'inventory.product_category_renamed',
+      targetType: 'PRODUCT_CATEGORY', targetId: id, summary: `Renamed category ${category.name} to ${name}`,
+    });
+    return renamed;
+  }
+
+  async deleteProductCategory(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const category = await this.prisma.stockProductCategory.findFirst({ where: { id, companyId } });
+    if (!category) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Category not found.');
+    const linked = await this.prisma.product.count({ where: { companyId, category: category.name } });
+    if (linked) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Move linked products to another category before deleting this category.');
+    await this.prisma.stockProductCategory.delete({ where: { id } });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId,
+      action: 'inventory.product_category_deleted',
+      targetType: 'PRODUCT_CATEGORY', targetId: id, summary: `Deleted unused category ${category.name}`,
+    });
+    return { id, deleted: true };
+  }
+
+  async listProductCategoryRecords(principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const [records, used] = await Promise.all([
+      this.prisma.stockProductCategory.findMany({ where: { companyId }, orderBy: { name: 'asc' } }),
+      this.prisma.product.groupBy({ by: ['category'], where: { companyId, category: { not: null } }, _count: { id: true } }),
+    ]);
+    const counts = new Map(used.map((r) => [r.category, r._count.id]));
+    return { items: records.map((r) => ({ ...r, productCount: counts.get(r.name) ?? 0 })) };
   }
 
   async createProduct(dto: CreateProductDto, principal: RequestPrincipal, actor: ActorContext) {
