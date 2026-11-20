@@ -923,8 +923,8 @@ export const api = {
     request<{ rows: ValuationRowDto[]; totalValueMinor: number; totalQuantity: number }>(
       `/inventory/valuation${companyId ? `?companyId=${companyId}` : ''}`,
     ),
-  reorderAlerts: (companyId?: string) =>
-    request<{ items: ReorderAlertDto[] }>(`/inventory/reorder-alerts${companyId ? `?companyId=${companyId}` : ''}`),
+  reorderAlerts: (params: { companyId?: string; warehouseId?: string } = {}) =>
+    request<{ items: ReorderAlertDto[] }>(`/inventory/reorder-alerts?${toQuery(params)}`),
   /**
    * The POS product grid: active products with their lead image and on-hand
    * position. `search` matches a scanned barcode as well as a name or SKU.
