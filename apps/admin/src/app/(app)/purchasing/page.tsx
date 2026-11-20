@@ -29,7 +29,7 @@ import {
 } from '@/components/ui';
 import type { PurchaseDocumentDto, RequisitionDto, SupplierDto, WarehouseDto } from '@oryx/shared';
 
-type Tab = 'dashboard' | 'orders' | 'requisitions' | 'receipts' | 'invoices' | 'returns' | 'suppliers';
+type Tab = 'dashboard' | 'requisitions' | 'orders' | 'receipts' | 'invoices' | 'returns' | 'suppliers';
 
 interface LineDraft {
   productId: string;
@@ -66,7 +66,7 @@ function useTaxOptions(companyId: string | null | undefined): {
   };
 }
 
-const TAB_KEYS = ['dashboard', 'orders', 'requisitions', 'receipts', 'invoices', 'returns', 'suppliers'] as const;
+const TAB_KEYS = ['dashboard', 'requisitions', 'orders', 'receipts', 'invoices', 'returns', 'suppliers'] as const;
 
 export default function PurchasingPage() {
   return (
@@ -83,8 +83,8 @@ function PurchasingInner() {
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.purchasing.dashboard') },
-    { key: 'orders', label: t('erp.purchasing.orders') },
     { key: 'requisitions', label: t('erp.purchasing.requisitions') },
+    { key: 'orders', label: t('erp.purchasing.orders') },
     { key: 'receipts', label: t('erp.purchasing.receipts') },
     { key: 'invoices', label: t('erp.purchasing.invoices') },
     { key: 'returns', label: t('erp.purchasing.returns') },
