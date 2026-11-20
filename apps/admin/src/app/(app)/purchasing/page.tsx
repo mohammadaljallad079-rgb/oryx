@@ -1151,7 +1151,7 @@ function SupplierInvoiceModal({
     try {
       await api.createSupplierInvoice({
         supplierId,
-        supplierInvoiceNumber,
+        ...(supplierInvoiceNumber.trim() ? { supplierInvoiceNumber: supplierInvoiceNumber.trim() } : {}),
         invoiceDate: new Date(invoiceDate).toISOString(),
         ...(dueDate ? { dueDate: new Date(dueDate).toISOString() } : {}),
         ...(branchId ? { branchId } : {}),
@@ -1184,7 +1184,7 @@ function SupplierInvoiceModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !supplierId || !supplierInvoiceNumber} onClick={submit} data-testid="save-supplier-invoice">
+          <Button variant="primary" disabled={busy || !supplierId} onClick={submit} data-testid="save-supplier-invoice">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -1218,7 +1218,7 @@ function SupplierInvoiceModal({
             )}
           />
         </Field>
-        <Field label={t('erp.purchasing.supplierInvoiceNumber')} required>
+        <Field label={t('erp.purchasing.supplierInvoiceNumber')}>
           <input
             className="oryx-input"
             value={supplierInvoiceNumber}
