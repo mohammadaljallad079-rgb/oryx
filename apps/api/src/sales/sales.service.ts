@@ -1718,7 +1718,7 @@ export class SalesService {
       let warehouseId = dto.warehouseId ?? null;
       // Invoice-linked returns must inherit the original monetary discount.
       // The client is not trusted to choose a smaller discount and over-refund.
-      const originalPricing = new Map<string, { quantity: number; discountMinor: number }>();
+      const originalPricing = new Map<string, { quantity: number; discountMinor: number; taxMinor: number }>();
       let invoiceCurrency: string | null = null;
       if (invoiceId) {
         const invoice = await tx.salesInvoice.findFirst({
@@ -1762,10 +1762,11 @@ export class SalesService {
         }
         for (const original of invoice.lines) {
           const k = key(original);
-          const current = originalPricing.get(k) ?? { quantity: 0, discountMinor: 0 };
+          const current = originalPricing.get(k) ?? { quantity: 0, discountMinor: 0, taxMinor: 0 };
           originalPricing.set(k, {
             quantity: current.quantity + original.quantity,
             discountMinor: current.discountMinor + original.discountMinor,
+            taxMinor: current.taxMinor + original.taxMinor,
           });
         }
         invoiceCurrency = invoice.currency;
@@ -1788,6 +1789,9 @@ export class SalesService {
           ...line,
           discountPercentBp: 0,
           discountAmountMinor: Math.round(original.discountMinor * line.quantity / original.quantity),
+          // Linked returns must reverse the invoice's actual posted VAT, even if
+          // that invoice predates the tax-before-discount policy.
+          taxAmountMinor: Math.round(original.taxMinor * line.quantity / original.quantity),
         };
       });
       const totals = computeDocumentTotals(returnInputs, rounding.mode, rounding.scale);
