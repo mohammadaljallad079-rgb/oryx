@@ -968,7 +968,11 @@ export class InventoryService {
       where: { companyId, isActive: true, trackStock: true, reorderLevel: { gt: 0 } },
       include: { levels: true },
     });
+    // A newly entered product is not yet stock that needs replenishing.
+    // Only products with a real warehouse stock position participate; a
+    // depleted item retains its zero-quantity StockLevel and still alerts.
     const alerts = products
+      .filter((p) => p.levels.length > 0)
       .map((p) => {
         const onHand = sumMinor(p.levels.map((l) => l.quantity));
         return {
