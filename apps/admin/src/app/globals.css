@@ -1338,6 +1338,35 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   -webkit-overflow-scrolling: touch;
 }
 
+.oryx-table-container {
+  min-width: 0;
+  position: relative;
+}
+
+.oryx-table-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+}
+
+.oryx-table-scroll-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  width: 100%;
+  height: 18px;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  scrollbar-width: auto;
+  overscroll-behavior-x: contain;
+}
+
+.oryx-table-scroll-dock::-webkit-scrollbar,
+.oryx-table-scroll::-webkit-scrollbar {
+  height: 14px;
+}
+
 .oryx-table-scroll:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: -2px;
