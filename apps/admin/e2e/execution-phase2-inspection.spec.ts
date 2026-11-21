@@ -132,17 +132,14 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await page.getByTestId('job-type-CABIN_AND_MECHANICAL').click();
     await page.getByTestId('create-inspection-job').click();
 
+    // Creating a job now opens its workspace immediately. The previous test
+    // expected to stay on the list, so the row vanished on successful routing.
+    await page.waitForURL(/\/automotive\/inspections\/[^/]+$/, { timeout: 20_000 });
     await expect(page.locator('.oryx-modal')).toHaveCount(0);
-    const row = page.locator('[data-testid^="job-row-"]').first();
-    await expect(row).toBeVisible();
-    const jobNumber = (await row.locator('td').first().innerText()).trim();
-    // The brief mandates a single leading letter with no separator; the
-    // inspection-session letter is `Z` (`Z00028`), not the retired `JOB-` form.
-    expect(jobNumber).toMatch(/^Z\d{5}$/);
-
-    await row.locator('[data-testid^="open-job-"]').click();
-    await page.waitForURL('**/automotive/inspections/**');
-    await expect(page.getByTestId('inspection-workspace')).toBeVisible();
+    const workspace = page.getByTestId('inspection-workspace');
+    await expect(workspace).toBeVisible({ timeout: 20_000 });
+    // The report/session identifier uses a single leading Z and five digits.
+    await expect(workspace).toContainText(/Z\d{5}/);
     await expectNoServerError(page);
 
     // The identity block carries the real vehicle, and the header names it.
