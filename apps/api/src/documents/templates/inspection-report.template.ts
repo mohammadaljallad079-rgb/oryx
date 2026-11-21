@@ -5,7 +5,6 @@ import {
 import {
   BODY_SCHEME_DATA_URI,
   CHASSIS_DIAGRAM_DATA_URI,
-  INTERIOR_DIAGRAM_DATA_URI,
 } from './inspection-artwork.assets';
 import { documentQualityBadge, signatureBlock, type DocumentChrome } from './chrome';
 import { docStamp, esc, escMultiline, grouped, orDash } from './html.util';
