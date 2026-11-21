@@ -110,7 +110,7 @@ export default function InspectionWorkspacePage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={session.status} label={t(`inspection.status.${session.status}`)} />
-            {session.status === 'APPROVED' && session.bookingId && can('erp.sales.read') && can('erp.inspection.read') ? (
+            {session.status === 'APPROVED' && can('erp.sales.read') && can('erp.inspection.read') ? (
               <Button disabled={bundleLoading} data-testid="inspection-download-bundle" onClick={async () => {
                 setBundleLoading(true);
                 setError(null);
