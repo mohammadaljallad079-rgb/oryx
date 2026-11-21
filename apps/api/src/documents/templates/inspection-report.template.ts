@@ -947,7 +947,8 @@ export const INSPECTION_REPORT_CSS = `
   .items .item-en{ direction:ltr; text-align:left; }
   .items .c-res{ text-align:center; vertical-align:middle; white-space:nowrap; }
   .items .c-res .mark{ vertical-align:middle; }
-  .cabin .itable{ position:relative; z-index:1; background:#fff; width:100%; min-width:0; overflow:hidden; }
+  .cabin .itable{ position:relative; z-index:1; background:#fff; }
+  .cabin .grp{ min-width:0; overflow:hidden; }
   .cabin .items{ width:100%; max-width:100%; table-layout:fixed; }
   .cabin .items th,.cabin .items td{ word-break:normal; overflow-wrap:anywhere; }
   .cabin .items thead{ display:table-header-group; }
