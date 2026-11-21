@@ -67,6 +67,14 @@ export function documentWatermark(issuer: DocumentIssuer): string {
   return `<div class="doc-watermark" aria-hidden="true"><img src="${esc(issuer.logoDataUri)}" alt="" style="width:${size}pt;max-width:${size}pt;max-height:${size}pt;object-fit:contain"></div>`;
 }
 
+/** The one approved header certification icon shared by invoices, vouchers and inspection reports. */
+export function documentQualityBadge(cssClass = ''): string {
+  return '<svg class="' + esc(cssClass) + '" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">' +
+    '<circle cx="12" cy="12" r="11" fill="#0e4477"/>' +
+    '<path d="M6.9 12.5 10.4 16 17.2 7.8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
+}
+
 /** The running header on the first page of a document. */
 export function documentHeader(chrome: DocumentChrome): string {
   const { issuer } = chrome;
@@ -84,7 +92,7 @@ export function documentHeader(chrome: DocumentChrome): string {
     </div>
     <div class="doc-head-right">
       ${logoBlock(issuer)}
-      <span class="doc-quality-badge"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#0e4477"/><path d="M6.9 12.5 10.4 16 17.2 7.8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="doc-quality-badge">${documentQualityBadge()}</span>
     </div>
   </header>
   <div class="doc-title-band">
