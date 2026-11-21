@@ -895,6 +895,7 @@ export class BookingService {
         resource: { select: { id: true, code: true, nameEn: true, nameAr: true, resourceType: true } },
         branch: { select: { id: true, code: true, nameEn: true, nameAr: true } },
         customerAccount: { select: { id: true, email: true, fullName: true, phone: true } },
+        vehicle: { select: { id: true, make: true, model: true, vin: true, plateNumber: true, modelYear: true } },
         events: { orderBy: { createdAt: 'asc' } },
       },
     });
@@ -934,7 +935,7 @@ export class BookingService {
         take: params.pageSize,
         include: {
           resource: { select: { code: true, nameEn: true, nameAr: true } },
-          customerAccount: { select: { fullName: true, email: true } },
+          customerAccount: { select: { fullName: true, email: true, phone: true } },
         },
       }),
       this.prisma.bookingSlot.count({ where }),
