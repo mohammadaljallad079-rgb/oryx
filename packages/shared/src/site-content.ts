@@ -13,6 +13,7 @@
  */
 
 import type { Locale } from './tokens';
+import type { StorefrontSectionKey } from './storefront-sections';
 
 export interface BrandPalette {
   /** Primary navy, `#00162b`. */
@@ -83,6 +84,8 @@ export interface SiteContent {
     taglineAr: string;
   };
   palette: BrandPalette;
+  /** Public-site section visibility, managed in Website Settings. */
+  sectionVisibility: Record<StorefrontSectionKey, boolean>;
   hero: {
     slides: HeroSlideContent[];
   };
@@ -145,6 +148,12 @@ export const DEFAULT_SITE_CONTENT: Record<Locale, SiteContent> = {
       taglineAr: 'خدمات سيارات بمعايير احترافية.',
     },
     palette: DEFAULT_PALETTE,
+    sectionVisibility: {
+      inspections: true,
+      maintenance: true,
+      products: true,
+      spare_parts: true,
+    },
     hero: {
       slides: [
         {
@@ -374,6 +383,12 @@ export const DEFAULT_SITE_CONTENT: Record<Locale, SiteContent> = {
       taglineAr: 'خدمات سيارات بمعايير احترافية.',
     },
     palette: DEFAULT_PALETTE,
+    sectionVisibility: {
+      inspections: true,
+      maintenance: true,
+      products: true,
+      spare_parts: true,
+    },
     hero: {
       slides: [
         {
