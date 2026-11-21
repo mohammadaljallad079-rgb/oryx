@@ -121,7 +121,7 @@ export class MediaStorageService implements OnModuleInit {
   }
 
   get maxUploadBytes(): number {
-    return Number(process.env.MEDIA_MAX_UPLOAD_BYTES ?? 12 * 1024 * 1024);
+    return Number(process.env.MEDIA_MAX_UPLOAD_BYTES ?? 200 * 1024 * 1024);
   }
 
   /**

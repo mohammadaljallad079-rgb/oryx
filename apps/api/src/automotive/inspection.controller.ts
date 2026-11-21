@@ -185,7 +185,7 @@ export class InspectionController {
   @Post(':id/attachments')
   @RequireModule('automotive_inspections')
   @RequirePermissions('erp.inspection.write')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 200 * 1024 * 1024, files: 1 } }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Attach a photograph or document to the inspection' })
   addAttachment(
