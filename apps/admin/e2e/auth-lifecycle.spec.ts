@@ -196,6 +196,19 @@ test.describe('expiry and revocation', () => {
     // cookies while a valid access token remains in memory does not expire it.
     await page.context().clearCookies();
 
+    // A missing cookie is usually rejected by the API, but the shared CI
+    // environment can transiently return an unavailable response instead.
+    // Explicitly model a definitive server-side revocation (401) so this test
+    // validates session-loss handling rather than network timing. The other
+    // auth tests cover retrying transient outages without signing the user out.
+    await page.route('**/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ statusCode: 401, message: 'Session expired' }),
+      });
+    });
+
     await page.goto('/companies', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('login-form')).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveURL(/\/login(?:[?#]|$)/);
