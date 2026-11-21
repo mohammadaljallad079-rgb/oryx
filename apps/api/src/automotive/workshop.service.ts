@@ -435,6 +435,87 @@ export class WorkshopService {
     return estimate;
   }
 
+  /**
+   * Save the job card's complete billable service/part set in one transaction.
+   * The legacy RepairEstimate tables are deliberately reused for existing
+   * invoice/reports compatibility; no approval step is exposed to operators.
+   * Replacing items instead of creating a new estimate on every Save preserves
+   * edits and prevents previously entered lines disappearing from the invoice.
+   */
+  async saveWorkItems(jobCardId: string, dto: CreateEstimateDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const job = await this.prisma.jobCard.findFirst({ where: { id: jobCardId, companyId } });
+    if (!job) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Job card not found.');
+    if (job.status === 'COMPLETED' || job.status === 'INVOICED' || job.status === 'CANCELLED') {
+      throw badRequest(ERROR_CODES.JOB_CARD_STATE, 'Work items cannot be changed after job completion or cancellation.');
+    }
+    if (dto.lines.length === 0 || dto.lines.some((line) => line.type !== 'SERVICE' && line.type !== 'PART')) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide at least one service or part line.');
+    }
+
+    const totals = computeDocumentTotals(dto.lines.map((line) => ({
+      quantity: line.quantity,
+      unitPriceMinor: line.unitPriceMinor,
+      discountPercentBp: 0,
+      taxPercentBp: line.taxPercentBp ?? 0,
+    })));
+    const saved = await this.posting.withTransaction(async (tx) => {
+      const existing = await tx.repairEstimate.findFirst({
+        where: { companyId, jobCardId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      const lines = dto.lines.map((line, index) => ({
+        companyId,
+        type: line.type as never,
+        productId: line.productId ?? null,
+        description: line.description,
+        quantity: line.quantity,
+        unitPriceMinor: line.unitPriceMinor,
+        taxPercentBp: line.taxPercentBp ?? 0,
+        lineTotalMinor: totals.lines[index].lineTotalMinor,
+        sortOrder: index,
+      }));
+      if (existing) {
+        return tx.repairEstimate.update({
+          where: { id: existing.id },
+          data: {
+            status: 'APPROVED',
+            subtotalMinor: totals.subtotalMinor,
+            taxMinor: totals.taxMinor,
+            totalMinor: totals.totalMinor,
+            lines: { deleteMany: {}, create: lines },
+          },
+          include: { lines: true },
+        });
+      }
+      const estimateNumber = await this.sequences.next(tx, companyId, 'repairEstimate');
+      return tx.repairEstimate.create({
+        data: {
+          companyId,
+          jobCardId,
+          estimateNumber,
+          status: 'APPROVED',
+          subtotalMinor: totals.subtotalMinor,
+          taxMinor: totals.taxMinor,
+          totalMinor: totals.totalMinor,
+          createdById: actor.userId,
+          lines: { create: lines },
+        },
+        include: { lines: true },
+      });
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'automotive.job_work_items_saved',
+      targetType: 'JOB_CARD',
+      targetId: jobCardId,
+      summary: `Saved ${saved.lines.length} service/part items for job ${job.jobNumber}`,
+    });
+    return saved;
+  }
+
   /** Record the customer's decision on an estimate. */
   async decideEstimate(id: string, approved: boolean, dto: ApproveEstimateDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
