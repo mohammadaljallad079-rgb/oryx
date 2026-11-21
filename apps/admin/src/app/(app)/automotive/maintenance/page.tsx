@@ -1374,15 +1374,49 @@ function CreateProviderModal({
 }
 
 function RequestsTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const { companyId } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ categoryKey: '', customerId: '', vehicleId: '', description: '' });
+  const services = useAsync(() => api.maintenanceServices(), []);
+  const customers = useAsync(() => api.salesCustomers({ companyId: companyId ?? undefined }).catch(() => null), [companyId]);
+  const vehicles = useAsync(() => companyId ? api.vehicles({ companyId, pageSize: 200 }).catch(() => null) : Promise.resolve(null), [companyId]);
   const list = useAsync(() => api.serviceRequests(), []);
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (!form.categoryKey) throw new Error(locale === 'ar' ? 'اختر الخدمة' : 'Select a service');
+      await api.createServiceRequest({
+        categoryKey: form.categoryKey,
+        customerId: form.customerId || undefined,
+        vehicleId: form.vehicleId || undefined,
+        description: form.description || undefined,
+      });
+      await list.reload();
+      setForm({ categoryKey: '', customerId: '', vehicleId: '', description: '' });
+      setOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
   const providers = useAsync(() => api.marketplaceProviders({ status: 'APPROVED' }), []);
   return (
     <Card>
-      <div className="border-b border-[var(--border)] p-4">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.automotive.serviceRequests')}</p>
+        {canManage ? (
+          <Button size="sm" variant="primary" onClick={() => setOpen(true)} data-testid="create-maintenance-request">
+            {locale === 'ar' ? 'إضافة طلب صيانة يدوياً' : 'Add manual maintenance request'}
+          </Button>
+        ) : null}
       </div>
       <p className="oryx-muted m-0 px-4 pt-3 text-[12px]">{t('erp.automotive.ws.requestsHint')}</p>
+      {error ? <ErrorBanner message={error} /> : null}
       {list.error ? (
         <div className="p-4">
           <ErrorBanner message={list.error} onRetry={list.reload} />
@@ -1435,6 +1469,42 @@ function RequestsTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
+      <Modal open={open} onClose={() => setOpen(false)}
+        title={locale === 'ar' ? 'طلب خدمة صيانة جديد' : 'New maintenance service request'}
+        footer={<>
+          <Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={busy || !form.categoryKey} onClick={() => void submit()} data-testid="save-maintenance-request">{t('common.save')}</Button>
+        </>}>
+        {error ? <ErrorBanner message={error} /> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={locale === 'ar' ? 'الخدمة' : 'Service'} required>
+            <select className="oryx-input" value={form.categoryKey}
+              onChange={(e) => setForm((v) => ({ ...v, categoryKey: e.target.value }))}>
+              <option value="">{t('common.select')}</option>
+              {(services.data ?? []).filter((item) => item.isActive).map((item) => <option key={item.id} value={item.code}>{locale === 'ar' ? item.nameAr : item.nameEn}</option>)}
+            </select>
+          </Field>
+          <Field label={t('erp.sales.customer')}>
+            <select className="oryx-input" value={form.customerId}
+              onChange={(e) => setForm((v) => ({ ...v, customerId: e.target.value, vehicleId: '' }))}>
+              <option value="">{t('common.select')}</option>
+              {(customers.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.nameEn || item.nameAr}</option>)}
+            </select>
+          </Field>
+          <Field label={t('erp.automotive.vehicle')}>
+            <select className="oryx-input" value={form.vehicleId}
+              onChange={(e) => setForm((v) => ({ ...v, vehicleId: e.target.value }))}>
+              <option value="">{t('common.select')}</option>
+              {(vehicles.data?.items ?? []).filter((v) => !form.customerId || v.customerId === form.customerId)
+                .map((v) => <option key={v.id} value={v.id}>{v.make} {v.model} — {v.plateNumber ?? v.vin}</option>)}
+            </select>
+          </Field>
+          <Field label={t('erp.accounting.description')}>
+            <textarea className="oryx-input" value={form.description}
+              onChange={(e) => setForm((v) => ({ ...v, description: e.target.value }))} />
+          </Field>
+        </div>
+      </Modal>
     </Card>
   );
 }
