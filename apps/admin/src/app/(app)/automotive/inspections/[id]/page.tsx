@@ -283,7 +283,18 @@ export default function InspectionWorkspacePage() {
                   setIssuing(true);
                   setIssueError(null);
                   try {
+                    // A standalone inspection report omits the invoice. Reissue
+                    // the report with the current approved template and download
+                    // the combined file so the posted invoice is always page one.
                     await api.issueInspectionDocument(id);
+                    const url = await api.inspectionBundleBlobUrl(id);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${session.jobNumber}-invoice-and-inspection.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
                     setDocsKey((k) => k + 1);
                   } catch (e) {
                     setIssueError(e instanceof Error ? e.message : t('common.error'));
@@ -293,7 +304,7 @@ export default function InspectionWorkspacePage() {
                 }}
               >
                 <Icon name="scroll" size={14} />
-                {t('documents.issueReport')}
+                {locale === 'ar' ? 'إصدار الفاتورة وتقرير الفحص PDF' : 'Issue Invoice + Inspection PDF'}
               </Button>
             ) : null
           }
