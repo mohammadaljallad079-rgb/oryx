@@ -814,7 +814,7 @@ export class InspectionService {
         where: { id: session.invoiceId, companyId },
         select: { id: true, status: true },
       });
-      if (!invoice || invoice.status === 'DRAFT' || invoice.status === 'CANCELLED') {
+      if (!invoice || invoice.status === 'DRAFT' || invoice.status === 'VOID') {
         throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Linked inspection invoice is missing or is not posted; reconcile accounting first.');
       }
       return invoice.id;
@@ -830,7 +830,7 @@ export class InspectionService {
           select: { id: true, status: true, customerId: true },
         });
         if (!oldInvoice || oldInvoice.customerId !== session.customerId ||
-            oldInvoice.status === 'CANCELLED' || oldInvoice.status === 'DRAFT') {
+            oldInvoice.status === 'VOID' || oldInvoice.status === 'DRAFT') {
           throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Legacy inspection invoice needs accounting reconciliation before reissue.');
         }
         await tx.inspectionSession.update({ where: { id }, data: { invoiceId: oldInvoice.id } });
