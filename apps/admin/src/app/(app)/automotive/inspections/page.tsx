@@ -1215,17 +1215,26 @@ function BookingsTab({ canBook, canApprove, canInvoice, onStartInspection }: {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="inspection-booking-details">
           {([
             [t('erp.automotive.bookingNumber'), selectedBooking?.bookingNumber],
+            [t('erp.automotive.customer'), locale === 'ar' ? (selectedBooking?.customerNameAr || selectedBooking?.customerNameEn) : (selectedBooking?.customerNameEn || selectedBooking?.customerNameAr)],
+            [locale === 'ar' ? 'رقم هاتف العميل' : 'Customer phone', selectedBooking?.customerPhone],
+            [locale === 'ar' ? 'البريد الإلكتروني' : 'Email', selectedBooking?.customerEmail],
             [t('erp.automotive.vehicle'), [selectedBooking?.make, selectedBooking?.model].filter(Boolean).join(' ')],
             ['VIN', selectedBooking?.vin],
             [locale === 'ar' ? 'رقم اللوحة' : 'Plate number', selectedBooking?.plateNumber],
-            [t('erp.automotive.service'), locale === 'ar' ? (selectedService?.nameAr || selectedBooking?.serviceNameAr) : (selectedService?.nameEn || selectedBooking?.serviceNameEn)],
+            [t('erp.automotive.service'), (selectedBooking?.serviceIds?.length ?? 0) > 1
+              ? selectedBooking!.serviceIds!.map((serviceId) => {
+                  const service = (services.data?.items ?? []).find((item: InspectionServiceDto) => item.id === serviceId);
+                  return service ? ((locale === 'ar' ? service.nameAr : service.nameEn) || service.nameEn) : serviceId;
+                }).join(' · ')
+              : locale === 'ar' ? (selectedService?.nameAr || selectedBooking?.serviceNameAr) : (selectedService?.nameEn || selectedBooking?.serviceNameEn)],
             [t('erp.automotive.scheduledAt'), selectedBooking?.scheduledAt ? new Date(selectedBooking.scheduledAt).toLocaleString(locale === 'ar' ? 'ar-BH' : 'en-BH') : null],
             [t('common.status'), selectedBooking?.status],
             [locale === 'ar' ? 'قراءة العداد' : 'Odometer', selectedBooking?.odometer],
             [locale === 'ar' ? 'حالة التقرير' : 'Report status', selectedBooking?.reportStatus],
             [locale === 'ar' ? 'رقم الفاتورة المرتبطة' : 'Linked invoice ID', selectedBooking?.invoiceId],
-            [locale === 'ar' ? 'سنة السيارة' : 'Vehicle year', selectedVehicle?.modelYear],
-            [locale === 'ar' ? 'اللون' : 'Color', selectedVehicle?.color],
+            [locale === 'ar' ? 'سنة السيارة' : 'Vehicle year', selectedBooking?.modelYear ?? selectedVehicle?.modelYear],
+            [locale === 'ar' ? 'اللون' : 'Color', selectedBooking?.color ?? selectedVehicle?.color],
+            [locale === 'ar' ? 'عداد المركبة' : 'Vehicle mileage', selectedBooking?.mileage ?? selectedVehicle?.mileage],
             [locale === 'ar' ? 'السعر قبل الضريبة' : 'Service price', selectedService ? money(selectedService.priceMinor) : null],
           ] as Array<[string, string | number | null | undefined]>).map(([label, value]) => (
             <div key={label} className="rounded-xl border border-[var(--border)] p-3">
