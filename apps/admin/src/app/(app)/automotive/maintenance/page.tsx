@@ -10,6 +10,8 @@ import { EntitySelect } from '@/components/entity-select';
 import { EntityPicker } from '@/components/inline-create';
 import { CustomerModal } from '@/components/customer-modal';
 import { VehicleModal } from '@/components/entity-modals';
+import { JobCardPrintActions } from '@/components/job-card-print';
+import { DocumentPrintActions } from '@/components/document-print';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -275,6 +277,10 @@ function JobCardsTab({
                     <Button size="sm" onClick={() => setDetailId(j.id)} data-testid={`open-job-${j.jobNumber}`}>
                       {t('common.details')}
                     </Button>
+                    <JobCardPrintActions id={j.id} customerName={j.customerNameEn ?? ''} />
+                    {canInvoice && j.status === 'INVOICED' && j.invoiceId ? (
+                      <DocumentPrintActions kind="SALES_INVOICE" id={j.invoiceId} compact />
+                    ) : null}
                     {canManage && j.status === 'OPEN' ? (
                       <Button
                         size="sm"
@@ -344,6 +350,7 @@ interface JobCardDetail {
   complaint: string | null;
   diagnosis: string | null;
   odometer: number | null;
+  invoiceId?: string | null;
   vehicle?: { vin: string; make: string; model: string; plateNumber: string | null } | null;
   labour?: Array<{ id: string; description: string; hours: number; rateMinor: number; amountMinor: number }>;
   estimates?: Array<{
@@ -636,6 +643,9 @@ function JobCardDetailModal({
               >
                 {t('erp.automotive.ws.completeWork')}
               </Button>
+            ) : null}
+            {canInvoice && job.status === 'INVOICED' && job.invoiceId ? (
+              <DocumentPrintActions kind="SALES_INVOICE" id={job.invoiceId} />
             ) : null}
             {canInvoice && job.status === 'COMPLETED' ? (
               <Button
