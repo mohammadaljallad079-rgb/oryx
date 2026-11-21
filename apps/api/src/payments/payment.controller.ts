@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -98,6 +99,13 @@ export class PaymentController {
     return this.payments.getIntent(principal.company?.companyId ?? '', id);
   }
 
+  @Delete('intents/:id')
+  @RequirePermissions('erp.payments.manage')
+  @ApiOperation({ summary: 'Delete a payment intent that has no financial result' })
+  async deleteIntent(@Param('id') id: string, @CurrentPrincipal() principal: RequestPrincipal) {
+    return this.payments.deleteIntent(principal.company?.companyId ?? '', id, principal.userId);
+  }
+
   @Post('intents/:id/confirm')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('erp.payments.manage')
@@ -178,6 +186,13 @@ export class PaymentController {
       principal.company?.companyId ?? '',
       onlyUnmatched === 'true',
     );
+  }
+
+  @Delete('reconciliations/:id')
+  @RequirePermissions('erp.payments.manage')
+  @ApiOperation({ summary: 'Delete an unmatched reconciliation batch' })
+  async deleteReconciliation(@Param('id') id: string, @CurrentPrincipal() principal: RequestPrincipal) {
+    return this.payments.deleteReconciliation(principal.company?.companyId ?? '', id, principal.userId);
   }
 }
 

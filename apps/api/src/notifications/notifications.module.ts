@@ -9,6 +9,7 @@ import {
 } from './notification-adapters';
 import { NotificationService } from './notification.service';
 import { CustomerNotificationController } from './customer-notification.controller';
+import { StaffNotificationController } from './staff-notification.controller';
 
 /**
  * Notification transport and delivery tracking.
@@ -19,7 +20,7 @@ import { CustomerNotificationController } from './customer-notification.controll
  */
 @Module({
   imports: [CustomerModule],
-  controllers: [CustomerNotificationController],
+  controllers: [CustomerNotificationController, StaffNotificationController],
   providers: [
     NotificationService,
     InAppAdapter,

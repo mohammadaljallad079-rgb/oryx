@@ -1,7 +1,17 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './icons';
+import { useUi } from '@/lib/ui-context';
+
+/**
+ * `useLayoutEffect` on the client, `useEffect` on the server (where it is a
+ * no-op and React warns about the layout variant). The modal registers its
+ * stacking depth in a layout effect so the depth is committed before the first
+ * paint, rather than a frame later.
+ */
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 export function Card({
   children,
@@ -28,8 +38,8 @@ export function SectionHeader({
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="m-0 text-[22px] font-extrabold tracking-tight">{title}</h1>
-        {subtitle ? <p className="oryx-muted m-0 mt-1 max-w-[72ch] text-[13px]">{subtitle}</p> : null}
+        <h1 className="oryx-section-title m-0">{title}</h1>
+        {subtitle ? <p className="oryx-muted oryx-section-subtitle m-0 mt-1">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
@@ -79,11 +89,13 @@ export function Button({
 export function Field({
   label,
   hint,
+  error,
   children,
   required,
 }: {
   label: string;
   hint?: string;
+  error?: string;
   children: ReactNode;
   required?: boolean;
 }) {
@@ -94,10 +106,26 @@ export function Field({
         {required ? <span className="oryx-gold"> *</span> : null}
       </span>
       {children}
-      {hint ? <span className="oryx-faint mt-1 block text-[11.5px]">{hint}</span> : null}
+      {error ? (
+        <span className="mt-1 block text-[11.5px] font-semibold" style={{ color: 'var(--danger)' }}>
+          {error}
+        </span>
+      ) : hint ? (
+        <span className="oryx-faint mt-1 block text-[11.5px]">{hint}</span>
+      ) : null}
     </label>
   );
 }
+
+/**
+ * Ids of the modals currently open, oldest first.
+ *
+ * A preview opened from inside another modal renders as a second modal, and
+ * both listen on `window`. Without this stack a single Escape (or a click on
+ * the inner backdrop, which bubbles to the outer one) closes the whole stack
+ * instead of the one dialog the user is looking at.
+ */
+const openModals: symbol[] = [];
 
 export function Modal({
   open,
@@ -105,44 +133,153 @@ export function Modal({
   onClose,
   children,
   footer,
+  size = 'default',
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  /**
+   * `full` widens the dialog for a workspace such as the POS terminal,
+   * `document` for the invoice/quotation form, which lays out two information
+   * panels and a five-column item table to mirror the printed page, and `pos`
+   * for a true edge-to-edge terminal that owns the whole viewport.
+   */
+  size?: 'default' | 'form' | 'full' | 'document' | 'pos';
 }) {
+  const { t } = useUi();
+  const idRef = useRef<symbol>(Symbol('oryx-modal'));
+  const id = idRef.current;
+  // The dialog is mounted at the depth it had when it opened, so a modal opened
+  // from inside another (a preview from a form, a confirm from a list) always
+  // paints above the one that spawned it instead of losing the paint race to a
+  // sibling that happens to sit later in the DOM.
+  const [depth, setDepth] = useState(0);
+  // Keep the latest `onClose` in a ref so the stack effect below does not depend
+  // on it: call sites pass a fresh arrow each render, and re-running the effect
+  // on every render would pop and re-push this modal, letting a nested dialog
+  // briefly see an empty stack and mount at depth 0 (z-index 60).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // A full-screen modal owns the viewport. Keep the document underneath from
+  // scrolling horizontally/vertically (the POS screenshot showed a page-level
+  // scrollbar even while the terminal was open). Nested dialogs restore the
+  // original scroll state only after the last modal closes.
+  useEffect(() => {
+    if (!open || typeof document === 'undefined') return;
+    const body = document.body;
+    if (!body.dataset.oryxModalScrollCount) {
+      body.dataset.oryxModalPreviousOverflow = body.style.overflow;
+      body.dataset.oryxModalScrollCount = '0';
+    }
+    body.dataset.oryxModalScrollCount = String(Number(body.dataset.oryxModalScrollCount) + 1);
+    body.style.overflow = 'hidden';
+    return () => {
+      const remaining = Math.max(0, Number(body.dataset.oryxModalScrollCount || 1) - 1);
+      body.dataset.oryxModalScrollCount = String(remaining);
+      if (!remaining) {
+        body.style.overflow = body.dataset.oryxModalPreviousOverflow || '';
+        delete body.dataset.oryxModalPreviousOverflow;
+        delete body.dataset.oryxModalScrollCount;
+      }
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      // Only the top-most modal reacts, so a nested preview closes alone.
+      if (openModals[openModals.length - 1] !== id) return;
+      e.stopPropagation();
+      onCloseRef.current();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open, id]);
+
+  // The stack registration runs in a layout effect so the depth is committed
+  // before the browser paints. A plain effect would paint the dialog at the
+  // default depth for one frame, and a nested dialog opened in that window
+  // would resolve to the base z-index and lose the paint race to its parent.
+  useIsomorphicLayoutEffect(() => {
+    if (!open) return;
+    openModals.push(id);
+    setDepth(openModals.length);
+    return () => {
+      const at = openModals.indexOf(id);
+      if (at !== -1) openModals.splice(at, 1);
+    };
+  }, [open, id]);
 
   if (!open) return null;
-  return (
-    <div className="oryx-modal-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
-      <div className="oryx-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+  // A portal lifts the dialog out of whatever scroll container or stacking
+  // context it was declared in, so the backdrop always covers the whole
+  // viewport and no ancestor `overflow`/`transform` can clip it. The inline
+  // z-index keeps a nested dialog above the one that opened it.
+  const tree = (
+    <div
+      className={`oryx-modal-backdrop${size === 'pos' ? ' oryx-modal-backdrop--pos' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      style={{ zIndex: 60 + depth * 5 }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <div
+        className={`oryx-modal ${
+          size === 'full'
+            ? 'oryx-modal--full'
+            : size === 'form'
+              ? 'oryx-modal--form'
+              : size === 'document'
+              ? 'oryx-modal--document'
+              : size === 'pos'
+                ? 'oryx-modal--pos'
+                : ''
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className={`flex items-center justify-between border-b border-[var(--border)] px-5 ${
+            size === 'pos' ? 'flex-none py-3' : 'py-4'
+          }`}
+        >
           <h2 className="m-0 text-[16px] font-bold">{title}</h2>
           <button
             type="button"
-            className="oryx-btn oryx-btn--ghost oryx-btn--sm"
+            className="oryx-modal-close flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] shadow-sm hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
             onClick={onClose}
-            aria-label="Close"
+            title={t('common.closeLabel')}
+            aria-label={t('common.closeLabel')}
           >
-            <Icon name="close" size={16} />
+            <span aria-hidden="true" className="text-[28px] font-semibold leading-none">&times;</span>
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className={size === 'pos' ? 'flex min-h-0 flex-1 flex-col' : 'px-5 py-4'}>{children}</div>
         {footer ? (
-          <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--border)] px-5 py-4">{footer}</div>
+          <div
+            className={
+              size === 'pos'
+                ? 'flex flex-none flex-wrap justify-end gap-2 border-t border-[var(--border)] px-5 py-3'
+                : 'flex flex-wrap justify-end gap-2 border-t border-[var(--border)] px-5 py-4'
+            }
+          >
+            {footer}
+          </div>
         ) : null}
       </div>
     </div>
   );
+  if (typeof document === 'undefined') return tree;
+  return createPortal(tree, document.body);
 }
 
 export function EmptyState({
@@ -195,10 +332,62 @@ export function Skeleton({ height = 16, width = '100%' }: { height?: number; wid
   return <div className="oryx-skeleton" style={{ height, width }} />;
 }
 
-export function TableShell({ children }: { children: ReactNode }) {
+export function TableShell({ children, label }: { children: ReactNode; label?: string }) {
+  const tableRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const [scrollWidth, setScrollWidth] = useState(0);
+  const [isWide, setIsWide] = useState(false);
+
+  // Keep a visible, sticky horizontal scrollbar at the bottom of a long table
+  // even when its real scrollbar is below the viewport.
+  useEffect(() => {
+    const table = tableRef.current;
+    const dock = dockRef.current;
+    if (!table || !dock) return;
+    const measure = () => {
+      setScrollWidth(table.scrollWidth);
+      setIsWide(table.scrollWidth > table.clientWidth + 2);
+    };
+    const fromTable = () => { dock.scrollLeft = table.scrollLeft; };
+    const fromDock = () => { table.scrollLeft = dock.scrollLeft; };
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(table);
+    const inner = table.querySelector('table');
+    if (inner) observer?.observe(inner);
+    window.addEventListener('resize', measure);
+    table.addEventListener('scroll', fromTable, { passive: true });
+    dock.addEventListener('scroll', fromDock, { passive: true });
+    measure();
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      table.removeEventListener('scroll', fromTable);
+      dock.removeEventListener('scroll', fromDock);
+    };
+  }, [children]);
+
   return (
-    <div className="overflow-x-auto">
-      <table className="oryx-table">{children}</table>
+    <div className="oryx-table-container">
+      <div
+        ref={tableRef}
+        className="oryx-table-scroll"
+        data-testid="table-scroll"
+        role="region"
+        aria-label={label}
+        tabIndex={0}
+      >
+        <table className="oryx-table">{children}</table>
+      </div>
+      <div
+        ref={dockRef}
+        className="oryx-table-scroll-dock"
+        data-testid="table-scroll-bottom"
+        aria-label={label ?? 'Horizontal table navigation'}
+        tabIndex={isWide ? 0 : -1}
+        style={{ display: isWide ? undefined : 'none' }}
+      >
+        <div style={{ width: scrollWidth, height: 1 }} aria-hidden="true" />
+      </div>
     </div>
   );
 }
@@ -245,4 +434,339 @@ export function StatusBadge({ status, label }: { status: string; label: string }
           ? 'danger'
           : 'neutral';
   return <Badge tone={tone}>{label}</Badge>;
+}
+
+/**
+ * The one KPI tile the admin uses.
+ *
+ * A KPI row previously had three separate markups — a padded `Card`, a raw
+ * flex row and an inline grid — with different paddings, icon sizes and label
+ * sizes, so the same metric looked different on every screen. This is the only
+ * tile now: one density, one label treatment, one value size.
+ *
+ * The tile is deliberately compact. The label sits above the value and the
+ * whole tile stays under a fixed minimum height, so a row of eight reads as one
+ * band rather than eight tall panels. `compact` drops the icon for dense grids.
+ */
+export function StatCard({
+  icon,
+  label,
+  value,
+  sub,
+  tone = 'default',
+  compact = false,
+  ...rest
+}: {
+  icon?: string;
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  tone?: 'default' | 'gold' | 'success' | 'danger';
+  compact?: boolean;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`oryx-stat-card oryx-stat-card--${tone}`} {...rest}>
+      {icon && (
+        <span className="oryx-stat-card__icon" aria-hidden>
+          <Icon name={icon} size={compact ? 15 : 16} />
+        </span>
+      )}
+      <span className="oryx-stat-card__body">
+        <span className="oryx-stat-card__label">{label}</span>
+        <span className="oryx-stat-card__value">{value}</span>
+        {sub ? <span className="oryx-stat-card__sub">{sub}</span> : null}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The KPI row.
+ *
+ * Columns are driven by a minimum tile width, not a fixed count, so a row of
+ * four on a wide screen becomes two on a tablet and one on a phone without a
+ * breakpoint per screen.
+ */
+export function StatGrid({
+  children,
+  className = '',
+  ...rest
+}: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`oryx-stat-grid ${className}`} {...rest}>
+      {children}
+    </div>
+  );
+}
+
+export interface SearchableOption {
+  value: string;
+  label: string;
+  /** Optional secondary text shown under the label (a code, a phone number). */
+  hint?: string;
+  disabled?: boolean;
+  data?: Record<string, unknown>;
+}
+
+/**
+ * A filterable dropdown. Native `<select>` cannot be searched, and the
+ * catalogues it is used against (companies, customers, accounts) are paginated,
+ * so the options are supplied by the caller and filtered locally by label.
+ */
+export function SearchableSelect({
+  value,
+  options,
+  onChange,
+  placeholder,
+  emptyLabel,
+  disabled = false,
+  testId,
+  ariaLabel,
+  onCreateNew,
+  createLabel,
+  create,
+  onSearch,
+  loading = false,
+  onSelectData,
+}: {
+  value: string | null;
+  options: SearchableOption[];
+  onChange: (value: string | null) => void;
+  placeholder?: string;
+  /** Option shown for the "no selection" case; omit to make the field required. */
+  emptyLabel?: string;
+  disabled?: boolean;
+  testId?: string;
+  ariaLabel?: string;
+  create?: {
+    actionLabel: string;
+    fields: Array<{ key: string; label: string; required?: boolean; placeholder?: string }>;
+    onSubmit: (values: Record<string, string>) => Promise<string>;
+  };
+  onSearch?: (value: string) => void;
+  loading?: boolean;
+  onSelectData?: (data: Record<string, unknown>) => void;
+  /**
+   * When set, a "+ Add new" action is shown inside the popover. It opens the
+   * record's own create form over the current one; on success the caller
+   * reloads the option list and selects the new id, so the same full form and
+   * the same validation are used as the standalone screen.
+   */
+  onCreateNew?: () => void;
+  createLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createValues, setCreateValues] = useState<Record<string, string>>({});
+  const [createError, setCreateError] = useState('');
+  const [creating, setCreating] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 280 });
+
+  // The menu must escape modal scroll containers; render it at viewport level
+  // and flip above the field when the bottom edge would clip the options.
+  useIsomorphicLayoutEffect(() => {
+    if (!open) return;
+    const position = () => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const below = window.innerHeight - rect.bottom - 12;
+      const above = rect.top - 12;
+      const maxHeight = Math.max(120, Math.min(320, Math.max(below, above)));
+      setPopoverPosition({
+        top: below >= 180 || below >= above ? rect.bottom + 4 : Math.max(8, rect.top - maxHeight - 4),
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8)),
+        width: Math.min(rect.width, window.innerWidth - 16),
+        maxHeight,
+      });
+    };
+    position();
+    window.addEventListener('resize', position);
+    window.addEventListener('scroll', position, true);
+    return () => {
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node) && !popoverRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const selected = options.find((o) => o.value === value) ?? null;
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) => o.label.toLowerCase().includes(q) || (o.hint ? o.hint.toLowerCase().includes(q) : false),
+    );
+  }, [options, query]);
+
+  const pick = (next: string | null) => {
+    onChange(next);
+    const option = options.find((o) => o.value === next);
+    if (option?.data && onSelectData) onSelectData(option.data as Record<string, unknown>);
+    setOpen(false);
+    setQuery('');
+  };
+
+  return (
+    <div ref={rootRef} className="relative" data-testid={testId}>
+      <button
+        type="button"
+        className="oryx-input flex w-full items-center justify-between gap-2 text-start"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className={selected ? 'truncate' : 'oryx-faint truncate'}>
+          {selected ? selected.label : placeholder ?? ''}
+        </span>
+        <Icon name="chevronDown" size={14} />
+      </button>
+      {open && typeof document !== 'undefined' ? createPortal(
+        <div
+          ref={popoverRef}
+          className="oryx-popover fixed overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg"
+          style={{ zIndex: 9999, top: popoverPosition.top, left: popoverPosition.left, width: popoverPosition.width, maxHeight: popoverPosition.maxHeight }}
+          role="listbox"
+        >
+          <input
+            autoFocus
+            className="oryx-input mb-2"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              onSearch?.(e.target.value);
+            }}
+            placeholder={placeholder}
+            data-testid={testId ? `${testId}-search` : undefined}
+          />
+          <div className="overflow-y-auto" style={{ maxHeight: Math.max(75, popoverPosition.maxHeight - 64) }}>
+            {emptyLabel !== undefined ? (
+              <button
+                type="button"
+                className="block w-full rounded-lg px-3 py-2 text-start text-[12.5px] hover:bg-[var(--surface-2)]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  pick(null);
+                }}
+              >
+                {emptyLabel}
+              </button>
+            ) : null}
+            {(onCreateNew || create) ? (
+              <button
+                type="button"
+                className="mb-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-2 text-start text-[12.5px] font-semibold"
+                style={{ color: 'var(--gold)' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setOpen(false);
+                  setQuery('');
+                  onCreateNew?.();
+                  if (create) setCreateOpen(true);
+                }}
+                data-testid={testId ? `${testId}-create` : undefined}
+              >
+                <Icon name="plus" size={14} />
+                {createLabel ?? create?.actionLabel ?? '+ Add new'}
+              </button>
+            ) : null}
+            {loading ? (
+              <p className="oryx-faint m-0 px-3 py-2 text-[12px]">Loading…</p>
+            ) : filtered.length === 0 ? (
+              <p className="oryx-faint m-0 px-3 py-2 text-[12px]">—</p>
+            ) : (
+              filtered.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  role="option"
+                  aria-selected={o.value === value}
+                  data-value={o.value}
+                  disabled={o.disabled}
+                  className="block w-full rounded-lg px-3 py-2 text-start hover:bg-[var(--surface-2)] disabled:opacity-50"
+                  onClick={(e) => {
+                    // `preventDefault` stops the wrapping `<label>` (from `Field`)
+                    // from re-dispatching a click to the trigger button, which
+                    // would instantly reopen the popover the pick just closed.
+                    e.preventDefault();
+                    pick(o.value);
+                  }}
+                >
+                  <span className="block text-[12.5px] font-semibold">{o.label}</span>
+                  {o.hint ? <span className="oryx-faint block text-[11px]">{o.hint}</span> : null}
+                </button>
+              ))
+            )}
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+      {createOpen && create ? (
+        <Modal
+          open
+          title={create.actionLabel}
+          onClose={() => setCreateOpen(false)}
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button
+                variant="primary"
+                disabled={creating || create.fields.some((f) => f.required !== false && !createValues[f.key]?.trim())}
+                onClick={async () => {
+                  setCreating(true);
+                  setCreateError('');
+                  try {
+                    const id = await create.onSubmit(createValues);
+                    setCreateOpen(false);
+                    setCreateValues({});
+                    pick(id);
+                  } catch (error) {
+                    setCreateError(error instanceof Error ? error.message : 'Could not create record');
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
+              >
+                {creating ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+          }
+        >
+          {createError ? <ErrorBanner message={createError} /> : null}
+          <div className="grid gap-3">
+            {create.fields.map((field) => (
+              <Field key={field.key} label={field.label} required={field.required !== false}>
+                <input
+                  className="oryx-input"
+                  value={createValues[field.key] ?? ''}
+                  placeholder={field.placeholder}
+                  data-testid={testId ? `${testId}-create-${field.key}` : undefined}
+                  onChange={(e) => setCreateValues((v) => ({ ...v, [field.key]: e.target.value }))}
+                />
+              </Field>
+            ))}
+          </div>
+        </Modal>
+      ) : null}
+    </div>
+  );
 }

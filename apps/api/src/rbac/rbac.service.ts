@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import {
@@ -11,6 +12,8 @@ import {
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { AuditService } from '../common/audit.service';
+import { AuthService } from '../auth/auth.service';
+import { findPlatformSuperAdminRole } from '../common/platform-role';
 import {
   badRequest,
   conflict,
@@ -21,9 +24,11 @@ import {
 import type { ActorContext } from '../organizations/organizations.service';
 import type {
   CreateRoleDto,
+  CreateUserDto,
   InviteUserDto,
   UpdateMembershipDto,
   UpdateRoleDto,
+  UpdateUserDto,
 } from './rbac.dto';
 
 const INVITATION_TTL_DAYS = 7;
@@ -36,6 +41,7 @@ export class RbacService {
     private readonly prisma: PrismaService,
     private readonly entitlements: EntitlementService,
     private readonly audit: AuditService,
+    private readonly auth: AuthService,
   ) {}
 
   // ------------------------------------------------------------------- context
@@ -65,10 +71,7 @@ export class RbacService {
   }
 
   private async platformPermissionCodes(): Promise<string[]> {
-    const role = await this.prisma.role.findFirst({
-      where: { isPlatform: true, code: 'platform_super_admin' },
-      include: { permissions: true },
-    });
+    const role = await findPlatformSuperAdminRole(this.prisma);
     return role?.permissions.map((p) => p.permissionCode) ?? [];
   }
 
@@ -143,7 +146,9 @@ export class RbacService {
     if (actor.kind === 'COMPANY' && actor.companyId !== companyId) {
       throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
     }
-    const code = dto.code.trim().toLowerCase().replace(/\s+/g, '_');
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a role name in Arabic or English.');
+    const code = (dto.code?.trim() || await nextMasterCode(this.prisma, 'RL')).toLowerCase().replace(/\s+/g, '_');
     const existing = await this.prisma.role.findFirst({ where: { companyId, code } });
     if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Role code "${code}" already exists.`);
 
@@ -154,8 +159,7 @@ export class RbacService {
       data: {
         companyId,
         code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        ...names,
         descriptionEn: dto.descriptionEn ?? null,
         isSystem: false,
         permissions: { create: permissions.map((permissionCode) => ({ permissionCode })) },
@@ -191,8 +195,11 @@ export class RbacService {
     if (actor.kind === 'COMPANY' && actor.companyId !== role.companyId) {
       throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
     }
-    if (role.isSystem) {
-      throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'System roles cannot be modified. Create a custom role instead.');
+    // Only the platform super admin may edit a company's seeded/system role.
+    // Platform roles (which have no companyId) are excluded above. Regular
+    // company administrators continue to edit custom roles only.
+    if (role.isSystem && actor.kind !== 'PLATFORM') {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'Only the platform super admin can modify a company system role.');
     }
 
     if (dto.permissions) {
@@ -281,20 +288,29 @@ export class RbacService {
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
-    const where = {
-      companyId,
-      ...(query.status ? { user: { status: query.status as never } } : {}),
-      ...(query.search
+    const search = query.search?.trim();
+    // The status and search conditions both target the related `user`, so they
+    // must be merged into a single filter object. Assigning them separately
+    // silently dropped whichever came second, which is why a status filter
+    // appeared to ignore the search box.
+    const userFilter = {
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(search
         ? {
-            user: {
-              OR: [
-                { email: { contains: query.search, mode: 'insensitive' as const } },
-                { fullNameEn: { contains: query.search, mode: 'insensitive' as const } },
-                { fullNameAr: { contains: query.search } },
-              ],
-            },
+            OR: [
+              { email: { contains: search, mode: 'insensitive' as const } },
+              { fullNameEn: { contains: search, mode: 'insensitive' as const } },
+              { fullNameAr: { contains: search } },
+              { nationalId: { contains: search, mode: 'insensitive' as const } },
+              { nationality: { contains: search, mode: 'insensitive' as const } },
+              { phone: { contains: search } },
+            ],
           }
         : {}),
+    };
+    const where = {
+      companyId,
+      ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
     };
 
     const [memberships, total] = await Promise.all([
@@ -318,10 +334,15 @@ export class RbacService {
         email: m.user.email,
         fullNameEn: m.user.fullNameEn,
         fullNameAr: m.user.fullNameAr,
+        nationalId: m.user.nationalId,
+        nationality: m.user.nationality,
+        address: m.user.address,
+        phone: m.user.phone,
         status: m.user.status,
         isSuperAdmin: m.user.isSuperAdmin,
         preferredLocale: m.user.preferredLocale,
         preferredTheme: m.user.preferredTheme,
+        preferredFontScale: m.user.preferredFontScale,
         lastLoginAt: m.user.lastLoginAt?.toISOString() ?? null,
         createdAt: m.user.createdAt.toISOString(),
         memberships: [
@@ -335,6 +356,7 @@ export class RbacService {
             roleNameEn: m.role.nameEn,
             roleNameAr: m.role.nameAr,
             branchIds: m.branches.map((b) => b.branchId),
+            isActive: m.isActive,
           },
         ],
       })),
@@ -500,6 +522,170 @@ export class RbacService {
       invitedByEmail: null,
       // Returned exactly once; only the hash is persisted.
       inviteToken: rawToken,
+    };
+  }
+
+  /**
+   * Create a user directly, with an active account and a membership.
+   *
+   * This is the deliberate alternative to an invitation: the administrator sets
+   * the initial password and the account is usable immediately. It shares the
+   * invitation path's guards — same-company role, delegable permissions, seat
+   * limit and reachable branches — so the two cannot diverge on what a company
+   * administrator is allowed to hand out.
+   */
+  async createUser(companyId: string, dto: CreateUserDto, actor: ActorContext) {
+    if (actor.kind === 'COMPANY' && actor.companyId !== companyId) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
+    }
+    const email = dto.email.toLowerCase().trim();
+    const role = await this.prisma.role.findFirst({ where: { id: dto.roleId, companyId } });
+    if (!role) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Role does not belong to this company.');
+    if (role.isPlatform) throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Platform roles cannot be assigned to company users.');
+
+    const rolePermissions = (
+      await this.prisma.rolePermission.findMany({ where: { roleId: role.id } })
+    ).map((p) => p.permissionCode);
+    await this.assertDelegation(companyId, actor, rolePermissions);
+
+    const ent = await this.entitlements.forCompany(companyId);
+    const usage = await this.entitlements.usageFor(companyId);
+    const limits: PlanLimits = { ...ent.limits };
+    const check = checkLimit(limits, 'maxUsers', usage.users, 1);
+    if (!check.ok) {
+      throw forbidden(ERROR_CODES.PLAN_LIMIT_EXCEEDED, `Plan user limit reached (${check.limit}).`, {
+        limit: check.limit,
+        current: check.current,
+        limitName: 'maxUsers',
+      });
+    }
+
+    const branchIds = dto.branchIds ?? [];
+    if (branchIds.length > 0) {
+      const branches = await this.prisma.branch.findMany({ where: { id: { in: branchIds } } });
+      for (const b of branches) {
+        if (b.companyId !== companyId) {
+          throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Branch belongs to another company.');
+        }
+      }
+      if (branches.length !== branchIds.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'One or more branches were not found.');
+      }
+    }
+
+    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    if (existingUser?.isSuperAdmin) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'That account is a platform administrator.');
+    }
+    if (existingUser) {
+      const existingMembership = await this.prisma.membership.findUnique({
+        where: { userId_companyId: { userId: existingUser.id, companyId } },
+      });
+      if (existingMembership) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'That user is already a member of this company.');
+      }
+      // The email already belongs to an account that is not a member of this
+      // company — in practice, a user of another tenant. Adding a membership to
+      // it must never mutate the account: overwriting the password would let a
+      // company administrator take over a sign-in that belongs to another
+      // company, and rewriting the profile would leak edits across the tenant
+      // boundary. The administrator must use the platform path for a shared
+      // identity, so this is refused outright.
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'That email already belongs to an account in another company; it cannot be taken over by adding a membership.',
+      );
+    }
+
+    const passwordHash = await AuthService.hashPassword(dto.password);
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email,
+          passwordHash,
+          status: 'ACTIVE',
+          fullNameEn: dto.fullNameEn,
+          fullNameAr: dto.fullNameAr,
+          nationalId: dto.nationalId ?? null,
+          nationality: dto.nationality ?? null,
+          address: dto.address ?? null,
+          phone: dto.phone ?? null,
+        },
+      });
+
+      const membership = await tx.membership.create({
+        data: { userId: created.id, companyId, roleId: role.id, invitedById: actor.userId },
+      });
+      for (const branchId of branchIds) {
+        await tx.membershipBranch.create({ data: { membershipId: membership.id, branchId } });
+      }
+      return created;
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'user.created',
+      targetType: 'USER',
+      targetId: user.id,
+      summary: `Created ${email} as ${role.nameEn}`,
+      metadata: { roleId: role.id, branchIds },
+    });
+
+    return {
+      id: user.id,
+      email: user.email,
+      fullNameEn: user.fullNameEn,
+      fullNameAr: user.fullNameAr,
+      nationalId: user.nationalId,
+      nationality: user.nationality,
+      address: user.address,
+      phone: user.phone,
+      status: user.status,
+    };
+  }
+
+  /** Edit the identity/contact details of a user in the caller's company. */
+  async updateUser(companyId: string, userId: string, dto: UpdateUserDto, actor: ActorContext) {
+    if (actor.kind === 'COMPANY' && actor.companyId !== companyId) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
+    }
+    const membership = await this.prisma.membership.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Membership not found.');
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.fullNameEn !== undefined ? { fullNameEn: dto.fullNameEn } : {}),
+        ...(dto.fullNameAr !== undefined ? { fullNameAr: dto.fullNameAr } : {}),
+        ...(dto.nationalId !== undefined ? { nationalId: dto.nationalId || null } : {}),
+        ...(dto.nationality !== undefined ? { nationality: dto.nationality || null } : {}),
+        ...(dto.address !== undefined ? { address: dto.address || null } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone || null } : {}),
+      },
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'user.updated',
+      targetType: 'USER',
+      targetId: userId,
+      summary: `Updated profile for ${updated.email}`,
+    });
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      fullNameEn: updated.fullNameEn,
+      fullNameAr: updated.fullNameAr,
+      nationalId: updated.nationalId,
+      nationality: updated.nationality,
+      address: updated.address,
+      phone: updated.phone,
+      status: updated.status,
     };
   }
 

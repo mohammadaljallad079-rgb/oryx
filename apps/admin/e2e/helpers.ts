@@ -143,26 +143,179 @@ export async function signIn(page: Page, credentials = SUPER_ADMIN): Promise<voi
   await expect(page.getByTestId('dashboard')).toBeVisible();
 }
 
-/** Switches the theme and waits for the attribute to settle. */
+/**
+ * Switches the theme and waits for the attribute to settle.
+ *
+ * The stored preference is read by an inline bootstrap script before first
+ * paint, so the write has to survive the reload. Under a loaded CI runner a
+ * single reload occasionally re-runs the bootstrap against the previous value,
+ * so the write and reload are retried once. The assertion still runs on every
+ * attempt, so an app that cannot honour the requested theme still fails.
+ */
 export async function setTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
-  await page.evaluate((value) => {
-    window.localStorage.setItem('oryx.theme', value);
-  }, theme);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+  await applyPreferenceAndReload(page, 'oryx.theme', theme, () =>
+    expect(page.locator('html')).toHaveAttribute('data-theme', theme),
+  );
 }
 
 /** Switches locale/direction and waits for the attribute to settle. */
 export async function setLocale(page: Page, locale: 'ar' | 'en'): Promise<void> {
-  await page.evaluate((value) => {
-    window.localStorage.setItem('oryx.locale', value);
-  }, locale);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dir', locale === 'ar' ? 'rtl' : 'ltr');
+  await applyPreferenceAndReload(page, 'oryx.locale', locale, () =>
+    expect(page.locator('html')).toHaveAttribute('data-dir', locale === 'ar' ? 'rtl' : 'ltr'),
+  );
+}
+
+async function applyPreferenceAndReload(
+  page: Page,
+  key: string,
+  value: string,
+  assertSettled: () => Promise<unknown>,
+): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    await page.evaluate(([k, v]) => window.localStorage.setItem(k, v), [key, value]);
+    await page.reload();
+    try {
+      await assertSettled();
+      return;
+    } catch (error) {
+      if (attempt >= 1) throw error;
+    }
+  }
+}
+
+/**
+ * Open a `SearchableSelect`/`EntitySelect` and pick an option.
+ *
+ * These pickers are not native `<select>` elements, so `selectOption` cannot
+ * drive them: the trigger is a button that reveals a `role="listbox"` popover,
+ * and the options are `role="option"` buttons carrying a `data-value`. The
+ * helper opens the popover, then clicks the first option whose value matches —
+ * or the first option overall when no target is given — so a test reads the way
+ * it did against a `<select>` without reaching into the component's internals.
+ *
+ * The popover is dismissed by toggling the trigger, never with Escape: the
+ * `Modal` listens for Escape on `window` in the capture phase and would close
+ * the whole dialog the picker lives in.
+ */
+export async function pickOption(
+  page: Page,
+  testId: string,
+  target?: string | { value?: string; label?: string; index?: number },
+): Promise<void> {
+  const root = page.getByTestId(testId);
+  const trigger = root.locator('button[aria-haspopup="listbox"]');
+  // SearchableSelect renders its dropdown through a portal on document.body.
+  const list = page.getByRole('listbox');
+  // The catalogue re-fetches on every query change, so an open popover can
+  // replace its option nodes between the visibility check and the click. Retry
+  // the whole open-and-pick a few times; a selection that landed detaches the
+  // popover, which is the success signal.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!(await list.count())) await trigger.click();
+    await expect(list).toBeVisible();
+    // A prior query may still filter the list; clear it only when it holds a
+    // term, since re-filling an empty box still re-fetches and re-renders.
+    const search = page.getByTestId(`${testId}-search`);
+    if ((await search.count()) && (await search.inputValue()) !== '') {
+      await search.fill('');
+    }
+    const opts = list.locator('[role="option"]');
+    let option = opts.first();
+    if (typeof target === 'string') {
+      option = list.locator(`[role="option"][data-value="${target}"]`).first();
+    } else if (target?.value !== undefined) {
+      option = list.locator(`[role="option"][data-value="${target.value}"]`).first();
+    } else if (target?.label !== undefined) {
+      option = opts.filter({ hasText: target.label }).first();
+    } else if (target?.index !== undefined) {
+      option = opts.nth(target.index);
+    }
+    await expect(option).toBeVisible({ timeout: 20_000 });
+    // Dispatch the click on the node itself rather than through the mouse: the
+    // node can detach mid-gesture, and a stray mouse-up then lands on the modal
+    // backdrop (closing the dialog) instead of the option.
+    await option.evaluate((el: HTMLElement) => el.click());
+    try {
+      await expect(list).toHaveCount(0, { timeout: 5_000 });
+      return;
+    } catch {
+      // The list survived (the click missed a re-rendered node); close it by
+      // toggling the trigger and try again. Escape is deliberately avoided: the
+      // Modal listens on `window` in the capture phase, so it would close the
+      // whole dialog instead of the popover.
+      await trigger.click();
+      await expect(list).toHaveCount(0);
+    }
+  }
+  throw new Error(`pickOption(${testId}): could not select an option`);
+}
+
+/** The number of options a `SearchableSelect`/`EntitySelect` currently offers. */
+export async function searchableOptionCount(page: Page, testId: string): Promise<number> {
+  const root = page.getByTestId(testId);
+  const trigger = root.locator('button[aria-haspopup="listbox"]');
+  // SearchableSelect renders its dropdown through a portal on document.body.
+  const list = page.getByRole('listbox');
+  await trigger.click();
+  await expect(list).toBeVisible();
+  const search = page.getByTestId(`${testId}-search`);
+  if ((await search.count()) && (await search.inputValue()) !== '') {
+    await search.fill('');
+  }
+  const count = await list.locator('[role="option"]').count();
+  // Close by toggling the trigger; Escape would reach the Modal's capture-phase
+  // listener and close the dialog the picker lives in.
+  await trigger.click();
+  await expect(list).toHaveCount(0);
+  return count;
 }
 
 export async function expectNoServerError(page: Page): Promise<void> {
   const body = await page.locator('body').innerText();
   expect(body).not.toContain('Application error');
   expect(body).not.toContain('Internal Server Error');
+}
+
+/**
+ * Top a product's on-hand stock back up before an invoice is issued.
+ *
+ * A suite that picks `products.items[0]` and sells from it drains the seeded
+ * quantity; once the level reaches zero the next run is refused by the real
+ * `inventory.insufficient_stock` rule and the test fails on a stock assertion
+ * rather than the document it means to check. Posting a positive adjustment
+ * restores the level through the same stock ledger the invoice consumes, so the
+ * scenario stays about the document. The adjustment is posted, not left as a
+ * draft, because only a posted adjustment moves the level.
+ */
+export async function ensureStock(
+  page: Page,
+  token: string,
+  productId: string,
+  warehouseId: string,
+  quantityDelta = 1_000_000,
+): Promise<void> {
+  await page.evaluate(
+    async ({ api, bearer, productId: pid, warehouseId: wid, delta }) => {
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` };
+      const created = (await (
+        await fetch(`${api}/inventory/adjustments`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            warehouseId: wid,
+            reason: 'e2e stock top-up',
+            lines: [{ productId: pid, quantityDelta: delta, unitCostMinor: 10000 }],
+          }),
+        })
+      ).json()) as { id?: string };
+      if (!created.id) throw new Error('stock top-up: adjustment was not created');
+      const posted = await fetch(`${api}/inventory/adjustments/${created.id}/post`, {
+        method: 'POST',
+        headers,
+        body: '{}',
+      });
+      if (!posted.ok) throw new Error(`stock top-up: post failed (${posted.status})`);
+    },
+    { api: API, bearer: token, productId, warehouseId, delta: quantityDelta },
+  );
 }

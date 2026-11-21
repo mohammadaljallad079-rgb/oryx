@@ -1,0 +1,1101 @@
+{
+  "base": "http://localhost:3002",
+  "generatedAt": "2026-10-22T02:26:08.628Z",
+  "cells": 12,
+  "passed": 12,
+  "failed": 0,
+  "results": [
+    {
+      "cell": "light-rtl-mobile",
+      "theme": "light",
+      "dir": "rtl",
+      "locale": "ar",
+      "viewport": "mobile",
+      "themeAttr": "light",
+      "dirAttr": "rtl",
+      "langAttr": "ar",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            31,
+            46,
+            64
+          ],
+          "contrast": 13.75,
+          "fontSize": 28,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(205, 216, 230)",
+          "surface": [
+            33,
+            48,
+            65
+          ],
+          "contrast": 9.34,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(232, 199, 102)",
+          "surface": [
+            30,
+            45,
+            63
+          ],
+          "contrast": 8.48,
+          "fontSize": 12.5,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(34, 32, 29)",
+          "surface": [
+            255,
+            255,
+            255
+          ],
+          "contrast": 16.25,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            25,
+            41,
+            59
+          ],
+          "contrast": 6.9,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            25,
+            41,
+            59
+          ],
+          "contrast": 14.81,
+          "fontSize": 22,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/light-rtl-mobile.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "light-rtl-tablet",
+      "theme": "light",
+      "dir": "rtl",
+      "locale": "ar",
+      "viewport": "tablet",
+      "themeAttr": "light",
+      "dirAttr": "rtl",
+      "langAttr": "ar",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            27,
+            43,
+            61
+          ],
+          "contrast": 14.4,
+          "fontSize": 28,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(205, 216, 230)",
+          "surface": [
+            26,
+            42,
+            59
+          ],
+          "contrast": 10.17,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(232, 199, 102)",
+          "surface": [
+            25,
+            41,
+            59
+          ],
+          "contrast": 9,
+          "fontSize": 12.5,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(34, 32, 29)",
+          "surface": [
+            255,
+            255,
+            255
+          ],
+          "contrast": 16.25,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            23,
+            39,
+            57
+          ],
+          "contrast": 7.03,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            23,
+            39,
+            57
+          ],
+          "contrast": 15.11,
+          "fontSize": 22,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/light-rtl-tablet.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "light-rtl-desktop",
+      "theme": "light",
+      "dir": "rtl",
+      "locale": "ar",
+      "viewport": "desktop",
+      "themeAttr": "light",
+      "dirAttr": "rtl",
+      "langAttr": "ar",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            23,
+            38,
+            56
+          ],
+          "contrast": 15.26,
+          "fontSize": 38,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(205, 216, 230)",
+          "surface": [
+            23,
+            38,
+            57
+          ],
+          "contrast": 10.59,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(232, 199, 102)",
+          "surface": [
+            22,
+            38,
+            56
+          ],
+          "contrast": 9.37,
+          "fontSize": 12.5,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(34, 32, 29)",
+          "surface": [
+            255,
+            255,
+            255
+          ],
+          "contrast": 16.25,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            21,
+            37,
+            55
+          ],
+          "contrast": 7.24,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            21,
+            37,
+            55
+          ],
+          "contrast": 15.57,
+          "fontSize": 22,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-muted",
+          "ink": "rgb(90, 84, 75)",
+          "surface": [
+            255,
+            255,
+            254
+          ],
+          "contrast": 7.48,
+          "fontSize": 13,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/light-rtl-desktop.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "light-ltr-mobile",
+      "theme": "light",
+      "dir": "ltr",
+      "locale": "en",
+      "viewport": "mobile",
+      "themeAttr": "light",
+      "dirAttr": "ltr",
+      "langAttr": "en",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            30,
+            45,
+            62
+          ],
+          "contrast": 14,
+          "fontSize": 28,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(205, 216, 230)",
+          "surface": [
+            32,
+            47,
+            64
+          ],
+          "contrast": 9.45,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(232, 199, 102)",
+          "surface": [
+            29,
+            44,
+            61
+          ],
+          "contrast": 8.66,
+          "fontSize": 12.5,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(34, 32, 29)",
+          "surface": [
+            255,
+            255,
+            255
+          ],
+          "contrast": 16.25,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            26,
+            41,
+            59
+          ],
+          "contrast": 6.84,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            26,
+            41,
+            59
+          ],
+          "contrast": 14.7,
+          "fontSize": 22,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/light-ltr-mobile.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "light-ltr-tablet",
+      "theme": "light",
+      "dir": "ltr",
+      "locale": "en",
+      "viewport": "tablet",
+      "themeAttr": "light",
+      "dirAttr": "ltr",
+      "langAttr": "en",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            27,
+            43,
+            61
+          ],
+          "contrast": 14.41,
+          "fontSize": 28,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(205, 216, 230)",
+          "surface": [
+            26,
+            42,
+            60
+          ],
+          "contrast": 10.11,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(232, 199, 102)",
+          "surface": [
+            26,
+            41,
+            59
+          ],
+          "contrast": 8.97,
+          "fontSize": 12.5,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(34, 32, 29)",
+          "surface": [
+            255,
+            255,
+            255
+          ],
+          "contrast": 16.25,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            24,
+            39,
+            58
+          ],
+          "contrast": 6.99,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            24,
+            40,
+            58
+          ],
+          "contrast": 15.03,
+          "fontSize": 22,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/light-ltr-tablet.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "light-ltr-desktop",
+      "theme": "light",
+      "dir": "ltr",
+      "locale": "en",
+      "viewport": "desktop",
+      "themeAttr": "light",
+      "dirAttr": "ltr",
+      "langAttr": "en",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            23,
+            39,
+            58
+          ],
+          "contrast": 15.09,
+          "fontSize": 38,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(205, 216, 230)",
+          "surface": [
+            23,
+            39,
+            58
+          ],
+          "contrast": 10.49,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(232, 199, 102)",
+          "surface": [
+            23,
+            39,
+            57
+          ],
+          "contrast": 9.24,
+          "fontSize": 12.5,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(34, 32, 29)",
+          "surface": [
+            255,
+            255,
+            255
+          ],
+          "contrast": 16.25,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            21,
+            37,
+            56
+          ],
+          "contrast": 7.2,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(255, 255, 255)",
+          "surface": [
+            21,
+            37,
+            56
+          ],
+          "contrast": 15.49,
+          "fontSize": 22,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-muted",
+          "ink": "rgb(90, 84, 75)",
+          "surface": [
+            255,
+            255,
+            254
+          ],
+          "contrast": 7.48,
+          "fontSize": 13,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/light-ltr-desktop.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "dark-rtl-mobile",
+      "theme": "dark",
+      "dir": "rtl",
+      "locale": "ar",
+      "viewport": "mobile",
+      "themeAttr": "dark",
+      "dirAttr": "rtl",
+      "langAttr": "ar",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            7,
+            28,
+            47
+          ],
+          "contrast": 15.43,
+          "fontSize": 28,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            5,
+            27,
+            46
+          ],
+          "contrast": 8.11,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            7,
+            29,
+            48
+          ],
+          "contrast": 7.94,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            2,
+            31,
+            58
+          ],
+          "contrast": 14.94,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(119, 141, 161)",
+          "surface": [
+            2,
+            23,
+            43
+          ],
+          "contrast": 5.28,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            1,
+            22,
+            42
+          ],
+          "contrast": 16.4,
+          "fontSize": 22,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/dark-rtl-mobile.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "dark-rtl-tablet",
+      "theme": "dark",
+      "dir": "rtl",
+      "locale": "ar",
+      "viewport": "tablet",
+      "themeAttr": "dark",
+      "dirAttr": "rtl",
+      "langAttr": "ar",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            9,
+            30,
+            47
+          ],
+          "contrast": 15.19,
+          "fontSize": 28,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            8,
+            29,
+            46
+          ],
+          "contrast": 7.94,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            11,
+            32,
+            48
+          ],
+          "contrast": 7.74,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            2,
+            31,
+            58
+          ],
+          "contrast": 14.94,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(119, 141, 161)",
+          "surface": [
+            3,
+            23,
+            43
+          ],
+          "contrast": 5.25,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            1,
+            22,
+            42
+          ],
+          "contrast": 16.37,
+          "fontSize": 22,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/dark-rtl-tablet.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "dark-rtl-desktop",
+      "theme": "dark",
+      "dir": "rtl",
+      "locale": "ar",
+      "viewport": "desktop",
+      "themeAttr": "dark",
+      "dirAttr": "rtl",
+      "langAttr": "ar",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            13,
+            32,
+            45
+          ],
+          "contrast": 14.93,
+          "fontSize": 38,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            9,
+            29,
+            44
+          ],
+          "contrast": 8,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            17,
+            35,
+            47
+          ],
+          "contrast": 7.45,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            2,
+            31,
+            58
+          ],
+          "contrast": 14.94,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(119, 141, 161)",
+          "surface": [
+            1,
+            20,
+            39
+          ],
+          "contrast": 5.41,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            1,
+            20,
+            38
+          ],
+          "contrast": 16.71,
+          "fontSize": 22,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-muted",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            0,
+            15,
+            31
+          ],
+          "contrast": 8.97,
+          "fontSize": 13,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/dark-rtl-desktop.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "dark-ltr-mobile",
+      "theme": "dark",
+      "dir": "ltr",
+      "locale": "en",
+      "viewport": "mobile",
+      "themeAttr": "dark",
+      "dirAttr": "ltr",
+      "langAttr": "en",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            6,
+            28,
+            47
+          ],
+          "contrast": 15.46,
+          "fontSize": 28,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            5,
+            27,
+            46
+          ],
+          "contrast": 8.13,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            7,
+            29,
+            48
+          ],
+          "contrast": 7.96,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            2,
+            31,
+            58
+          ],
+          "contrast": 14.94,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(119, 141, 161)",
+          "surface": [
+            1,
+            23,
+            43
+          ],
+          "contrast": 5.29,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            1,
+            22,
+            43
+          ],
+          "contrast": 16.31,
+          "fontSize": 22,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/dark-ltr-mobile.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "dark-ltr-tablet",
+      "theme": "dark",
+      "dir": "ltr",
+      "locale": "en",
+      "viewport": "tablet",
+      "themeAttr": "dark",
+      "dirAttr": "ltr",
+      "langAttr": "en",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            4,
+            26,
+            46
+          ],
+          "contrast": 15.76,
+          "fontSize": 28,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            2,
+            25,
+            46
+          ],
+          "contrast": 8.28,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            3,
+            26,
+            47
+          ],
+          "contrast": 8.2,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            2,
+            31,
+            58
+          ],
+          "contrast": 14.94,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(119, 141, 161)",
+          "surface": [
+            1,
+            23,
+            44
+          ],
+          "contrast": 5.26,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            1,
+            23,
+            44
+          ],
+          "contrast": 16.23,
+          "fontSize": 22,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/dark-ltr-tablet.png",
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "cell": "dark-ltr-desktop",
+      "theme": "dark",
+      "dir": "ltr",
+      "locale": "en",
+      "viewport": "desktop",
+      "themeAttr": "dark",
+      "dirAttr": "ltr",
+      "langAttr": "en",
+      "measured": [
+        {
+          "selector": ".oryx-hero__title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            1,
+            24,
+            46
+          ],
+          "contrast": 16.1,
+          "fontSize": 38,
+          "min": 3
+        },
+        {
+          "selector": ".oryx-hero__lede",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            1,
+            23,
+            45
+          ],
+          "contrast": 8.37,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-eyebrow",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            1,
+            24,
+            46
+          ],
+          "contrast": 8.34,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-card-title",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            2,
+            31,
+            58
+          ],
+          "contrast": 14.94,
+          "fontSize": 16,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__label",
+          "ink": "rgb(119, 141, 161)",
+          "surface": [
+            0,
+            23,
+            44
+          ],
+          "contrast": 5.27,
+          "fontSize": 12,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-stat__value",
+          "ink": "rgb(238, 243, 249)",
+          "surface": [
+            0,
+            23,
+            44
+          ],
+          "contrast": 16.25,
+          "fontSize": 22,
+          "min": 4.5
+        },
+        {
+          "selector": ".oryx-muted",
+          "ink": "rgb(159, 179, 200)",
+          "surface": [
+            0,
+            16,
+            31
+          ],
+          "contrast": 8.93,
+          "fontSize": 13,
+          "min": 4.5
+        }
+      ],
+      "screenshot": "/workspace/project/oryx/docs/audit/exec07/phase-e-after/theme-matrix/dark-ltr-desktop.png",
+      "failures": [],
+      "warnings": []
+    }
+  ]
+}

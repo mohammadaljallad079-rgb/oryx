@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
@@ -62,6 +62,13 @@ export class OperationsController {
     return this.ops.updateProject(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('projects/:id')
+  @RequirePermissions('erp.operations.project.manage')
+  @ApiOperation({ summary: 'Delete a project that has no work orders' })
+  deleteProject(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.ops.deleteProject(id, p, actorFrom(p, req));
+  }
+
   // ------------------------------------------------------------------ tasks
   @Get('tasks')
   @RequireAnyPermission('erp.operations.read', 'erp.operations.task.manage')
@@ -82,6 +89,13 @@ export class OperationsController {
   @ApiOperation({ summary: 'Update a task' })
   updateTask(@Param('id') id: string, @Body() dto: UpdateTaskDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.ops.updateTask(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('tasks/:id')
+  @RequirePermissions('erp.operations.task.manage')
+  @ApiOperation({ summary: 'Delete a task and its subtasks' })
+  deleteTask(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.ops.deleteTask(id, p, actorFrom(p, req));
   }
 
   // ------------------------------------------------------------ work orders
@@ -127,6 +141,13 @@ export class OperationsController {
     return this.ops.toggleChecklist(id, dto.isDone, p, actorFrom(p, req));
   }
 
+  @Delete('work-orders/:id')
+  @RequirePermissions('erp.operations.work_order.manage')
+  @ApiOperation({ summary: 'Delete a work order that is not completed' })
+  deleteWorkOrder(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.ops.deleteWorkOrder(id, p, actorFrom(p, req));
+  }
+
   // -------------------------------------------------------------- approvals
   @Get('approvals')
   @RequireAnyPermission('erp.operations.read', 'erp.operations.approval.manage')
@@ -147,6 +168,13 @@ export class OperationsController {
   @ApiOperation({ summary: 'Approve or reject a request' })
   decideApproval(@Param('id') id: string, @Body() dto: DecideApprovalDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.ops.decideApproval(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('approvals/:id')
+  @RequirePermissions('erp.operations.approval.manage')
+  @ApiOperation({ summary: 'Delete an approval request' })
+  deleteApproval(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.ops.deleteApproval(id, p, actorFrom(p, req));
   }
 
   // -------------------------------------------------- comments & attachments
@@ -193,6 +221,13 @@ export class OperationsController {
     return this.ops.createCalendarEvent(dto, p, actorFrom(p, req));
   }
 
+  @Delete('calendar/:id')
+  @RequirePermissions('erp.operations.work_order.manage')
+  @ApiOperation({ summary: 'Delete a calendar event' })
+  deleteEvent(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.ops.deleteCalendarEvent(id, p, actorFrom(p, req));
+  }
+
   // ---------------------------------------------------------- notifications
   @Get('notifications')
   @ApiOperation({ summary: 'List the current user notifications' })
@@ -211,6 +246,12 @@ export class OperationsController {
   @ApiOperation({ summary: 'Send an internal notification' })
   createNotification(@Body() dto: CreateNotificationDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.ops.createNotification(dto, p, actorFrom(p, req));
+  }
+
+  @Delete('notifications/:id')
+  @ApiOperation({ summary: 'Delete one of the current user notifications' })
+  deleteNotification(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.ops.deleteNotification(id, p);
   }
 
   // ---------------------------------------------------------------- reporting

@@ -14,6 +14,7 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   TableShell,
@@ -26,14 +27,14 @@ function SupportPageInner() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="support-page">
+    <div className="flex flex-col gap-4" data-testid="support-page">
       <SectionHeader
         title={t('support.title')}
         subtitle={t('support.subtitle')}
         actions={
           <>
             <Button size="sm" onClick={() => void sessions.reload()}>
-              <Icon name="search" size={15} />
+              <Icon name="refresh" size={15} />
               {t('common.refresh')}
             </Button>
             <Button variant="primary" onClick={() => setOpen(true)} data-testid="open-support">
@@ -208,19 +209,16 @@ function OpenSupportModal({
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('context.company')} required>
-              <select
-                className="oryx-select"
-                value={form.companyId}
-                onChange={(e) => setForm({ ...form, companyId: e.target.value })}
-                data-testid="support-company"
-              >
-                <option value="">—</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {locale === 'ar' ? c.nameAr : c.nameEn}
-                  </option>
-                ))}
-              </select>
+              <SearchableSelect
+                value={form.companyId || null}
+                options={companies.map((c) => ({
+                  value: c.id,
+                  label: locale === 'ar' ? c.nameAr : c.nameEn,
+                }))}
+                onChange={(v) => setForm({ ...form, companyId: v ?? '' })}
+                placeholder={t('common.select')}
+                testId="support-company"
+              />
             </Field>
             <Field label={t('support.duration')}>
               <input

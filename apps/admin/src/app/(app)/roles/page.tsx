@@ -40,7 +40,7 @@ export default function RolesPage() {
 
 function RolesInner() {
   const { t, locale } = useUi();
-  const { companyId, can } = useAuth();
+  const { companyId, can, isPlatform } = useAuth();
   const params = useSearchParams();
   const scopeCompanyId = params.get('companyId') ?? companyId;
 
@@ -61,6 +61,13 @@ function RolesInner() {
   const [creating, setCreating] = useState(false);
 
   const delegableSet = useMemo(() => new Set(delegable.data?.permissions ?? []), [delegable.data]);
+  // Seeded system roles carry a bilingual description; custom roles fall back to
+  // the free-text English description the tenant supplied.
+  const roleDescription = (role: RoleDto): string => {
+    const key = `roles.description.${role.code}`;
+    const seeded = t(key);
+    return seeded === key ? role.descriptionEn ?? '' : seeded;
+  };
   const catalogByCode = useMemo(() => {
     const map = new Map<string, CatalogPermission>();
     for (const p of catalog.data?.permissions ?? []) map.set(p.code, p);
@@ -69,7 +76,7 @@ function RolesInner() {
 
   if (!scopeCompanyId) {
     return (
-      <div className="flex flex-col gap-5" data-testid="roles-page">
+      <div className="flex flex-col gap-4" data-testid="roles-page">
         <SectionHeader title={t('roles.title')} subtitle={t('roles.subtitle')} />
         <Card>
           <EmptyState title={t('common.selectCompany')} />
@@ -81,14 +88,14 @@ function RolesInner() {
   const canCreate = can('company.role.create') || can('platform.company.update');
 
   return (
-    <div className="flex flex-col gap-5" data-testid="roles-page">
+    <div className="flex flex-col gap-4" data-testid="roles-page">
       <SectionHeader
         title={t('roles.title')}
         subtitle={t('roles.subtitle')}
         actions={
           <>
             <Button size="sm" onClick={() => void roles.reload()}>
-              <Icon name="search" size={15} />
+              <Icon name="refresh" size={15} />
               {t('common.refresh')}
             </Button>
             {canCreate ? (
@@ -107,7 +114,7 @@ function RolesInner() {
         {roles.loading
           ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} height={170} />)
           : (roles.data ?? []).map((r) => (
-              <Card key={r.id} className="p-5" data-testid={`role-card-${r.code}`}>
+              <Card key={r.id} className="p-4" data-testid={`role-card-${r.code}`}>
                 <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="oryx-panel-title m-0">{locale === 'ar' ? r.nameAr : r.nameEn}</p>
@@ -123,7 +130,7 @@ function RolesInner() {
                   </div>
                 </div>
 
-                <p className="oryx-muted m-0 mb-3 text-[12px]">{r.descriptionEn ?? ''}</p>
+                <p className="oryx-muted m-0 mb-3 text-[12px]">{roleDescription(r)}</p>
 
                 <div className="mb-3 flex flex-wrap gap-1">
                   {r.permissions.slice(0, 10).map((p) => {
@@ -150,7 +157,7 @@ function RolesInner() {
                   <Badge tone="neutral">
                     {r.permissions.length} {t('roles.permissionCount')}
                   </Badge>
-                  {!r.isSystem && can('company.role.update') ? (
+                  {(isPlatform || !r.isSystem) && (isPlatform || can('company.role.update')) ? (
                     <Button size="sm" onClick={() => setEditing(r)} data-testid={`edit-role-${r.code}`}>
                       {t('common.edit')}
                     </Button>
@@ -162,8 +169,8 @@ function RolesInner() {
             ))}
       </div>
 
-      <Card className="p-5" data-testid="permission-catalog">
-        <p className="oryx-panel-title m-0 mb-1">Permission catalog</p>
+      <Card className="p-4" data-testid="permission-catalog">
+        <p className="oryx-panel-title m-0 mb-1">{t('roles.catalogTitle')}</p>
         <p className="oryx-muted m-0 mb-4 text-[12px]">
           {locale === 'ar'
             ? 'كل صلاحية تُقيَّم على الخادم. الصلاحيات المرتبطة بوحدة غير مرخصة تُعطَّل تلقائياً.'
@@ -272,16 +279,16 @@ function RoleEditor({
       const permissions = [...selected];
       if (role) {
         await api.updateRole(role.id, {
-          nameEn: form.nameEn,
-          nameAr: form.nameAr,
+          nameEn: form.nameEn.trim() || form.nameAr.trim(),
+          nameAr: form.nameAr.trim() || form.nameEn.trim(),
           descriptionEn: form.descriptionEn || undefined,
           permissions,
         });
       } else {
         await api.createRole(companyId, {
-          code: form.code,
-          nameEn: form.nameEn,
-          nameAr: form.nameAr,
+          code: '',
+          nameEn: form.nameEn.trim() || form.nameAr.trim(),
+          nameAr: form.nameAr.trim() || form.nameEn.trim(),
           descriptionEn: form.descriptionEn || undefined,
           permissions,
         });
@@ -304,7 +311,7 @@ function RoleEditor({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr || (!role && !form.code)}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())}
             onClick={submit}
             data-testid="save-role"
           >
@@ -328,13 +335,14 @@ function RoleEditor({
           <Field label={t('common.code')} required>
             <input
               className="oryx-input"
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value })}
+              value=""
+              readOnly
+              placeholder="Automatic / تلقائي"
               data-testid="role-code"
             />
           </Field>
         ) : null}
-        <Field label={`${t('common.name')} (EN)`} required>
+        <Field label={`${t('common.name')} (EN)`}>
           <input
             className="oryx-input"
             value={form.nameEn}
@@ -342,7 +350,7 @@ function RoleEditor({
             data-testid="role-name-en"
           />
         </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
+        <Field label={`${t('common.name')} (AR)`}>
           <input
             className="oryx-input"
             value={form.nameAr}

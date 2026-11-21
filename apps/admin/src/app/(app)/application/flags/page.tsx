@@ -27,14 +27,14 @@ function FeatureFlagsPageInner() {
   const [creating, setCreating] = useState(false);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="feature-flags-page">
+    <div className="flex flex-col gap-4" data-testid="feature-flags-page">
       <SectionHeader
         title={t('app.flags')}
         subtitle={t('app.subtitle')}
         actions={
           <>
             <Button size="sm" onClick={() => void flags.reload()}>
-              <Icon name="search" size={15} />
+              <Icon name="refresh" size={15} />
               {t('common.refresh')}
             </Button>
             <Button variant="primary" onClick={() => setCreating(true)} data-testid="new-flag">

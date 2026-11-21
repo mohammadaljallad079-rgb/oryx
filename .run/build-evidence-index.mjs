@@ -1,0 +1,134 @@
+/**
+ * Builds a self-contained HTML index of the Phase C screenshots so the owner
+ * can review the actual rendered pages in a browser, grouped by page with
+ * desktop / tablet / mobile and both locales side by side.
+ *
+ * Run with: node .run/build-evidence-index.mjs
+ */
+import { readdirSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+
+const ROOT = '/workspace/project/oryx';
+const SRC = `${ROOT}/docs/audit/exec07/phase-c/after`;
+const OUT_DIR = `${ROOT}/.run/evidence/exec07-phase-c`;
+const manifest = JSON.parse(await import('node:fs').then((fs) =>
+  fs.readFileSync(`${SRC}/manifest.json`, 'utf8'),
+));
+
+// One entry per route; each route has desktop/tablet/mobile and en/ar variants.
+const byRoute = new Map();
+for (const shot of manifest) {
+  const key = shot.route;
+  if (!byRoute.has(key)) byRoute.set(key, []);
+  byRoute.get(key).push(shot);
+}
+
+const files = new Set(readdirSync(OUT_DIR));
+const label = (route) =>
+  ({
+    '/': 'Public homepage',
+    '/services': 'Service categories',
+    '/providers': 'Provider directory',
+    '/providers/apply': 'Provider application',
+    '/login': 'Sign in',
+    '/register': 'Register',
+    '/forgot-password': 'Forgot password',
+    '/reset-password': 'Reset password',
+    '/dashboard': 'Customer dashboard',
+    '/garage': 'My garage',
+    '/bookings': 'Bookings',
+    '/invoices': 'Invoices & payments',
+    '/support': 'Support',
+    '/notifications': 'Notifications',
+    '/profile': 'Profile & addresses',
+  })[route] ?? route;
+
+function card(route, width) {
+  const name = `${route === '/' ? 'home' : route.replace(/^\//, '').replace(/\//g, '-')}-${width}.png`;
+  if (!files.has(name)) return '';
+  const alts = [`${name.replace(/\.png$/, '')}`];
+  const ar = name.replace(`-${width}.png`, `-${width}.png`);
+  return `
+    <figure class="shot">
+      <a href="${name}" target="_blank" rel="noopener">
+        <img src="${name}" alt="${route} at ${width}" loading="lazy" />
+      </a>
+      <figcaption>${width}</figcaption>
+    </figure>`;
+}
+
+const sections = [];
+for (const [route, shots] of byRoute) {
+  const widths = ['desktop', 'tablet', 'mobile'];
+  const cards = widths.map((w) => card(route, w)).join('');
+  if (!cards.trim()) continue;
+  const meta = shots[0];
+  sections.push(`
+    <section>
+      <h2>${label(route)} <code>${route}</code></h2>
+      <p class="meta">${shots.length} captures · HTTP ${meta.status} · overflow ${meta.overflow}px</p>
+      <div class="grid">${cards}</div>
+    </section>`);
+}
+
+const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ORYX — Execution 07 Phase C evidence</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 24px 64px;
+    background: #00162b; color: #e8edf4;
+    font: 15px/1.6 system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  header { max-width: 1400px; margin: 0 auto 32px; }
+  h1 { font-size: 26px; margin: 0 0 8px; }
+  .lede { color: #9fb2c8; max-width: 70ch; margin: 0; }
+  .stats { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 20px; }
+  .stat {
+    padding: 12px 18px; border-radius: 12px; background: #0b2439;
+    border: 1px solid #1d3a55;
+  }
+  .stat b { display: block; font-size: 22px; color: #d8b158; }
+  .stat span { font-size: 12px; color: #9fb2c8; text-transform: uppercase; letter-spacing: .08em; }
+  section { max-width: 1400px; margin: 0 auto 44px; }
+  h2 { font-size: 18px; margin: 0 0 4px; }
+  h2 code { color: #d8b158; font-size: 14px; font-weight: 500; }
+  .meta { color: #7f95ad; font-size: 13px; margin: 0 0 16px; }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .shot { margin: 0; }
+  .shot img {
+    width: 100%; display: block; border-radius: 10px;
+    border: 1px solid #1d3a55; background: #0b2439;
+  }
+  figcaption { font-size: 12px; color: #7f95ad; margin-top: 6px; text-transform: capitalize; }
+  footer { max-width: 1400px; margin: 0 auto; color: #7f95ad; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ORYX — Execution 07 Phase C evidence</h1>
+  <p class="lede">
+    Every customer web surface, captured from the live staging preview over public
+    HTTPS at desktop (1440px), tablet (834px) and mobile (390px) widths. These are
+    real renders of the running platform, not mockups.
+  </p>
+  <div class="stats">
+    <div class="stat"><b>${manifest.length}</b><span>captures</span></div>
+    <div class="stat"><b>${byRoute.size}</b><span>routes</span></div>
+    <div class="stat"><b>${manifest.filter((m) => m.overflow > 1).length}</b><span>overflow defects</span></div>
+    <div class="stat"><b>${manifest.filter((m) => m.status >= 400).length}</b><span>non-200 responses</span></div>
+  </div>
+</header>
+${sections.join('\n')}
+<footer>Generated by <code>.run/build-evidence-index.mjs</code> from <code>docs/audit/exec07/phase-c/after/manifest.json</code>.</footer>
+</body>
+</html>
+`;
+
+mkdirSync(OUT_DIR, { recursive: true });
+writeFileSync(`${OUT_DIR}/index.html`, html);
+console.log(`wrote ${OUT_DIR}/index.html (${sections.length} sections, ${manifest.length} captures)`);

@@ -27,7 +27,10 @@ interface BookingRow {
   startsAt: string;
   durationMinutes: number;
   resource?: { code: string; nameEn: string; nameAr: string } | null;
-  customerAccount?: { fullName: string; email: string } | null;
+  customerAccount?: { fullName: string; email: string; phone?: string | null } | null;
+  guestName?: string | null;
+  guestPhone?: string | null;
+  guestEmail?: string | null;
   vehicle?: { make: string; model: string; vin: string } | null;
 }
 
@@ -72,7 +75,7 @@ export default function BookingsPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="bookings-page">
+    <div className="flex flex-col gap-4" data-testid="bookings-page">
       <SectionHeader
         title={t('nav.booking_engine')}
         subtitle={t('erp.booking.subtitle')}
@@ -138,7 +141,7 @@ export default function BookingsPage() {
                     <td className="text-[12.5px]">{new Date(b.startsAt).toLocaleString()}</td>
                     <td className="text-[12.5px]">{b.bookingType}</td>
                     <td className="text-[12.5px]">{b.resource?.nameEn ?? '—'}</td>
-                    <td className="text-[12.5px]">{b.customerAccount?.fullName ?? '—'}</td>
+                    <td className="text-[12.5px]">{b.customerAccount?.fullName || b.guestName || '—'}</td>
                     <td className="tabular-nums text-[12.5px]">{b.durationMinutes}</td>
                     <td><StatusBadge status={b.status} label={b.status} /></td>
                     <td className="text-end">
@@ -295,10 +298,10 @@ function ResourcesTab({ canManage }: { canManage: boolean }) {
           </Field>
           <Field label={t('erp.booking.kind')} required>
             <select className="oryx-select" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} data-testid="resource-kind">
-              <option value="BAY">BAY</option>
-              <option value="LIFT">LIFT</option>
-              <option value="TECHNICIAN">TECHNICIAN</option>
-              <option value="PROVIDER">PROVIDER</option>
+              <option value="BAY">{t('erp.booking.kindBay')}</option>
+              <option value="LIFT">{t('erp.booking.kindLift')}</option>
+              <option value="TECHNICIAN">{t('erp.booking.kindTechnician')}</option>
+              <option value="PROVIDER">{t('erp.booking.kindProvider')}</option>
             </select>
           </Field>
           <Field label={t('erp.booking.nameEn')} required>
@@ -327,7 +330,7 @@ function BookingModal({
   canManage: boolean;
   onClose: () => void;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const detail = useAsync(() => (id ? api.booking(id) : Promise.resolve(null)), [id]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -361,6 +364,30 @@ function BookingModal({
             <Detail label={t('erp.booking.when')} value={new Date(String(booking.startsAt)).toLocaleString()} />
             <Detail label={t('erp.booking.duration')} value={`${String(booking.durationMinutes)} ${t('erp.customerPlatform.minutes')}`} />
             <Detail label={t('erp.booking.serviceRef')} value={String(booking.serviceRef ?? '—')} />
+            {typeof booking.guestName === 'string' && booking.guestName ? (
+              <Detail label={t('erp.booking.customer')} value={booking.guestName} />
+            ) : null}
+            {typeof booking.guestPhone === 'string' && booking.guestPhone ? (
+              <Detail label={locale === 'ar' ? 'هاتف العميل' : 'Customer phone'} value={booking.guestPhone} />
+            ) : null}
+            {typeof booking.guestEmail === 'string' && booking.guestEmail ? (
+              <Detail label={locale === 'ar' ? 'بريد العميل' : 'Customer email'} value={booking.guestEmail} />
+            ) : null}
+            {booking.customerAccount && typeof booking.customerAccount === 'object' ? (
+              <>
+                <Detail label={t('erp.booking.customer')} value={String((booking.customerAccount as Record<string, unknown>).fullName ?? '—')} />
+                <Detail label="Email" value={String((booking.customerAccount as Record<string, unknown>).email ?? '—')} />
+                {(booking.customerAccount as Record<string, unknown>).phone ? (
+                  <Detail label="Phone" value={String((booking.customerAccount as Record<string, unknown>).phone)} />
+                ) : null}
+              </>
+            ) : null}
+            {booking.vehicle && typeof booking.vehicle === 'object' ? (
+              <Detail label="Vehicle" value={[String((booking.vehicle as Record<string, unknown>).make ?? ''), String((booking.vehicle as Record<string, unknown>).model ?? ''), String((booking.vehicle as Record<string, unknown>).vin ?? '')].filter(Boolean).join(' · ') || '—'} />
+            ) : null}
+            {typeof booking.notes === 'string' && booking.notes ? (
+              <Detail label="Notes" value={booking.notes} />
+            ) : null}
           </div>
           {canManage ? (
             <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">

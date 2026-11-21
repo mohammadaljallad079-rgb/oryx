@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
@@ -15,12 +15,17 @@ import {
   CreateCashierSessionDto,
   CreateCreditNoteDto,
   CreateCustomerDto,
+  CustomerListQueryDto,
   CreateInvoiceDto,
   CreatePosSaleDto,
   CreateQuotationDto,
   CreateSalesOrderDto,
+  CustomerAttachmentDto,
+  CustomerBranchDto,
+  UpdateCustomerBranchDto,
   ListQueryDto,
   UpdateCustomerDto,
+  UpdateInvoiceDto,
 } from './sales.dto';
 
 interface RequestLike {
@@ -39,7 +44,7 @@ export class SalesController {
   @Get('customers')
   @RequireAnyPermission('erp.sales.read', 'erp.sales.customer.manage')
   @ApiOperation({ summary: 'List customers' })
-  customers(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+  customers(@Query() query: CustomerListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
     return this.sales.listCustomers(query, p);
   }
 
@@ -48,6 +53,88 @@ export class SalesController {
   @ApiOperation({ summary: 'Create a customer' })
   createCustomer(@Body() dto: CreateCustomerDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.sales.createCustomer(dto, p, actorFrom(p, req));
+  }
+
+  @Get('customers/:id')
+  @RequireAnyPermission('erp.sales.read', 'erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Read one customer with its history' })
+  getCustomer(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.sales.getCustomer(id, p);
+  }
+
+  @Get('customers/:id/attachments')
+  @RequireAnyPermission('erp.sales.read', 'erp.sales.customer.manage')
+  @ApiOperation({ summary: 'List a customer attachments' })
+  customerAttachments(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.sales.listCustomerAttachments(id, p);
+  }
+
+  @Post('customers/:id/attachments')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Attach a document reference to a customer' })
+  addCustomerAttachment(
+    @Param('id') id: string,
+    @Body() dto: CustomerAttachmentDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.addCustomerAttachment(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('customers/:id/attachments/:attachmentId')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Remove a customer attachment' })
+  removeCustomerAttachment(
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.removeCustomerAttachment(id, attachmentId, p, actorFrom(p, req));
+  }
+
+  @Get('customers/:id/branches')
+  @RequireAnyPermission('erp.sales.read', 'erp.sales.customer.manage')
+  @ApiOperation({ summary: 'List a company customer secondary branches' })
+  customerBranches(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.sales.listCustomerBranches(id, p);
+  }
+
+  @Post('customers/:id/branches')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Add a secondary branch to a company customer' })
+  createCustomerBranch(
+    @Param('id') id: string,
+    @Body() dto: CustomerBranchDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.createCustomerBranch(id, dto, p, actorFrom(p, req));
+  }
+
+  @Post('customers/:id/branches/:branchId')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Update a secondary branch' })
+  updateCustomerBranch(
+    @Param('id') id: string,
+    @Param('branchId') branchId: string,
+    @Body() dto: UpdateCustomerBranchDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.updateCustomerBranch(id, branchId, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('customers/:id/branches/:branchId')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Remove a secondary branch' })
+  deleteCustomerBranch(
+    @Param('id') id: string,
+    @Param('branchId') branchId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.deleteCustomerBranch(id, branchId, p, actorFrom(p, req));
   }
 
   @Post('customers/:id')
@@ -60,6 +147,13 @@ export class SalesController {
     @Req() req: RequestLike,
   ) {
     return this.sales.updateCustomer(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('customers/:id')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Delete a customer that carries no commercial history' })
+  deleteCustomer(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.sales.deleteCustomer(id, p, actorFrom(p, req));
   }
 
   // -------------------------------------------------------------- quotations
@@ -87,6 +181,18 @@ export class SalesController {
     @Req() req: RequestLike,
   ) {
     return this.sales.convertQuotation(id, dto, p, actorFrom(p, req));
+  }
+
+  @Post('quotations/:id/convert-to-invoice')
+  @RequirePermissions('erp.sales.invoice.manage')
+  @ApiOperation({ summary: 'Convert a quotation into a draft sales invoice awaiting approval' })
+  convertQuotationToDraftInvoice(
+    @Param('id') id: string,
+    @Body() dto: ConvertQuotationDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.convertQuotationToDraftInvoice(id, dto, p, actorFrom(p, req));
   }
 
   // ------------------------------------------------------------ sales orders
@@ -117,6 +223,25 @@ export class SalesController {
   @ApiOperation({ summary: 'Sales invoice detail' })
   invoice(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
     return this.sales.getInvoice(id, p);
+  }
+
+  @Post('invoices/:id')
+  @RequirePermissions('erp.sales.invoice.manage')
+  @ApiOperation({ summary: 'Update a draft sales invoice' })
+  updateInvoice(
+    @Param('id') id: string,
+    @Body() dto: UpdateInvoiceDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.updateInvoice(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('invoices/:id')
+  @RequirePermissions('erp.sales.invoice.manage')
+  @ApiOperation({ summary: 'Delete an unposted draft sales invoice' })
+  deleteInvoice(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.sales.deleteInvoice(id, p, actorFrom(p, req));
   }
 
   @Post('invoices')

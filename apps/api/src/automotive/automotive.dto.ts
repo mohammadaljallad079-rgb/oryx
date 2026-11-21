@@ -1,6 +1,8 @@
 import { Type } from 'class-transformer';
+import { VEHICLE_DOCUMENT_CATEGORIES, INSPECTION_SECTION_KEYS } from '@oryx/shared';
 import {
   ArrayMinSize,
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -8,6 +10,7 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -23,6 +26,29 @@ export class ListQueryDto {
   @IsOptional() @IsString() branchId?: string;
   @IsOptional() @IsString() customerId?: string;
   @IsOptional() @IsString() vehicleId?: string;
+  @IsOptional() @IsString() productId?: string;
+}
+
+/**
+ * Reserved-stock lookup. The base list query carries no warehouse filter, and
+ * `forbidNonWhitelisted` rejects any property a DTO does not declare, so the
+ * warehouse filter needs an explicit optional field here.
+ */
+export class ReservedStockQueryDto extends ListQueryDto {
+  @IsOptional() @IsString() warehouseId?: string;
+}
+
+/**
+ * Parts-compatibility lookup. The make, model and year all come from the query
+ * string, so each needs a validator: without one the handler coerced a missing
+ * or non-numeric `year` into `NaN` and handed it to a Prisma numeric filter,
+ * which raised a 500 instead of a 400.
+ */
+export class CompatiblePartsQueryDto {
+  @IsString() @MinLength(1) @MaxLength(80) make!: string;
+  @IsString() @MinLength(1) @MaxLength(80) model!: string;
+  @Type(() => Number) @IsInt() @Min(1900) @Max(2100) year!: number;
+  @IsOptional() @IsString() companyId?: string;
 }
 
 // ------------------------------------------------------------------ vehicles
@@ -58,22 +84,49 @@ export class RecordMileageDto {
 }
 
 export class VehicleDocumentDto {
-  @IsString() @MinLength(2) @MaxLength(80) category!: string;
+  @IsIn(VEHICLE_DOCUMENT_CATEGORIES as unknown as string[])
+  category!: string;
   @IsOptional() @IsString() @MaxLength(80) number?: string;
   @IsOptional() @IsISO8601() expiresAt?: string;
-  @IsOptional() @IsString() @MaxLength(400) fileRef?: string;
+}
+
+/**
+ * The OCR extraction request. It carries the same category the eventual
+ * document will hold, so the adapter knows what kind of paper it is reading,
+ * but no field values: extraction only suggests, it never saves.
+ */
+export class OcrExtractDto {
+  @IsIn(VEHICLE_DOCUMENT_CATEGORIES as unknown as string[])
+  category!: string;
 }
 
 // --------------------------------------------------------------- inspections
 
 export class CreateInspectionServiceDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(160) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(600) description?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) priceMinor?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) taxPercentBp?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) durationMinutes?: number;
+  /** Optional media-library asset id to show as the service picture. */
+  @IsOptional() @IsString() @MaxLength(40) imageAssetId?: string | null;
+}
+
+export class UpdateInspectionServiceDto {
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(160) nameAr?: string;
+  @IsOptional() @IsString() @MaxLength(600) description?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) priceMinor?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) taxPercentBp?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) durationMinutes?: number;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+  /**
+   * The media-library asset id to show as the service picture. An empty string
+   * clears the picture; a string links the stored asset.
+   */
+  @IsOptional() @IsString() @MaxLength(40) imageAssetId?: string | null;
 }
 
 export class CreateChecklistItemDto {
@@ -84,9 +137,25 @@ export class CreateChecklistItemDto {
   @IsString() @MinLength(1) @MaxLength(60) category!: string;
 }
 
+export class ApprovedInspectionServicePriceDto {
+  @IsIn(INSPECTION_SECTION_KEYS as unknown as string[]) area!: string;
+  @Type(() => Number) @IsInt() @Min(1) priceMinor!: number;
+  @Type(() => Number) @IsInt() @Min(0) @Max(10000) taxPercentBp!: number;
+  @Type(() => Number) @IsInt() @Min(1) durationMinutes!: number;
+}
+
+export class ReplaceInspectionServicesDto {
+  @IsArray() @ArrayMinSize(7) @ArrayMaxSize(7)
+  @ValidateNested({ each: true }) @Type(() => ApprovedInspectionServicePriceDto)
+  services!: ApprovedInspectionServicePriceDto[];
+}
+
 export class CreateInspectionBookingDto {
   @IsString() vehicleId!: string;
+  /** Backward compatible primary service. */
   @IsString() serviceId!: string;
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(7) @IsString({ each: true })
+  serviceIds?: string[];
   @IsOptional() @IsString() branchId?: string;
   @IsISO8601() scheduledAt!: string;
   @IsOptional() @IsString() inspectorUserId?: string;
@@ -135,9 +204,9 @@ export class InvoiceInspectionDto {
 // -------------------------------------------------------------- maintenance
 
 export class CreateWorkshopBayDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
   @IsOptional() @IsString() branchId?: string;
 }
 
@@ -261,9 +330,9 @@ export class CreateCompatibilityDto {
 // --------------------------------------------------------------- marketplace
 
 export class CreateProviderDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(80) categoryKey?: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
@@ -278,8 +347,8 @@ export class ApproveProviderDto {
 
 export class CreateListingDto {
   @IsString() @MinLength(1) @MaxLength(80) categoryKey!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(200) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(1000) description?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) priceMinor?: number;
 }

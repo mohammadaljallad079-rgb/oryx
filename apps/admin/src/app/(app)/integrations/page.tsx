@@ -148,13 +148,13 @@ function IntegrationsPageInner() {
   const summary = center.data?.summary;
 
   return (
-    <div className="flex flex-col gap-5" data-testid="integrations-page">
+    <div className="flex flex-col gap-4" data-testid="integrations-page">
       <SectionHeader
         title={t('integration.title')}
         subtitle={t('integration.subtitle')}
         actions={
           <Button size="sm" onClick={() => void center.reload()}>
-            <Icon name="search" size={15} />
+            <Icon name="refresh" size={15} />
             {t('common.refresh')}
           </Button>
         }

@@ -1,0 +1,16 @@
+10-27 00:12:52.093 W/unknown:BridgelessReact( 9452): ReactHost{0}.startSurface(surfaceId = 0): Schedule
+10-27 00:12:52.094 W/unknown:BridgelessReact( 9452): ReactHost{0}.attachSurface(surfaceId = 0)
+10-27 00:12:52.181 W/unknown:BridgelessReact( 9452): ReactHost{0}.getOrCreateReactInstanceTask()
+10-27 00:12:52.181 W/unknown:BridgelessReact( 9452): ReactHost{0}.getOrCreateReactInstanceTask(): Start
+10-27 00:12:52.182 W/unknown:BridgelessReact( 9452): ReactHost{0}.getJSBundleLoader()
+10-27 00:12:52.282 W/unknown:BridgelessReact( 9452): ReactHost{0}.getOrCreateReactContext(): Creating BridgelessReactContext
+10-27 00:12:52.318 W/unknown:BridgelessReact( 9452): ReactHost{0}.getOrCreateReactInstanceTask(): Creating ReactInstance
+10-27 00:12:52.619 W/unknown:BridgelessReact( 9452): ReactHost{0}.onHostResume(activity)
+10-27 00:12:52.622 W/unknown:BridgelessReact( 9452): ReactContext.onHostResume()
+10-27 00:12:58.671 W/unknown:BridgelessReact( 9452): ReactHost{0}.getOrCreateReactInstanceTask(): Loading JS Bundle
+10-27 00:12:58.804 W/unknown:BridgelessReact( 9452): ReactHost{0}.getOrCreateReactInstanceTask(): Calling DevSupportManagerBase.onNewReactContextCreated(reactContext)
+10-27 00:12:58.898 W/unknown:BridgelessReact( 9452): ReactContext.onHostResume()
+10-27 00:12:58.898 W/unknown:BridgelessReact( 9452): ReactHost{0}.getOrCreateReactInstanceTask(): Executing ReactInstanceEventListeners
+10-27 00:12:58.910 W/unknown:BridgelessReact( 9452): ReactHost{0}.startSurface(surfaceId = 0): Execute
+10-27 00:13:05.414 W/BridgelessReactContext( 9452): [WARNING] Bridgeless doesn't support CatalystInstance. Accessing an API that's not part of the new architecture is not encouraged usage.
+10-27 00:13:07.698 I/ReactNativeJS( 9452): Running "main"

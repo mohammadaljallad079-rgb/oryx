@@ -1,5 +1,6 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
-import { lineAmountMinor, sumMinor } from '@oryx/shared';
+import { hoursAmountMinor, hoursToQuantity, sumMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService } from '../common/accounting-posting.service';
@@ -30,6 +31,7 @@ import type {
   InvoiceJobCardDto,
   IssueReservationDto,
   ListQueryDto,
+  ReservedStockQueryDto,
   UpdateJobCardDto,
   UpdateMaintenanceBookingDto,
   UpdateServiceRequestDto,
@@ -65,6 +67,62 @@ export class WorkshopService {
 
   // ------------------------------------------------------------------ bays
 
+  /**
+   * The workshop dashboard: live counts for the workshop landing screen.
+   *
+   * Every figure is a count from the tenant's own rows, so the screen shows
+   * what the database holds rather than a cached total. `openJobCards` counts
+   * the states that still need workshop attention, which is the number an
+   * operator acts on, not the lifetime total.
+   */
+  async dashboard(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const [
+      bays,
+      activeBays,
+      jobCards,
+      openJobCards,
+      awaitingApproval,
+      completedJobCards,
+      invoicedJobCards,
+      bookings,
+      scheduledBookings,
+      reservations,
+      outstandingReservations,
+      warranties,
+      activeWarranties,
+    ] = await Promise.all([
+      this.prisma.workshopBay.count({ where: { companyId } }),
+      this.prisma.workshopBay.count({ where: { companyId, isActive: true } }),
+      this.prisma.jobCard.count({ where: { companyId } }),
+      this.prisma.jobCard.count({ where: { companyId, status: { in: ['OPEN', 'AWAITING_APPROVAL', 'APPROVED', 'IN_PROGRESS'] } } }),
+      this.prisma.jobCard.count({ where: { companyId, status: 'AWAITING_APPROVAL' } }),
+      this.prisma.jobCard.count({ where: { companyId, status: 'COMPLETED' } }),
+      this.prisma.jobCard.count({ where: { companyId, status: 'INVOICED' } }),
+      this.prisma.maintenanceBooking.count({ where: { companyId } }),
+      this.prisma.maintenanceBooking.count({ where: { companyId, status: { in: ['REQUESTED', 'SCHEDULED', 'IN_PROGRESS'] } } }),
+      this.prisma.partsReservation.count({ where: { companyId } }),
+      this.prisma.partsReservation.count({ where: { companyId, status: { in: ['RESERVED', 'PARTIALLY_ISSUED'] } } }),
+      this.prisma.warrantyRecord.count({ where: { companyId } }),
+      this.prisma.warrantyRecord.count({ where: { companyId, isActive: true } }),
+    ]);
+    return {
+      bays,
+      activeBays,
+      jobCards,
+      openJobCards,
+      awaitingApproval,
+      completedJobCards,
+      invoicedJobCards,
+      bookings,
+      scheduledBookings,
+      reservations,
+      outstandingReservations,
+      warranties,
+      activeWarranties,
+    };
+  }
+
   async listBays(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.workshopBay.findMany({ where: { companyId }, orderBy: { code: 'asc' } });
@@ -72,11 +130,15 @@ export class WorkshopService {
   }
 
   async createBay(dto: CreateWorkshopBayDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'BAY');
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Name required in Arabic or English.');
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
-    const dup = await this.prisma.workshopBay.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Bay ${dto.code} already exists.`);
-    const bay = await this.prisma.workshopBay.create({ data: { companyId, branchId: dto.branchId ?? null, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr } });
+    const dup = await this.prisma.workshopBay.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Bay ${code} already exists.`);
+    const bay = await this.prisma.workshopBay.create({ data: { companyId, branchId: dto.branchId ?? null, code: code, ...names } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.bay_created', targetType: 'WORKSHOP_BAY', targetId: bay.id, summary: `Created bay ${bay.code}` });
     return bay;
   }
@@ -143,18 +205,87 @@ export class WorkshopService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.status ? { status: query.status as never } : {}), ...(query.vehicleId ? { vehicleId: query.vehicleId } : {}) };
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.vehicleId ? { vehicleId: query.vehicleId } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { jobNumber: { contains: query.search, mode: 'insensitive' as const } },
+              { complaint: { contains: query.search, mode: 'insensitive' as const } },
+              { vehicle: { vin: { contains: query.search, mode: 'insensitive' as const } } },
+              { vehicle: { plateNumber: { contains: query.search, mode: 'insensitive' as const } } },
+            ],
+          }
+        : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.jobCard.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true } }, _count: { select: { labour: true, estimates: true, reservations: true } } },
+        include: {
+          vehicle: { select: { vin: true, make: true, model: true, plateNumber: true } },
+          _count: { select: { labour: true, estimates: true, reservations: true } },
+        },
       }),
       this.prisma.jobCard.count({ where }),
     ]);
-    return { items: rows.map(toJobCardDto), total, page, pageSize };
+    return { items: await this.decorateJobCards(rows), total, page, pageSize };
+  }
+
+  /**
+   * Resolve the customer and technician names for a page of job cards in two
+   * batched queries rather than joining per row. The JobCard model deliberately
+   * carries raw ids for these (no relation), so the names are looked up here.
+   */
+  private async decorateJobCards<T extends {
+    id: string;
+    jobNumber: string;
+    vehicleId: string;
+    customerId: string;
+    status: string;
+    technicianUserId: string | null;
+    odometer: number | null;
+    complaint: string | null;
+    diagnosis: string | null;
+    invoiceId: string | null;
+    vehicle?: { vin: string; make: string; model: string; plateNumber: string | null } | null;
+    _count?: { labour: number; estimates: number; reservations: number };
+    createdAt: Date;
+  }>(rows: T[]) {
+    const customerIds = [...new Set(rows.map((r) => r.customerId))];
+    const technicianIds = [...new Set(rows.map((r) => r.technicianUserId).filter((v): v is string => Boolean(v)))];
+    const [customers, technicians] = await Promise.all([
+      customerIds.length
+        ? this.prisma.customer.findMany({
+            where: { id: { in: customerIds } },
+            select: { id: true, nameEn: true, nameAr: true, phone: true },
+          })
+        : Promise.resolve([]),
+      technicianIds.length
+        ? this.prisma.user.findMany({
+            where: { id: { in: technicianIds } },
+            select: { id: true, fullNameEn: true, fullNameAr: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const customerById = new Map(customers.map((c) => [c.id, c]));
+    const technicianById = new Map(technicians.map((u) => [u.id, u]));
+    return rows.map((r) => {
+      const customer = customerById.get(r.customerId);
+      const technician = r.technicianUserId ? technicianById.get(r.technicianUserId) : undefined;
+      return {
+        ...toJobCardDto(r),
+        customerNameEn: customer?.nameEn ?? null,
+        customerNameAr: customer?.nameAr ?? null,
+        customerPhone: customer?.phone ?? null,
+        technicianNameEn: technician?.fullNameEn ?? null,
+        technicianNameAr: technician?.fullNameAr ?? null,
+      };
+    });
   }
 
   async getJobCard(id: string, principal: RequestPrincipal) {
@@ -249,7 +380,7 @@ export class WorkshopService {
       for (const [i, op] of dto.operations.entries()) {
         created.push(
           await tx.labourOperation.create({
-            data: { companyId, jobCardId: id, description: op.description, hours: op.hours, rateMinor: op.rateMinor, amountMinor: lineAmountMinor(op.hours, op.rateMinor), sortOrder: count + i },
+            data: { companyId, jobCardId: id, description: op.description, hours: op.hours, rateMinor: op.rateMinor, amountMinor: hoursAmountMinor(op.hours, op.rateMinor), sortOrder: count + i },
           }),
         );
       }
@@ -413,6 +544,80 @@ export class WorkshopService {
     return result;
   }
 
+  /**
+   * Cancel a parts reservation.
+   *
+   * Only a reservation that has not been issued (or partially issued) can be
+   * cancelled: once stock has left the ledger through `issueReservation`, the
+   * movement is permanent and must be reversed through the inventory module
+   * rather than silently dropped. A cancelled reservation releases the
+   * reserved quantity for other work orders.
+   */
+  async cancelReservation(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const result = await this.posting.withTransaction(async (tx) => {
+      const reservation = await tx.partsReservation.findFirst({ where: { id, companyId }, include: { lines: true } });
+      if (!reservation) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Reservation not found.');
+      if (reservation.status === 'CANCELLED') {
+        throw badRequest(ERROR_CODES.RESERVATION_ALREADY_ISSUED, 'This reservation is already cancelled.');
+      }
+      const issued = reservation.lines.some((l) => l.issuedQuantity > 0);
+      if (issued) {
+        throw badRequest(
+          ERROR_CODES.RESERVATION_ALREADY_ISSUED,
+          'Parts have already been issued from this reservation; reverse the stock movement instead of cancelling.',
+        );
+      }
+      return tx.partsReservation.update({ where: { id }, data: { status: 'CANCELLED' }, include: { lines: true } });
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.parts_reservation_cancelled', targetType: 'PARTS_RESERVATION', targetId: id, summary: 'Cancelled a parts reservation' });
+    return result;
+  }
+
+  /**
+   * Outstanding reserved quantity per product and warehouse.
+   *
+   * A reservation does not touch the stock ledger, so `StockLevel.quantity` is
+   * on-hand only. This reports the quantity that is promised to open job cards
+   * but not yet issued, so a workshop can see what is genuinely available.
+   */
+  async reservedStock(query: ReservedStockQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const lines = await this.prisma.partsReservationLine.findMany({
+      where: {
+        companyId,
+        ...(query.productId ? { productId: query.productId } : {}),
+        reservation: {
+          status: { in: ['RESERVED', 'PARTIALLY_ISSUED'] },
+          ...(query.warehouseId ? { warehouseId: query.warehouseId } : {}),
+        },
+      },
+      include: {
+        reservation: { select: { warehouseId: true, status: true } },
+        product: { select: { sku: true, nameEn: true } },
+      },
+    });
+
+    const byKey = new Map<string, { warehouseId: string; productId: string; sku: string; nameEn: string; reservedQuantity: number }>();
+    for (const line of lines) {
+      const outstanding = line.quantity - line.issuedQuantity;
+      if (outstanding <= 0) continue;
+      const key = `${line.reservation.warehouseId}:${line.productId}`;
+      const entry = byKey.get(key) ?? {
+        warehouseId: line.reservation.warehouseId,
+        productId: line.productId,
+        sku: line.product.sku,
+        nameEn: line.product.nameEn,
+        reservedQuantity: 0,
+      };
+      entry.reservedQuantity += outstanding;
+      byKey.set(key, entry);
+    }
+
+    const items = [...byKey.values()].sort((a, b) => a.sku.localeCompare(b.sku));
+    return { items, total: items.length, page: 1, pageSize: items.length };
+  }
+
   // ----------------------------------------------------------------- invoicing
 
   /**
@@ -443,7 +648,9 @@ export class WorkshopService {
         }
       } else {
         for (const op of job.labour) {
-          lines.push({ productId: null, description: op.description, quantity: op.hours, unitPriceMinor: op.rateMinor, taxPercentBp: 0 });
+          // `op.hours` is hundredths of an hour; invoice lines carry quantities
+          // scaled by QUANTITY_SCALE (10^4), so rescale before pricing.
+          lines.push({ productId: null, description: op.description, quantity: hoursToQuantity(op.hours), unitPriceMinor: op.rateMinor, taxPercentBp: 0 });
         }
       }
       if (lines.length === 0) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The job card has no billable lines.');
@@ -494,9 +701,34 @@ export class WorkshopService {
 
   // --------------------------------------------------------------- parts data
 
+  /**
+   * Part numbers with an optional free-text search.
+   *
+   * A workshop looks a part up by number, brand or the linked product's SKU or
+   * name, so the filter spans all four rather than the part number alone.
+   */
   async listPartReferences(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
-    const rows = await this.prisma.partReference.findMany({ where: { companyId }, orderBy: { partNumber: 'asc' }, include: { product: { select: { sku: true, nameEn: true } } } });
+    const search = query.search?.trim();
+    const rows = await this.prisma.partReference.findMany({
+      where: {
+        companyId,
+        ...(query.productId ? { productId: query.productId } : {}),
+        ...(query.status ? { type: query.status as never } : {}),
+        ...(search
+          ? {
+              OR: [
+                { partNumber: { contains: search, mode: 'insensitive' as const } },
+                { brand: { contains: search, mode: 'insensitive' as const } },
+                { product: { sku: { contains: search, mode: 'insensitive' as const } } },
+                { product: { nameEn: { contains: search, mode: 'insensitive' as const } } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { partNumber: 'asc' },
+      include: { product: { select: { sku: true, nameEn: true } } },
+    });
     return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
   }
 
@@ -532,6 +764,11 @@ export class WorkshopService {
 
   /** Parts compatible with a given vehicle, resolved through the shared catalog. */
   async compatibleParts(make: string, model: string, year: number, principal: RequestPrincipal, companyIdInput?: string) {
+    // Guard the numeric filter even though the controller validates: a NaN
+    // reaching Prisma raises a 500, and this method is callable from elsewhere.
+    if (!Number.isInteger(year)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A model year is required.');
+    }
     const { companyId } = await this.context.resolveCompanyScope(principal, companyIdInput);
     const rows = await this.prisma.partCompatibility.findMany({
       where: { companyId, make: { equals: make, mode: 'insensitive' }, model: { equals: model, mode: 'insensitive' }, yearFrom: { lte: year }, OR: [{ yearTo: null }, { yearTo: { gte: year } }] },
@@ -552,13 +789,16 @@ export class WorkshopService {
   }
 
   async createProvider(dto: CreateProviderDto, principal: RequestPrincipal, actor: ActorContext) {
-    const dup = await this.prisma.marketplaceProvider.findUnique({ where: { code: dto.code } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Provider ${dto.code} already exists.`);
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'PRV');
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Name required in Arabic or English.');
+    const dup = await this.prisma.marketplaceProvider.findUnique({ where: { code: code } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Provider ${code} already exists.`);
     const provider = await this.prisma.marketplaceProvider.create({
       data: {
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...names,
         categoryKey: dto.categoryKey ?? null,
         email: dto.email ?? null,
         phone: dto.phone ?? null,
@@ -589,10 +829,12 @@ export class WorkshopService {
   }
 
   async createListing(providerId: string, dto: CreateListingDto, principal: RequestPrincipal, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Name required in Arabic or English.');
     const provider = await this.prisma.marketplaceProvider.findUnique({ where: { id: providerId } });
     if (!provider) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Provider not found.');
     const listing = await this.prisma.providerServiceListing.create({
-      data: { providerId, categoryKey: dto.categoryKey, nameEn: dto.nameEn, nameAr: dto.nameAr, description: dto.description ?? null, priceMinor: dto.priceMinor ?? 0 },
+      data: { providerId, categoryKey: dto.categoryKey, ...names, description: dto.description ?? null, priceMinor: dto.priceMinor ?? 0 },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId: null, action: 'marketplace.listing_created', targetType: 'PROVIDER_SERVICE_LISTING', targetId: listing.id, summary: `Created listing ${listing.nameEn}` });
     return listing;
@@ -737,6 +979,7 @@ function toJobCardDto(j: {
   technicianUserId: string | null;
   odometer: number | null;
   complaint: string | null;
+  diagnosis: string | null;
   invoiceId: string | null;
   vehicle?: { vin: string; make: string; model: string; plateNumber: string | null } | null;
   _count?: { labour: number; estimates: number; reservations: number };
@@ -755,6 +998,7 @@ function toJobCardDto(j: {
     technicianUserId: j.technicianUserId,
     odometer: j.odometer,
     complaint: j.complaint,
+    diagnosis: j.diagnosis,
     invoiceId: j.invoiceId,
     labourCount: j._count?.labour,
     estimateCount: j._count?.estimates,

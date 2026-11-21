@@ -1,5 +1,6 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
-import { allocateMinor, fromMinor, sumMinor, toMinor } from '@oryx/shared';
+import { allocateMinor, DEFAULT_CURRENCY, fromMinor, sumMinor, toMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService, SYSTEM_ROLES, type SystemRole } from '../common/accounting-posting.service';
@@ -55,6 +56,8 @@ const STANDARD_CHART: Array<{
   // Execution 04 — marketplace
   { code: '4200', nameEn: 'Marketplace commission revenue', nameAr: 'إيرادات عمولة السوق', type: 'REVENUE', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.MARKETPLACE_COMMISSION },
   { code: '2230', nameEn: 'Service provider payable', nameAr: 'مستحقات مزودي الخدمة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.PROVIDER_PAYABLE },
+  // Optional whole-amount cash rounding gain/loss
+  { code: '5930', nameEn: 'Rounding gain / loss', nameAr: 'فروق التقريب', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.ROUNDING_GAIN_LOSS },
 ];
 
 const DEBIT_TYPES = new Set(['ASSET', 'EXPENSE']);
@@ -71,32 +74,55 @@ export class AccountingService {
 
   // ------------------------------------------------------------------ accounts
 
-  /** Seed the standard chart of accounts for a company that has none. */
-  async seedStandardChart(companyId: string, currency = 'SAR', actorUserId?: string) {
-    const existing = await this.prisma.account.count({ where: { companyId } });
-    if (existing > 0) return { created: 0 };
-    await this.prisma.account.createMany({
-      data: STANDARD_CHART.map((a) => ({
+  /** Seed or complete the standard chart without disturbing custom accounts. */
+  async seedStandardChart(companyId: string, currency = DEFAULT_CURRENCY, actorUserId?: string) {
+    const existing = await this.prisma.account.findMany({
+      where: { companyId },
+      select: { code: true, systemRole: true },
+    });
+
+    const byCode = new Map(existing.map((a) => [a.code, a]));
+    const missing = STANDARD_CHART.filter((a) => !byCode.has(a.code));
+    const roleBackfill = STANDARD_CHART.filter((a) => {
+      const row = byCode.get(a.code);
+      return row !== undefined && !row.systemRole && a.systemRole;
+    });
+
+    if (missing.length > 0) {
+      await this.prisma.account.createMany({
+        data: missing.map((a) => ({
+          companyId,
+          code: a.code,
+          nameEn: a.nameEn,
+          nameAr: a.nameAr,
+          type: a.type,
+          normalBalance: a.normalBalance,
+          isPostable: true,
+          isSystem: true,
+          systemRole: a.systemRole ?? null,
+          currency,
+        })),
+      });
+    }
+
+    for (const a of roleBackfill) {
+      await this.prisma.account.updateMany({
+        where: { companyId, code: a.code, systemRole: null },
+        data: { systemRole: a.systemRole ?? null },
+      });
+    }
+
+    if (missing.length > 0 || roleBackfill.length > 0) {
+      await this.audit.record({
+        actorUserId: actorUserId ?? null,
         companyId,
-        code: a.code,
-        nameEn: a.nameEn,
-        nameAr: a.nameAr,
-        type: a.type,
-        normalBalance: a.normalBalance,
-        isPostable: true,
-        isSystem: true,
-        systemRole: a.systemRole ?? null,
-        currency,
-      })),
-    });
-    await this.audit.record({
-      actorUserId: actorUserId ?? null,
-      companyId,
-      action: 'accounting.chart_seeded',
-      targetType: 'ACCOUNT',
-      summary: `Seeded standard chart of accounts (${STANDARD_CHART.length} accounts)`,
-    });
-    return { created: STANDARD_CHART.length };
+        action: 'accounting.chart_seeded',
+        targetType: 'ACCOUNT',
+        summary: `Standard chart completed (${missing.length} added, ${roleBackfill.length} roles updated)`,
+      });
+    }
+
+    return { created: missing.length, updated: roleBackfill.length };
   }
 
   async listAccounts(query: ListQueryDto, principal: RequestPrincipal) {
@@ -123,9 +149,14 @@ export class AccountingService {
   }
 
   async createAccount(dto: CreateAccountDto, principal: RequestPrincipal, actor: ActorContext) {
+    const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.account.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Account code ${dto.code} already exists.`);
+    // Preserve chart-of-accounts type blocks and parent hierarchy on allocation.
+    const code = dto.code?.trim() || (await this.nextAccountCode(dto.type, dto.parentId, principal)).code;
+    const companyCurrency = await this.context.companyCurrency(companyId);
+    const dup = await this.prisma.account.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Account code ${code} already exists.`);
 
     let level = 1;
     if (dto.parentId) {
@@ -137,16 +168,15 @@ export class AccountingService {
     const account = await this.prisma.account.create({
       data: {
         companyId,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...normalizedNames,
         type: dto.type,
         normalBalance,
         parentId: dto.parentId ?? null,
         level,
         isPostable: dto.isPostable ?? true,
         systemRole: dto.systemRole ?? null,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? companyCurrency,
       },
     });
     await this.audit.record({
@@ -160,20 +190,114 @@ export class AccountingService {
     return toAccountDto(account);
   }
 
+  /**
+   * Suggest the next account code for a type.
+   *
+   * Codes are structured as a type block of 1000s: assets 1000–1999,
+   * liabilities 2000–2999, equity 3000–3999, revenue 4000–4999 and expenses
+   * 5000–5999. The suggestion is the highest existing code in the block, plus
+   * 10, so a chart keeps room to insert between accounts. A child account
+   * inherits the parent's block and gets the next sub-code at its level.
+   */
+  async nextAccountCode(type: string, parentId: string | undefined, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const ranges: Record<string, [number, number]> = {
+      ASSET: [1000, 1999],
+      LIABILITY: [2000, 2999],
+      EQUITY: [3000, 3999],
+      REVENUE: [4000, 4999],
+      EXPENSE: [5000, 5999],
+    };
+    const [lo, hi] = ranges[type] ?? [1000, 1999];
+
+    if (parentId) {
+      const parent = await this.prisma.account.findFirst({ where: { id: parentId, companyId } });
+      if (parent) {
+        // A child's code extends its parent's: parent 1200 yields 1201, 1202 …
+        const children = await this.prisma.account.findMany({
+          where: { companyId, parentId },
+          select: { code: true },
+        });
+        const numeric = children
+          .map((c) => Number(c.code))
+          .filter((n) => Number.isFinite(n));
+        const base = Number(parent.code);
+        const next = numeric.length ? Math.max(...numeric) + 1 : (Number.isFinite(base) ? base + 1 : 1001);
+        return { code: String(next) };
+      }
+    }
+
+    const accounts = await this.prisma.account.findMany({
+      where: { companyId },
+      select: { code: true },
+    });
+    const inRange = accounts
+      .map((a) => Number(a.code))
+      .filter((n) => Number.isFinite(n) && n >= lo && n <= hi);
+    const next = inRange.length ? Math.min(Math.max(...inRange) + 10, hi) : lo;
+    return { code: String(next) };
+  }
+
   async updateAccount(id: string, dto: UpdateAccountDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const account = await this.prisma.account.findFirst({ where: { id, companyId } });
     if (!account) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Account not found.');
-    const updated = await this.prisma.account.update({
-      where: { id },
-      data: {
-        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
-        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
-        ...(dto.isPostable !== undefined ? { isPostable: dto.isPostable } : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-        ...(dto.systemRole !== undefined ? { systemRole: dto.systemRole } : {}),
-      },
+
+    // A type change on an account that already carries postings or children
+    // would contradict the statements and the child hierarchy, so it is
+    // refused; an account still being set up may be reclassified.
+    const typeChanging = dto.type !== undefined && dto.type !== account.type;
+    const balanceChanging = dto.normalBalance !== undefined && dto.normalBalance !== account.normalBalance;
+    if (typeChanging || balanceChanging) {
+      const [children, lines] = await Promise.all([
+        this.prisma.account.count({ where: { companyId, parentId: id } }),
+        this.prisma.journalLine.count({ where: { companyId, accountId: id } }),
+      ]);
+      if (children > 0 || lines > 0) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'The account type or normal balance cannot be changed once the account has children or ledger postings.');
+      }
+    }
+
+    // Re-parenting must not create a cycle. The parent has to exist in the same
+    // company and may not be the account itself or one of its descendants,
+    // otherwise the chart becomes a loop that no tree walk can terminate on.
+    let level = account.level;
+    if (dto.parentId !== undefined && dto.parentId !== account.parentId) {
+      if (dto.parentId === null) {
+        level = 1;
+      } else {
+        const parent = await this.prisma.account.findFirst({ where: { id: dto.parentId, companyId } });
+        if (!parent) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Parent account not found.');
+        if (parent.id === id) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'An account cannot be its own parent.');
+        if (await this.isDescendant(companyId, parent.id, id)) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'An account cannot be moved under one of its own descendants.');
+        }
+        level = parent.level + 1;
+      }
+    }
+
+    const updated = await this.posting.withTransaction(async (tx) => {
+      const row = await tx.account.update({
+        where: { id },
+        data: {
+          ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+          ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+          ...(dto.type !== undefined ? { type: dto.type } : {}),
+          ...(dto.normalBalance !== undefined ? { normalBalance: dto.normalBalance } : {}),
+          ...(dto.parentId !== undefined ? { parentId: dto.parentId, level } : {}),
+          ...(dto.isPostable !== undefined ? { isPostable: dto.isPostable } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+          ...(dto.systemRole !== undefined ? { systemRole: dto.systemRole } : {}),
+        },
+      });
+      // A move shifts the whole subtree, so the descendants' levels are
+      // recomputed from the new parent depth.
+      if (dto.parentId !== undefined && dto.parentId !== account.parentId) {
+        await this.relevelDescendants(tx, companyId, id, level);
+      }
+      return row;
     });
+
     await this.audit.record({
       actorUserId: actor.userId,
       companyId,
@@ -183,6 +307,77 @@ export class AccountingService {
       summary: `Updated account ${updated.code}`,
     });
     return toAccountDto(updated);
+  }
+
+  /** True when `candidateId` sits anywhere below `rootId` in the chart. */
+  private async isDescendant(companyId: string, candidateId: string, rootId: string): Promise<boolean> {
+    let current: string | null = candidateId;
+    const seen = new Set<string>();
+    while (current) {
+      if (current === rootId) return true;
+      if (seen.has(current)) return false;
+      seen.add(current);
+      const row: { parentId: string | null } | null = await this.prisma.account.findFirst({
+        where: { id: current, companyId },
+        select: { parentId: true },
+      });
+      current = row?.parentId ?? null;
+    }
+    return false;
+  }
+
+  /** Rewrites `level` for every descendant so it stays `parent.level + 1`. */
+  private async relevelDescendants(
+    tx: Pick<PrismaService, 'account'>,
+    companyId: string,
+    parentId: string,
+    parentLevel: number,
+  ): Promise<void> {
+    const children = await tx.account.findMany({ where: { companyId, parentId }, select: { id: true } });
+    for (const child of children) {
+      await tx.account.update({ where: { id: child.id }, data: { level: parentLevel + 1 } });
+      await this.relevelDescendants(tx, companyId, child.id, parentLevel + 1);
+    }
+  }
+
+  /**
+   * Delete a chart-of-accounts entry that carries no postings and no children.
+   *
+   * A ledger that has ever touched the account keeps it; the account is
+   * deactivated (`isActive: false`) instead so historical statements still
+   * resolve. The parent link is `SetNull`, so a child would otherwise survive
+   * orphaned; the explicit child check prevents that.
+   */
+  async deleteAccount(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const account = await this.prisma.account.findFirst({ where: { id, companyId } });
+    if (!account) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Account not found.');
+    const [children, lines] = await Promise.all([
+      this.prisma.account.count({ where: { companyId, parentId: id } }),
+      this.prisma.journalLine.count({ where: { companyId, accountId: id } }),
+    ]);
+    if (children > 0) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This account has child accounts and cannot be deleted.');
+    if (lines > 0) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This account has ledger postings and cannot be deleted. Deactivate it instead so the statements still resolve.');
+    await this.prisma.account.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'accounting.account_deleted', targetType: 'ACCOUNT', targetId: id, summary: `Deleted account ${account.code}` });
+    return { id, deleted: true };
+  }
+
+  /**
+   * Delete a fiscal year that has no posted journals. Its periods cascade away.
+   */
+  async deleteFiscalYear(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const year = await this.prisma.fiscalYear.findFirst({ where: { id, companyId } });
+    if (!year) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Fiscal year not found.');
+    const periodIds = (await this.prisma.fiscalPeriod.findMany({ where: { companyId, fiscalYearId: id }, select: { id: true } })).map((p) => p.id);
+    const posted = periodIds.length
+      ? await this.prisma.journalEntry.count({ where: { companyId, fiscalPeriodId: { in: periodIds } } })
+      : 0;
+    if (posted > 0) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This fiscal year has journals and cannot be deleted.');
+    await this.prisma.fiscalYear.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'accounting.fiscal_year_deleted', targetType: 'FISCAL_YEAR', targetId: id, summary: `Deleted fiscal year ${year.code}` });
+    return { id, deleted: true };
   }
 
   // -------------------------------------------------------------- fiscal years
@@ -214,18 +409,19 @@ export class AccountingService {
 
   async createFiscalYear(dto: CreateFiscalYearDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'FY');
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
     if (endDate <= startDate) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'endDate must be after startDate.');
 
-    const dup = await this.prisma.fiscalYear.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Fiscal year ${dto.code} already exists.`);
+    const dup = await this.prisma.fiscalYear.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Fiscal year ${code} already exists.`);
 
     const periods = buildMonthlyPeriods(startDate, endDate);
     const year = await this.prisma.fiscalYear.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         startDate,
         endDate,
         periods: {
@@ -712,6 +908,16 @@ export class AccountingService {
       }
 
       const paymentNumber = await this.sequences.next(tx, companyId, 'payment');
+      // The payment must carry the tenant's own currency, not the schema default,
+      // or a non-BHD tenant stores and prints every receipt in the wrong currency.
+      const currency = dto.currency ?? (await this.context.companyCurrency(companyId, tx));
+      // The printed slip names who took the money. Fall back to the operator's
+      // own name so the "Received By" line is never blank, and let an explicit
+      // value win when the caller names someone else.
+      const receivedByName =
+        dto.receivedByName?.trim() ||
+        (await tx.user.findUnique({ where: { id: actor.userId }, select: { fullNameEn: true } }))?.fullNameEn ||
+        null;
       const payment = await tx.payment.create({
         data: {
           companyId,
@@ -723,8 +929,10 @@ export class AccountingService {
           paymentNumber,
           method: dto.method,
           amountMinor: dto.amountMinor,
+          currency,
           reference: dto.reference ?? null,
           notes: dto.notes ?? null,
+          receivedByName,
           paidAt,
           idempotencyKey: dto.idempotencyKey ?? null,
           createdById: actor.userId,
@@ -919,6 +1127,7 @@ function toPaymentDto(p: {
   currency: string;
   reference: string | null;
   notes: string | null;
+  receivedByName: string | null;
   paidAt: Date;
   journalEntryId: string | null;
   customer?: { nameEn: string; nameAr: string } | null;
@@ -946,6 +1155,7 @@ function toPaymentDto(p: {
     currency: p.currency,
     reference: p.reference,
     notes: p.notes,
+    receivedByName: p.receivedByName,
     paidAt: p.paidAt.toISOString(),
     journalEntryId: p.journalEntryId,
     allocations: p.allocations.map((a) => ({

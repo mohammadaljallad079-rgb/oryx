@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { api } from '@/lib/api';
+import { Suspense, useState } from 'react';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -41,7 +43,7 @@ interface IntentRow {
   refunds?: Array<{ id: string; refundNumber: string; amountMinor: number; status: string }>;
 }
 
-type Tab = 'intents' | 'providers' | 'reconciliation';
+type Tab = 'dashboard' | 'intents' | 'providers' | 'reconciliation';
 
 /**
  * Payments console.
@@ -51,19 +53,31 @@ type Tab = 'intents' | 'providers' | 'reconciliation';
  * `live` stays false until a real transaction is verified. Manual confirm exists
  * for cash and bank transfer, where the operator confirms the funds arrived.
  */
+const TAB_KEYS = ['dashboard', 'intents', 'providers', 'reconciliation'] as const;
+
 export default function PaymentsPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <PaymentsInner />
+    </Suspense>
+  );
+}
+
+function PaymentsInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('intents');
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   const tabs = [
+    { key: 'dashboard' as const, label: t('erp.payments.dashboard') },
     { key: 'intents' as const, label: t('erp.payments.intents') },
     { key: 'providers' as const, label: t('erp.payments.providers') },
     { key: 'reconciliation' as const, label: t('erp.payments.reconciliation') },
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="payments-page">
+    <div className="flex flex-col gap-4" data-testid="payments-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.payments')}
         subtitle={t('erp.payments.subtitle')}
@@ -86,6 +100,7 @@ export default function PaymentsPage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="payments" /> : null}
       {tab === 'intents' ? <IntentsTab canManage={can('erp.payments.manage')} /> : null}
       {tab === 'providers' ? <ProvidersTab /> : null}
       {tab === 'reconciliation' ? <ReconciliationTab canManage={can('erp.payments.manage')} /> : null}
@@ -97,7 +112,21 @@ function IntentsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [status, setStatus] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const list = useAsync(() => api.paymentIntents({ status: status || undefined }), [status]);
+
+  const removeIntent = async (row: IntentRow) => {
+    if (!window.confirm(t('erp.payments.confirmDeleteIntent'))) return;
+    setBusyId(row.id);
+    try {
+      await api.deletePaymentIntent(row.id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.payments.deleteIntentBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -141,9 +170,16 @@ function IntentsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{p.provider}</td>
                 <td><StatusBadge status={p.status} label={p.status} /></td>
                 <td className="text-end">
-                  <Button size="sm" onClick={() => setOpenId(p.id)} data-testid={`intent-open-${p.intentNumber}`}>
-                    {t('common.view')}
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-end gap-1">
+                    <Button size="sm" onClick={() => setOpenId(p.id)} data-testid={`intent-open-${p.intentNumber}`}>
+                      {t('common.view')}
+                    </Button>
+                    {canManage ? (
+                      <Button size="sm" variant="danger" disabled={busyId === p.id} aria-label={`${t('common.delete')} ${p.intentNumber}`} onClick={() => void removeIntent(p)} data-testid={`intent-delete-${p.intentNumber}`}>
+                        {t('common.delete')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -345,7 +381,21 @@ function ReconciliationTab({ canManage }: { canManage: boolean }) {
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const list = useAsync(() => api.paymentReconciliations(onlyUnmatched), [onlyUnmatched]);
+
+  const removeRecon = async (id: string) => {
+    if (!window.confirm(t('erp.payments.confirmDeleteReconciliation'))) return;
+    setBusyId(id);
+    try {
+      await api.deletePaymentReconciliation(id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.payments.deleteReconciliationBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   async function submit() {
     setBusy(true);
@@ -395,6 +445,7 @@ function ReconciliationTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.payments.external')}</th>
               <th>{t('erp.payments.variance')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -406,6 +457,13 @@ function ReconciliationTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{String(r.externalMinor ?? 0)}</td>
                 <td className="tabular-nums text-[12.5px]">{String(r.varianceMinor ?? 0)}</td>
                 <td><StatusBadge status={r.matched ? 'MATCHED' : 'UNMATCHED'} label={r.matched ? t('erp.payments.matched') : t('erp.payments.unmatched')} /></td>
+                <td>
+                  {canManage && !r.matched ? (
+                    <Button size="sm" variant="danger" disabled={busyId === String(r.id)} aria-label={t('common.delete')} onClick={() => void removeRecon(String(r.id))} data-testid={`recon-delete-${String(r.id)}`}>
+                      {t('common.delete')}
+                    </Button>
+                  ) : null}
+                </td>
               </tr>
             ))}
           </tbody>

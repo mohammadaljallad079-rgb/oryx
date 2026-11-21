@@ -3,6 +3,10 @@
 The artwork is original generated geometry — no stock photography and no
 third-party brand marks — so the dashboard stays image-led without inventing
 the owner's logo asset (which is not present in the repository).
+
+This is the single source of truth for tile art. The tiles are served as SVG
+(see `tileImageUrl` in packages/shared/src/modules.ts), so there is no raster
+step and no dependency on the owner's design reference.
 """
 
 import math
@@ -15,7 +19,7 @@ W, H = 640, 420
 
 
 def wrap(name, inner):
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img">
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid slice" role="img">
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0%" stop-color="#04213d"/>
@@ -56,6 +60,32 @@ def hero():
 <path d="M300 330 q40 -66 130 -66 h150 q60 0 84 40 l26 26" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="2"/>
 <path d="M120 356 h420" stroke="url(#gold)" stroke-opacity="0.35" stroke-width="1.5"/>
 <path d="M60 96 h96 M60 96 v40 M156 96 v40" fill="none" stroke="#d4af37" stroke-opacity="0.5" stroke-width="1.2"/>'''
+
+
+def dashboard():
+    """Operational-overview motif: a gold telemetry gauge over a KPI strip.
+
+    Original geometry, generated here — the dashboard tile must not reuse the
+    approved design reference as artwork.
+    """
+    bars = []
+    heights = [58, 96, 74, 128, 88, 150, 112]
+    for i, h in enumerate(heights):
+        x = 120 + i * 58
+        bars.append(
+            f'<rect x="{x}" y="{300 - h}" width="26" height="{h}" rx="4" '
+            f'fill="url(#gold)" fill-opacity="{0.28 + i * 0.07:.2f}"/>'
+        )
+    return grid() + '''
+<circle cx="500" cy="150" r="118" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="1.2"/>
+<path d="M500 32 a118 118 0 0 1 102 59" fill="none" stroke="url(#gold)" stroke-opacity="0.85" stroke-width="4" stroke-linecap="round"/>
+<path d="M500 32 a118 118 0 0 0 -102 59" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="4" stroke-linecap="round"/>
+<circle cx="500" cy="150" r="78" fill="none" stroke="url(#gold)" stroke-opacity="0.45" stroke-width="1.4"/>
+<circle cx="500" cy="150" r="10" fill="url(#gold)"/>
+<path d="M500 150 L560 96" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3" stroke-linecap="round"/>
+''' + ''.join(bars) + '''
+<path d="M96 300 h470" stroke="url(#gold)" stroke-opacity="0.35" stroke-width="1.5"/>
+<path d="M120 340 h96 M120 340 v-22 M216 340 v-22" fill="none" stroke="#d4af37" stroke-opacity="0.5" stroke-width="1.2"/>'''
 
 
 def car():
@@ -251,6 +281,72 @@ def crm():
 <path d="M320 288 q-52 0 -52 -34 q0 -34 52 -34 q52 0 52 34 q0 34 -52 34z" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="2"/>'''
 
 
+def permissions():
+    """Roles-and-permissions motif: a keyed lock over a granted-access list.
+
+    Distinct from `users()` (a group of people) so the Users & Permissions card
+    does not share the Human Resources visual.
+    """
+    return '''
+<rect x="204" y="196" width="152" height="126" rx="16" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="2.4"/>
+<path d="M232 196 v-34 q0 -44 48 -44 q48 0 48 44 v34" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="2.4"/>
+<circle cx="280" cy="250" r="17" fill="none" stroke="url(#gold)" stroke-opacity="0.85" stroke-width="2.8"/>
+<path d="M280 267 v26" stroke="url(#gold)" stroke-opacity="0.85" stroke-width="3.2" stroke-linecap="round"/>
+<g stroke="#d4af37" stroke-opacity="0.5" stroke-width="2.2">
+  <path d="M404 214 h58 M404 250 h58 M404 286 h34"/>
+</g>
+<g stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.6">
+  <path d="M398 206 v16 M398 242 v16 M398 278 v16"/>
+</g>'''
+
+
+def booking():
+    """Calendar motif: a month grid with a highlighted confirmed slot."""
+    slots = []
+    for row in range(3):
+        for col in range(4):
+            x = 236 + col * 46
+            y = 202 + row * 40
+            filled = row == 1 and col == 2
+            if filled:
+                slots.append(f'<rect x="{x}" y="{y}" width="30" height="28" rx="6" fill="url(#gold)" fill-opacity="0.85"/>')
+            else:
+                slots.append(
+                    f'<rect x="{x}" y="{y}" width="30" height="28" rx="6" fill="none" '
+                    f'stroke="#ffffff" stroke-opacity="0.16" stroke-width="1.6"/>'
+                )
+    return (
+        '<rect x="204" y="140" width="232" height="196" rx="16" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="2.4"/>'
+        '<path d="M204 190 h232" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.8"/>'
+        '<path d="M256 122 v34 M384 122 v34" stroke="#d4af37" stroke-opacity="0.6" stroke-width="4" stroke-linecap="round"/>'
+        + ''.join(slots)
+    )
+
+
+def provider():
+    """Provider-portal motif: a storefront with an approval tick."""
+    return '''
+<path d="M188 216 h264 v128 h-264z" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="2.4"/>
+<path d="M170 216 l26 -62 h248 l26 62z" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="2.4"/>
+<path d="M206 216 v128 M434 216 v128" stroke="#ffffff" stroke-opacity="0.1" stroke-width="1.6"/>
+<rect x="290" y="262" width="60" height="82" rx="8" fill="none" stroke="#d4af37" stroke-opacity="0.55" stroke-width="2"/>
+<circle cx="466" cy="180" r="34" fill="#001a33" stroke="url(#gold)" stroke-opacity="0.85" stroke-width="2.8"/>
+<path d="M450 180 l12 13 l24 -26" fill="none" stroke="url(#gold)" stroke-opacity="0.9" stroke-width="3.2" stroke-linecap="round"/>'''
+
+
+def payments():
+    """Payments motif: a terminal card with a settled gold transaction line."""
+    return '''
+<rect x="182" y="158" width="276" height="172" rx="18" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="2.4"/>
+<path d="M182 214 h276" stroke="#d4af37" stroke-opacity="0.6" stroke-width="3"/>
+<rect x="212" y="244" width="66" height="48" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="2"/>
+<g stroke="#ffffff" stroke-opacity="0.14" stroke-width="2">
+  <path d="M304 252 h124 M304 280 h88"/>
+</g>
+<circle cx="466" cy="300" r="42" fill="#001a33" stroke="url(#gold)" stroke-opacity="0.8" stroke-width="3"/>
+<path d="M450 300 l11 12 l22 -24" fill="none" stroke="url(#gold)" stroke-opacity="0.9" stroke-width="3.2" stroke-linecap="round"/>'''
+
+
 ASSETS = {
     'tile-company': building(),
     'tile-branch': pin(),
@@ -265,7 +361,10 @@ ASSETS = {
     'tile-maintenance': gear(),
     'tile-parts': parts(),
     'tile-reports': chart('donut'),
-    'tile-users': users(),
+    'tile-users': permissions(),
+    'tile-booking': booking(),
+    'tile-provider': provider(),
+    'tile-payments': payments(),
     'tile-subscription': card(),
     'tile-settings': settings_art(),
     'tile-website': globe(),
@@ -274,6 +373,7 @@ ASSETS = {
     'tile-support': shield(),
     'tile-modules': gear(),
     'tile-plans': card(),
+    'tile-dashboard': dashboard(),
 }
 
 

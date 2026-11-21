@@ -10,21 +10,23 @@ import {
   MinLength,
 } from 'class-validator';
 
+import { TrimString } from '../common/transformers';
+
 export class CreateRoleDto {
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(60)
-  code!: string;
+  code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(120)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(120)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
@@ -62,6 +64,7 @@ export class UpdateRoleDto {
 }
 
 export class InviteUserDto {
+  @TrimString()
   @IsEmail()
   email!: string;
 
@@ -82,6 +85,100 @@ export class InviteUserDto {
   @IsArray()
   @IsString({ each: true })
   branchIds?: string[];
+}
+
+/**
+ * Direct user creation.
+ *
+ * Unlike an invitation, this creates an active account immediately: the
+ * administrator sets the first password (hashed with the same argon2 path as
+ * every other credential) and the membership, so the new user can sign in at
+ * once without an email round-trip. Identity fields are optional so a tenant
+ * that does not need them can create a user with the same four required fields
+ * the invitation form uses.
+ */
+export class CreateUserDto {
+  @TrimString()
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  fullNameEn!: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  fullNameAr!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  nationalId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  nationality?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+
+  @IsString()
+  roleId!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  branchIds?: string[];
+}
+
+/** Editable identity/contact details on a user record. */
+export class UpdateUserDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  fullNameEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  fullNameAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  nationalId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  nationality?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
 }
 
 export class UpdateMembershipDto {

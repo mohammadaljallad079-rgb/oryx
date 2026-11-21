@@ -35,14 +35,14 @@ function AppVersionsPageInner() {
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="app-versions-page">
+    <div className="flex flex-col gap-4" data-testid="app-versions-page">
       <SectionHeader
         title={t('app.versions')}
         subtitle={t('app.subtitle')}
         actions={
           <>
             <Button size="sm" onClick={() => void versions.reload()}>
-              <Icon name="search" size={15} />
+              <Icon name="refresh" size={15} />
               {t('common.refresh')}
             </Button>
             <Button variant="primary" onClick={() => setOpen(true)} data-testid="new-app-version">
@@ -152,8 +152,8 @@ function AppVersionsPageInner() {
               onChange={(e) => setForm({ ...form, platform: e.target.value })}
               data-testid="version-platform"
             >
-              <option value="IOS">iOS</option>
-              <option value="ANDROID">Android</option>
+              <option value="IOS">{t('common.ios')}</option>
+              <option value="ANDROID">{t('common.android')}</option>
             </select>
           </Field>
           <Field label={t('app.version')} required>

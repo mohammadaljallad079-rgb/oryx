@@ -1,0 +1,259 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="440" viewBox="0 0 1600 440" preserveAspectRatio="xMidYMid slice" role="img" aria-label="ORYX automotive studio banner">
+  <title>ORYX automotive banner</title>
+  <desc>Studio composition in the approved ORYX navy and gold palette: a rim-lit automotive silhouette against a warm key light, with a gold contour and a swept light trail. Vector artwork authored in-repo; no third-party photography or brand marks.</desc>
+
+  <defs>
+    <linearGradient id="studio" x1="0.05" y1="0" x2="0.72" y2="1">
+      <stop offset="0%" stop-color="#0c4271"/>
+      <stop offset="34%" stop-color="#052440"/>
+      <stop offset="100%" stop-color="#000912"/>
+    </linearGradient>
+
+    <radialGradient id="keyLight" cx="0.79" cy="0.06" r="0.62">
+      <stop offset="0%" stop-color="#fdf3d4" stop-opacity="0.72"/>
+      <stop offset="30%" stop-color="#e8c766" stop-opacity="0.3"/>
+      <stop offset="64%" stop-color="#d4af37" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#d4af37" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="coolFill" cx="0.1" cy="0.16" r="0.58">
+      <stop offset="0%" stop-color="#a8cbee" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#a8cbee" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0e3a63"/>
+      <stop offset="40%" stop-color="#05192e"/>
+      <stop offset="100%" stop-color="#00050b"/>
+    </linearGradient>
+
+    <!-- Flat, near-black body: a silhouette reads as deliberate at banner scale,
+         where hand-shaded panels read as noise. -->
+    <linearGradient id="bodyFlat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a1d31"/>
+      <stop offset="55%" stop-color="#05101d"/>
+      <stop offset="100%" stop-color="#020810"/>
+    </linearGradient>
+
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0.3">
+      <stop offset="0%" stop-color="#a9861f" stop-opacity="0.35"/>
+      <stop offset="22%" stop-color="#e8c766" stop-opacity="0.95"/>
+      <stop offset="55%" stop-color="#fdf3d4" stop-opacity="1"/>
+      <stop offset="82%" stop-color="#e8c766" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#d4af37" stop-opacity="0.5"/>
+    </linearGradient>
+
+    <linearGradient id="goldBar" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fdf3d4"/>
+      <stop offset="50%" stop-color="#d4af37"/>
+      <stop offset="100%" stop-color="#8f6f18"/>
+    </linearGradient>
+
+    <linearGradient id="glass" x1="0.1" y1="0" x2="0.85" y2="1">
+      <stop offset="0%" stop-color="#cfe2f4" stop-opacity="0.5"/>
+      <stop offset="42%" stop-color="#5b7d9d" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#0a1725" stop-opacity="0.85"/>
+    </linearGradient>
+
+    <linearGradient id="silver" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#eaf1f8" stop-opacity="0.06"/>
+      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.62"/>
+      <stop offset="100%" stop-color="#9fb3c8" stop-opacity="0.14"/>
+    </linearGradient>
+
+    <radialGradient id="lamp" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.98"/>
+      <stop offset="34%" stop-color="#e2efff" stop-opacity="0.62"/>
+      <stop offset="100%" stop-color="#5fb0ff" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="pool" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#d4af37" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#d4af37" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="trail" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0%" stop-color="#fdf3d4" stop-opacity="0.8"/>
+      <stop offset="30%" stop-color="#8fb8e0" stop-opacity="0.36"/>
+      <stop offset="100%" stop-color="#8fb8e0" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="trailGlow" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0%" stop-color="#fdf3d4" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#fdf3d4" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="reflFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.26"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="reflMask">
+      <rect x="0" y="316" width="1600" height="124" fill="url(#reflFade)"/>
+    </mask>
+
+    <!-- Copy-side falloff: the left third stays dark for the headline. -->
+    <linearGradient id="copyScrim" x1="0" y1="0" x2="1" y2="0.12">
+      <stop offset="0%" stop-color="#00060f" stop-opacity="0.84"/>
+      <stop offset="22%" stop-color="#00060f" stop-opacity="0.58"/>
+      <stop offset="42%" stop-color="#00060f" stop-opacity="0.2"/>
+      <stop offset="64%" stop-color="#00060f" stop-opacity="0.03"/>
+      <stop offset="100%" stop-color="#00060f" stop-opacity="0"/>
+    </linearGradient>
+
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0v64" fill="none" stroke="#ffffff" stroke-opacity="0.032" stroke-width="1"/>
+    </pattern>
+
+    <filter id="soften" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+    <filter id="blurBig" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+    <filter id="bloom" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4.5" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="440" fill="url(#studio)"/>
+  <rect width="1600" height="440" fill="url(#grid)"/>
+  <rect width="1600" height="440" fill="url(#coolFill)"/>
+  <rect width="1600" height="440" fill="url(#keyLight)"/>
+
+  <!-- Ground plane and a warm pool of light under the vehicle. -->
+  <rect y="316" width="1600" height="124" fill="url(#floor)"/>
+  <rect y="314.6" width="1600" height="1.6" fill="url(#goldBar)" opacity="0.34"/>
+  <ellipse cx="1130" cy="318" rx="420" ry="36" fill="url(#pool)" filter="url(#blurBig)"/>
+
+  <!-- Softbox reflections in the polished floor. -->
+  <g opacity="0.22" filter="url(#soften)">
+    <rect x="1160" y="328" width="290" height="30" rx="7" fill="#fdf3d4" opacity="0.4"/>
+    <rect x="880" y="340" width="160" height="18" rx="5" fill="#c9d6e4" opacity="0.18"/>
+  </g>
+
+  <!-- ========================================= lit automotive silhouette ====
+       Authored at studio scale, then placed into the right two thirds. The hero
+       applies `background-size: cover`, so the composition keeps clear space
+       above and below the roof to survive the crop. -->
+  <g id="vehicle" transform="translate(792,86) scale(0.8) translate(-690,-286)">
+    <!-- Warm halo behind the car: the rim light needs something to read against. -->
+    <ellipse cx="1120" cy="330" rx="470" ry="118" fill="#fdf3d4" opacity="0.16" filter="url(#blurBig)"/>
+    <ellipse cx="1180" cy="360" rx="330" ry="76" fill="#e8c766" opacity="0.14" filter="url(#blurBig)"/>
+
+    <!-- Ground shadow, anchored under the wheels. -->
+    <ellipse cx="1130" cy="452" rx="420" ry="22" fill="#00030a" opacity="0.7" filter="url(#soften)"/>
+
+    <!-- Body: one flat mass, so the silhouette stays crisp. -->
+    <path
+      d="M690 424
+         C 686 396 700 376 728 370
+         L 812 354
+         C 842 330 882 306 932 298
+         L 1180 290
+         C 1242 290 1292 302 1336 328
+         L 1434 356
+         C 1490 362 1532 376 1552 398
+         C 1566 414 1568 428 1558 438
+         L 1540 452
+         L 708 452
+         C 694 444 690 436 690 424 Z"
+      fill="url(#bodyFlat)"
+    />
+
+    <!-- Glasshouse. -->
+    <path
+      d="M870 304 C 900 278 934 260 976 254 L 1128 250
+         C 1188 250 1232 264 1268 290 L 1304 318 L 906 324 Z"
+      fill="url(#glass)"
+    />
+    <path d="M976 254 L 1128 250 C 1188 250 1232 264 1268 290" fill="none" stroke="#dbe8f5" stroke-opacity="0.34" stroke-width="2.6"/>
+    <path d="M1040 252 L 1024 320" stroke="#04101c" stroke-width="10" opacity="0.92"/>
+    <path d="M1206 252 L 1218 318" stroke="#04101c" stroke-width="8" opacity="0.82"/>
+
+    <!-- Bright shoulder highlight: the single line that separates body from
+         backdrop. Kept as the brightest non-gold element in the composition. -->
+    <path d="M744 386 C 900 364 1180 356 1500 372" fill="none" stroke="url(#silver)" stroke-width="10" opacity="0.8"/>
+    <path d="M734 444 C 920 434 1230 432 1532 440" fill="none" stroke="#00040a" stroke-opacity="0.7" stroke-width="3.6"/>
+
+    <!-- Signature gold contour over roof and shoulder. -->
+    <path
+      d="M728 370 L 812 354
+         C 842 330 882 306 932 298
+         L 1180 290
+         C 1242 290 1292 302 1336 328
+         L 1434 356
+         C 1490 362 1532 376 1552 398"
+      fill="none" stroke="url(#gold)" stroke-width="5.2" stroke-linecap="round" filter="url(#bloom)"
+    />
+
+    <!-- Gold door handles. -->
+    <rect x="1016" y="350" width="32" height="6" rx="3" fill="url(#goldBar)" opacity="0.85"/>
+    <rect x="1250" y="348" width="32" height="6" rx="3" fill="url(#goldBar)" opacity="0.7"/>
+
+    <!-- Rear lamp and gold signature bar. -->
+    <path d="M1522 378 C 1546 386 1560 398 1562 412 L 1538 420 L 1516 406 Z" fill="#f2555a" opacity="0.9"/>
+    <rect x="1508" y="388" width="52" height="6" rx="3" fill="url(#goldBar)" opacity="0.95"/>
+
+    <!-- Head lamp. -->
+    <ellipse cx="712" cy="384" rx="38" ry="24" fill="url(#lamp)"/>
+    <path d="M686 372 C 702 364 724 366 736 376 L 732 394 C 716 402 694 400 684 390 Z" fill="#f2f8ff" opacity="0.9" filter="url(#bloom)"/>
+
+    <!-- Wheels: dark alloys, silver spokes, gold centre caps. -->
+    <g>
+      <circle cx="906" cy="446" r="72" fill="#01050a"/>
+      <circle cx="906" cy="446" r="66" fill="#060f1a"/>
+      <circle cx="906" cy="446" r="47" fill="none" stroke="#c9d6e4" stroke-opacity="0.42" stroke-width="3.6"/>
+      <g stroke="#c9d6e4" stroke-opacity="0.42" stroke-width="3.6">
+        <path d="M906 408 L906 426 M906 466 L906 484 M868 446 L886 446 M926 446 L944 446"/>
+        <path d="M879 419 L892 432 M920 460 L933 473 M933 419 L920 432 M892 460 L879 473"/>
+      </g>
+      <circle cx="906" cy="446" r="23" fill="#10203a" stroke="#d4af37" stroke-opacity="0.72" stroke-width="2.6"/>
+      <circle cx="906" cy="446" r="72" fill="none" stroke="#00040a" stroke-opacity="0.8" stroke-width="2.6"/>
+      <path d="M840 418 A 68 68 0 0 1 972 418" fill="none" stroke="url(#gold)" stroke-opacity="0.5" stroke-width="2.8"/>
+    </g>
+    <g>
+      <circle cx="1420" cy="446" r="72" fill="#01050a"/>
+      <circle cx="1420" cy="446" r="66" fill="#060f1a"/>
+      <circle cx="1420" cy="446" r="47" fill="none" stroke="#c9d6e4" stroke-opacity="0.42" stroke-width="3.6"/>
+      <g stroke="#c9d6e4" stroke-opacity="0.42" stroke-width="3.6">
+        <path d="M1420 408 L1420 426 M1420 466 L1420 484 M1382 446 L1400 446 M1440 446 L1458 446"/>
+        <path d="M1393 419 L1406 432 M1434 460 L1447 473 M1447 419 L1434 432 M1406 460 L1393 473"/>
+      </g>
+      <circle cx="1420" cy="446" r="23" fill="#10203a" stroke="#d4af37" stroke-opacity="0.72" stroke-width="2.6"/>
+      <circle cx="1420" cy="446" r="72" fill="none" stroke="#00040a" stroke-opacity="0.8" stroke-width="2.6"/>
+      <path d="M1354 418 A 68 68 0 0 1 1486 418" fill="none" stroke="url(#gold)" stroke-opacity="0.5" stroke-width="2.8"/>
+    </g>
+  </g>
+
+  <!-- Swept light trail: motion cue leading across the banner. -->
+  <g>
+    <path d="M770 300 C 520 278 260 300 30 334" fill="none" stroke="url(#trailGlow)" stroke-width="15" filter="url(#soften)" opacity="0.6"/>
+    <path d="M770 300 C 520 278 260 300 30 334" fill="none" stroke="url(#trail)" stroke-width="3" stroke-linecap="round"/>
+    <path d="M782 334 C 540 322 300 334 50 356" fill="none" stroke="url(#trail)" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  </g>
+
+  <!-- Floor reflection, mirrored about the ground line at y=316. -->
+  <g mask="url(#reflMask)" transform="translate(0 632) scale(1 -1)" opacity="0.34">
+    <g filter="url(#soften)" transform="translate(792,86) scale(0.8) translate(-690,-286)">
+      <path
+        d="M690 424 C 686 396 700 376 728 370 L 812 354 C 842 330 882 306 932 298
+           L 1180 290 C 1242 290 1292 302 1336 328 L 1434 356
+           C 1490 362 1532 376 1552 398 C 1566 414 1568 428 1558 438 L 1540 452
+           L 708 452 C 694 444 690 436 690 424 Z"
+        fill="#0a1c2e"
+      />
+      <path d="M870 304 C 900 278 934 260 976 254 L 1128 250 C 1188 250 1232 264 1268 290 L 1304 318 L 906 324 Z" fill="#41637f" opacity="0.5"/>
+      <circle cx="906" cy="446" r="68" fill="#050e18"/>
+      <circle cx="1420" cy="446" r="68" fill="#050e18"/>
+      <ellipse cx="712" cy="384" rx="30" ry="17" fill="#d8e9ff" opacity="0.4"/>
+      <rect x="1508" y="388" width="52" height="6" rx="3" fill="#d4af37" opacity="0.45"/>
+    </g>
+  </g>
+
+  <rect width="1600" height="440" fill="url(#copyScrim)"/>
+</svg>

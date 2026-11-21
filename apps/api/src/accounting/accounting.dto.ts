@@ -17,19 +17,20 @@ import {
 const ACCOUNT_TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'] as const;
 
 export class CreateAccountDto {
+  @IsOptional()
   @IsString()
   @MaxLength(24)
-  code!: string;
+  code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsIn(ACCOUNT_TYPES)
   type!: (typeof ACCOUNT_TYPES)[number];
@@ -68,6 +69,24 @@ export class UpdateAccountDto {
   @MaxLength(160)
   nameAr?: string;
 
+  /** `null` detaches the account and makes it a root; a string re-parents it. */
+  @IsOptional()
+  @IsString()
+  parentId?: string | null;
+
+  /**
+   * A type change is refused for an account that has postings or children —
+   * either would leave the chart and the statements inconsistent — but an
+   * account still being built may be reclassified.
+   */
+  @IsOptional()
+  @IsIn(ACCOUNT_TYPES)
+  type?: (typeof ACCOUNT_TYPES)[number];
+
+  @IsOptional()
+  @IsIn(['DEBIT', 'CREDIT'])
+  normalBalance?: 'DEBIT' | 'CREDIT';
+
   @IsOptional()
   @IsBoolean()
   isPostable?: boolean;
@@ -80,6 +99,16 @@ export class UpdateAccountDto {
   @IsString()
   @MaxLength(40)
   systemRole?: string;
+}
+
+/** The account type a suggested code is being generated for. */
+export class NextAccountCodeQueryDto {
+  @IsIn(ACCOUNT_TYPES)
+  type!: (typeof ACCOUNT_TYPES)[number];
+
+  @IsOptional()
+  @IsString()
+  parentId?: string;
 }
 
 export class ListQueryDto {
@@ -113,9 +142,10 @@ export class ListQueryDto {
 }
 
 export class CreateFiscalYearDto {
+  @IsOptional()
   @IsString()
   @MaxLength(20)
-  code!: string;
+  code?: string;
 
   @IsISO8601()
   startDate!: string;
@@ -230,8 +260,27 @@ export class RecordPaymentDto {
   @MaxLength(300)
   notes?: string;
 
+  /**
+   * The name printed on the "المستلم / Received By" line. Optional: when it is
+   * absent the API records the operator's own name, so the printed receipt is
+   * never blank.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  receivedByName?: string;
+
   @IsISO8601()
   paidAt!: string;
+
+  /**
+   * ISO currency code. Optional: when absent the API records the tenant's own
+   * currency so a receipt never silently defaults to the launch-market one.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  currency?: string;
 
   @IsOptional()
   @IsString()

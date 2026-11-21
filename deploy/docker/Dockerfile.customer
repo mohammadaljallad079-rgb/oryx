@@ -1,0 +1,74 @@
+# ORYX — Customer website runtime image (server-rendered mode).
+#
+# `apps/customer` can build two ways:
+#   - server-rendered (this image), when ORYX_STATIC_EXPORT is unset;
+#   - a static export for GitHub Pages, when ORYX_STATIC_EXPORT=1.
+#
+# The deployment package ships the server-rendered form, because it can serve
+# the booking and payment pages that need a live API and it can set response
+# headers. The static export is a preview artefact and is not deployed here.
+#
+# Build from the repository root:
+#   docker build -f deploy/docker/Dockerfile.customer \
+#     --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.example.com/api \
+#     -t oryx-customer .
+
+# ---------------------------------------------------------------- base
+FROM node:20-bookworm-slim AS base
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+ENV CI=true
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+WORKDIR /app
+
+FROM base AS manifest
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY packages/shared/package.json        packages/shared/
+COPY packages/database/package.json      packages/database/
+COPY apps/api/package.json               apps/api/
+COPY apps/admin/package.json             apps/admin/
+COPY apps/customer/package.json          apps/customer/
+COPY apps/mobile/package.json            apps/mobile/
+RUN pnpm install --frozen-lockfile --prod=false
+
+# ----------------------------------------------------------------- build
+FROM manifest AS build
+ARG NEXT_PUBLIC_API_BASE_URL
+ARG NEXT_PUBLIC_DEFAULT_LOCALE=ar
+ARG NEXT_PUBLIC_DEFAULT_THEME=light
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_DEFAULT_LOCALE=$NEXT_PUBLIC_DEFAULT_LOCALE
+ENV NEXT_PUBLIC_DEFAULT_THEME=$NEXT_PUBLIC_DEFAULT_THEME
+ENV ORYX_DOCKER_BUILD=1
+ENV NEXT_TELEMETRY_DISABLED=1
+
+COPY packages ./packages
+COPY apps/customer ./apps/customer
+RUN pnpm --filter @oryx/shared build \
+ && pnpm --filter @oryx/customer build
+
+# --------------------------------------------------------------- runtime
+FROM base AS runtime
+ENV NODE_ENV=production
+ENV PORT=3002
+# Next.js standalone binds to `process.env.HOSTNAME`, which Docker sets to the
+# container id. That id resolves on the compose network but not on loopback, so
+# the healthcheck below would fail while the app served traffic normally. Bind
+# every interface explicitly.
+ENV HOSTNAME=0.0.0.0
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN groupadd --system --gid 1001 oryx \
+ && useradd --system --uid 1001 --gid oryx --create-home --shell /usr/sbin/nologin oryx
+
+COPY --from=build /app/apps/customer/.next/standalone ./
+COPY --from=build /app/apps/customer/.next/static     ./apps/customer/.next/static
+COPY --from=build /app/apps/customer/public           ./apps/customer/public
+
+USER oryx
+EXPOSE 3002
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3002)+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["node", "apps/customer/server.js"]

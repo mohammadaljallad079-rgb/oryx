@@ -1,5 +1,70 @@
 @import 'tailwindcss';
 
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-arabic-400-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-arabic-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-arabic-500-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-arabic-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-arabic-600-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-arabic-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-arabic-700-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-arabic-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /*
  * ORYX design system.
  *
@@ -13,8 +78,52 @@
  */
 
 :root {
-  --oryx-font-sans: 'Segoe UI', 'Noto Sans Arabic', Tahoma, system-ui, -apple-system,
-    'Helvetica Neue', Arial, sans-serif;
+  /*
+   * The ORYX type stack: one family everywhere.
+   *
+   * IBM Plex Sans Arabic is bundled (apps/admin/public/fonts) in weights
+   * 400/500/600/700. It carries both a full Latin subset and a full Arabic
+   * subset, so English and Arabic share one typeface and one metric system —
+   * the brief's "one font throughout the platform" requirement. The generic
+   * families after it are a last-resort fallback if the bundles fail to load.
+   */
+  --oryx-font-sans: 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  /* The user-selectable body size, written by the typography settings panel and
+   * the preference bootstrap. Everything downstream derives from these. */
+  --font-scale: 1;
+  --font-size-base: 15px;
+  --font-size-heading: 1.5;
+  --font-size-module: 1.13;
+  --font-size-desc: 0.93;
+  --font-size-form: 0.93;
+  --font-size-table: 0.87;
+  /* Per-company typography is written to the document root at runtime from the
+   * active tenant's settings; these are the shipped defaults so the shell is
+   * complete before the first fetch resolves. */
+  --oryx-heading-weight: 800;
+  --oryx-label-tracking: 0.05em;
+
+  /*
+   * Tell the browser which scheme the native widgets belong to. Without this the
+   * date/time picker popup and the calendar indicator keep the operating
+   * system's default (usually light), so a dark-theme field renders a bright
+   * white panel over the navy page. It flips with the theme below.
+   */
+  color-scheme: dark;
+
+  /* The official brand colours. */
+  --brand-navy: #0f2b48;
+  --brand-gray: #64748b;
+  /* The primary action ramp. Navy is the ORYX primary, per the brand brief; the
+   * dark theme lifts it and adds a hairline edge so a navy button still reads
+   * against the deep-navy page. */
+  --primary: #0f2b48;
+  --primary-hover: #143a5e;
+  --primary-border: color-mix(in srgb, var(--brand-navy) 70%, #000000);
+  --on-primary: #ffffff;
+  /* Secondary controls and labels. */
+  --secondary: #64748b;
+  --secondary-hover: #556376;
 
   /* Dark theme (default) — matches the approved reference. */
   --bg: #00162b;
@@ -31,51 +140,297 @@
   --text-inverse: #00121f;
   --navy: #00162b;
   --gold: #d4af37;
+  --gold-hover: #e8c766;
   --gold-soft: #e8c766;
   --gold-deep: #a9861f;
+  /*
+   * The metallic gold button ramp. It is separate from the accent tokens
+   * because a fill has different constraints from text: the fill must stay
+   * bright enough that dark ink reads on it, while `--gold` has to be dark
+   * enough to read as text on the page field.
+   */
+  --gold-fill-from: #e8c766;
+  --gold-fill-to: #d4af37;
+  --gold-fill-hover-from: #d4af37;
+  --gold-fill-hover-to: #a9861f;
+  --on-gold: #00121f;
+  /* Gold used as *text* on a gold-tinted chip. In the dark theme the plain
+   * accent already clears 4.5:1 on every chip, so this reproduces it. */
+  --gold-on-tint: #d4af37;
+  /*
+   * The gold-tint ramp. Rules take a step by name instead of writing their own
+   * `color-mix(in srgb, var(--gold) N%, transparent)`, so a chip, a badge and the
+   * nav markers cannot resolve to four different golds.
+   *
+   * The dark percentages are exactly the ones the admin rules already used
+   * (badge 15%/40%, collapsed nav 18%, nav gradient 20%), so the approved dark
+   * render is byte-identical. The light block below tunes the same names, which
+   * is the point of a ramp: the theme changes the steps, not the rules.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 15%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 20%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 18%, transparent);
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  /* A hovered table row: subtle on navy, and re-tuned on ivory where the same
+   * lift would disappear into the page. */
+  --row-hover: color-mix(in srgb, var(--surface-raised) 70%, transparent);
   --success: #3ecf8e;
   --warning: #f0b429;
   --danger: #f2555a;
   --info: #4aa8ff;
-  --tile-overlay: linear-gradient(
-    180deg,
-    rgba(0, 12, 24, 0.15) 0%,
-    rgba(0, 15, 30, 0.72) 55%,
-    rgba(0, 18, 34, 0.94) 100%
-  );
   --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.85);
+  --shadow-tile: 0 24px 48px -26px rgba(0, 0, 0, 0.9);
+  --shadow-modal: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+  /* The focus ring and the modal backdrop are semantic, not literal: the light
+   * theme needs a softer ring and a lighter scrim than a navy page does. */
+  --focus-ring: rgba(212, 175, 55, 0.18);
+  --backdrop: rgba(0, 10, 20, 0.66);
+  /* Compatibility aliases. Several screens reference these names directly, so
+   * they are defined here rather than left to fall back to nothing: an
+   * unresolved custom property drops the declaration, which made muted text
+   * render at full strength and a hovered option lose its background. */
+  --muted: var(--text-muted);
+  --surface-2: var(--surface-hover);
+  --accent: var(--gold);
+  --accent-strong: var(--gold);
+  --brand-primary: var(--primary);
+  --brand-primary-foreground: var(--on-primary);
+  /* The shade a company brand colour is mixed toward to derive its pressed and
+   * hover states. It is a token rather than a literal so the branded shell has
+   * no colour value that a theme switch cannot reach. */
+  --brand-shade: #000000;
+  /*
+   * Ink and chrome for photo-backed surfaces (module tiles, the dashboard hero).
+   * These sit on a navy scrim in both themes, so the values are intentionally
+   * identical in both token blocks rather than tracking the page palette.
+   */
+  --on-media: #ffffff;
+  --on-media-muted: rgba(233, 240, 248, 0.82);
+  --on-media-accent: #e8c766;
+  --on-media-shadow: rgba(0, 0, 0, 0.7);
+  --on-media-shadow-soft: rgba(0, 0, 0, 0.75);
+  --media-chip-bg: rgba(0, 15, 30, 0.55);
+  --media-chip-border: rgba(212, 175, 55, 0.5);
+  /*
+   * The information band along the bottom of a module tile. Unlike the artwork
+   * above it, this band tracks the theme: the dark theme leaves the full-cover
+   * scrim to do the work (`none` here), while the light block paints an ivory
+   * fade with dark ink so no fixed navy plate survives a theme switch. The
+   * artwork itself is untouched in both themes.
+   */
+  --tile-band: linear-gradient(180deg, var(--surface-raised) 0%, var(--surface) 100%);
+  --tile-band-ink: var(--text);
+  --tile-band-ink-muted: var(--text-muted);
+  --tile-band-line: var(--border-soft);
+  --tile-state-bg: color-mix(in srgb, var(--gold) 14%, transparent);
+  --tile-state-border: color-mix(in srgb, var(--gold) 38%, transparent);
+  --tile-state-ink: var(--gold-soft);
+  /*
+   * The dashboard banner field. A navy gradient with a warm gold bloom, so the
+   * lockup sits on a deep ground in the dark theme. The light theme swaps in an
+   * ivory field and navy ink (see the light block). Both values are opaque, so
+   * the banner never depends on a photograph and needs no scrim.
+   */
+  --hero-field: linear-gradient(135deg, #1b4670 0%, #0f2b48 46%, #00101f 100%);
+  --hero-bloom: radial-gradient(760px 320px at 50% -30%, rgba(212, 175, 55, 0.22), transparent 68%),
+    radial-gradient(520px 260px at 82% 118%, rgba(74, 168, 255, 0.14), transparent 70%);
+  --hero-border: rgba(212, 175, 55, 0.28);
+  /* Banner ink on the navy field. The light block re-inks the same three tokens
+   * to navy, which is what lets one hero component serve both themes. */
+  --hero-ink: #ffffff;
+  --hero-ink-muted: rgba(233, 240, 248, 0.82);
+  --hero-ink-accent: #e8c766;
+  /* Ambient wash behind the shell. */
+  --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.09), transparent 62%),
+    radial-gradient(900px 460px at 6% 4%, rgba(74, 168, 255, 0.06), transparent 58%);
+  /*
+   * The navigation rail. The brand brief asks for "navy navigation", so the
+   * rail is a navy surface in *both* themes rather than an ivory one on the
+   * light theme: the identity is a navy rail with a white/gold lockup, exactly
+   * as the approved dark reference renders it. The values are the official
+   * brand navy (#0f2b48) and its darker stop; the light theme deepens the field
+   * below so the rail separates from the ivory page.
+   */
+  --nav-bg: linear-gradient(180deg, #12314f 0%, #0f2b48 55%, #0a1f36 100%);
+  --nav-solid: #0f2b48;
+  --nav-border: rgba(212, 175, 55, 0.18);
+  --nav-text: #c9d6e4;
+  --nav-text-strong: #ffffff;
+  --nav-text-faint: #9db1c9;
+  --nav-hover: rgba(255, 255, 255, 0.07);
+  --nav-active: rgba(212, 175, 55, 0.22);
+  --nav-active-border: rgba(212, 175, 55, 0.55);
+  --nav-danger: #ff9d9d;
   --header-h: 68px;
   --sidebar-w: 268px;
+  /*
+   * One height for every form control, so a select in the header, a filter bar
+   * and a modal all line up. The topbar previously carried an inline
+   * `height: 34`, which made its selects 4px shorter than the rest of the app.
+   */
+  --control-h: 38px;
 }
 
+/*
+ * Light theme — elegant ivory field, white and warm-neutral surfaces, deep
+ * charcoal type and a restrained metallic gold.
+ *
+ * These are the same values the approved customer site renders, so the control
+ * plane and the customer platform read as one product rather than two palettes.
+ * The previous admin light theme was a cold blue-grey ramp (`#f5f6f8` field,
+ * `#0d2338` navy type) that fought the ivory/gold identity everywhere else.
+ *
+ * Every foreground/background pair here is measured by
+ * `.run/check-admin-light-palette.mjs`, which asserts the WCAG 2.1 ratio and
+ * fails the build when a future edit breaks contrast.
+ */
 :root[data-theme='light'] {
-  --bg: #f5f6f8;
-  --bg-deep: #eceef2;
+  color-scheme: light;
+  --bg: #f7f4ed;
+  --bg-deep: #efeae0;
   --surface: #ffffff;
-  --surface-raised: #f0f2f6;
-  --surface-hover: #e8ecf2;
-  --border: rgba(0, 22, 43, 0.12);
-  --border-soft: rgba(0, 22, 43, 0.08);
-  --border-strong: rgba(169, 134, 31, 0.55);
-  --text: #0d2338;
-  --text-muted: #5b6b7d;
-  --text-faint: #8794a3;
-  --text-inverse: #ffffff;
+  --surface-raised: #fbf9f4;
+  --surface-hover: #f4f0e8;
+  --border: rgba(36, 31, 20, 0.14);
+  --border-soft: rgba(36, 31, 20, 0.09);
+  --border-strong: rgba(125, 95, 16, 0.5);
+  --text: #22201d;
+  --text-muted: #5a544b;
+  --text-faint: #6b6459;
+  /* Warm charcoal, not white: the primary button sits on a light gold ramp and
+   * white ink would fall to ~2:1 on its top stop. */
+  --text-inverse: #241f14;
   --navy: #00162b;
-  --gold: #b8912a;
-  --gold-soft: #d4af37;
-  --gold-deep: #8f6f18;
-  --success: #1f9d63;
-  --warning: #b7791f;
-  --danger: #c53030;
-  --info: #2b6cb0;
-  --tile-overlay: linear-gradient(
-    180deg,
-    rgba(0, 12, 24, 0.1) 0%,
-    rgba(0, 22, 43, 0.62) 55%,
-    rgba(0, 22, 43, 0.9) 100%
-  );
-  --shadow-card: 0 16px 36px -26px rgba(0, 22, 43, 0.45);
+  /* Accent gold dark enough to read as text on the deepest ivory (5:1). The
+   * hover step darkens rather than lightens, because a lighter gold loses
+   * contrast on a light surface. */
+  --gold: #7d5f10;
+  --gold-hover: #6f5510;
+  --gold-soft: #d9b447;
+  --gold-deep: #a9821c;
+  /* On the ivory page the navy primary is already high-contrast, so the ramp
+   * only needs a pressed step: navy deepens toward black rather than lightening. */
+  --primary: #0f2b48;
+  --primary-hover: #0a1f36;
+  --primary-border: #081a2c;
+  --on-primary: #ffffff;
+  --secondary: #64748b;
+  --secondary-hover: #4d5a6b;
+  /*
+   * The metallic gold fill ramp, mirroring the approved customer theme. Dark
+   * warm ink (`--on-gold`) reads on both stops; the accent `--gold` above is
+   * darker because it is used as text, not as a fill.
+   */
+  --gold-fill-from: #e0c168;
+  --gold-fill-to: #c9a227;
+  --gold-fill-hover-from: #d4af37;
+  --gold-fill-hover-to: #b8912a;
+  --on-gold: #241f14;
+  /* Gold used as *text* on a gold-tinted chip. A 12% chip lifts the surface
+   * enough that the plain accent dips toward the AA floor, so chips use this
+   * slightly deeper gold instead — the same value the customer theme uses. */
+  --gold-on-tint: #7a5c10;
+  /*
+   * The gold-tint ramp, one step lighter than the dark ramp so a chip reads as a
+   * warm tint on a white card rather than a saturated block. The light
+   * percentages match `LIGHT_THEME`, so the control plane and the customer
+   * platform cannot drift apart.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 12%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 14%, var(--surface-raised));
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 34%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  /* A warm lift, so a hovered row separates from the ivory field. */
+  --row-hover: color-mix(in srgb, var(--surface-raised) 85%, transparent);
+  --success: #1a7f4f;
+  --warning: #8a5a06;
+  --danger: #b3261e;
+  --info: #1d5fa8;
+  /* Photo tiles keep white ink over a navy scrim in both themes, so this ramp
+   * is deliberately theme-independent. */
+  --shadow-card: 0 16px 36px -26px rgba(58, 48, 30, 0.28);
+  /* See the dark block: a warm charcoal reads as a shade on ivory, whereas
+   * pure black makes a branded button look dirty. */
+  --brand-shade: #241f14;
+  --shadow-tile: 0 24px 48px -26px rgba(58, 48, 30, 0.35);
+  --shadow-modal: 0 40px 80px -40px rgba(58, 48, 30, 0.4);
+  --focus-ring: color-mix(in srgb, var(--gold) 20%, transparent);
+  --backdrop: rgba(26, 22, 14, 0.5);
+  /* Compatibility aliases. Several screens reference these names directly, so
+   * they are defined here rather than left to fall back to nothing: an
+   * unresolved custom property drops the declaration, which made muted text
+   * render at full strength and a hovered option lose its background. */
+  --muted: var(--text-muted);
+  --surface-2: var(--surface-hover);
+  --accent: var(--gold);
+  --accent-strong: var(--gold);
+  --brand-primary: var(--primary);
+  --brand-primary-foreground: var(--on-primary);
+  /* Photo surfaces keep the dark-theme ink: the scrim behind them is navy in
+   * both themes, so white type over artwork stays correct on ivory too. */
+  --on-media: #ffffff;
+  --on-media-muted: rgba(233, 240, 248, 0.82);
+  --on-media-accent: #e8c766;
+  --on-media-shadow: rgba(0, 0, 0, 0.7);
+  --on-media-shadow-soft: rgba(0, 0, 0, 0.75);
+  --media-chip-bg: rgba(0, 15, 30, 0.55);
+  --media-chip-border: rgba(212, 175, 55, 0.5);
+  /* The module-tile information band in the light theme: an ivory fade with
+   * dark ink, so the card bottom switches with the theme while the artwork above
+   * it stays put. The scrim stops at 94%, so the photograph still reads. */
+  --tile-band: linear-gradient(180deg, #fffdf9 0%, #f4efe4 100%);
+  --tile-band-ink: #1a1712;
+  --tile-band-ink-muted: #4a443a;
+  --tile-band-line: color-mix(in srgb, var(--gold) 22%, transparent);
+  --tile-state-bg: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tile-state-border: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tile-state-ink: var(--gold-on-tint);
+  /* The dashboard banner is theme-adaptive: an ivory field with navy ink in the
+   * light theme, so it belongs to the page rather than floating as a navy slab.
+   * The lockup uses its on-light (navy/gold) colourway here; the dark block
+   * keeps the navy field and the on-dark colourway. */
+  --hero-field: linear-gradient(135deg, #ffffff 0%, #f7f4ed 52%, #efeae0 100%);
+  --hero-bloom: radial-gradient(760px 320px at 50% -30%, rgba(212, 175, 55, 0.22), transparent 68%),
+    radial-gradient(560px 280px at 86% 118%, rgba(125, 95, 16, 0.08), transparent 70%);
+  --hero-border: rgba(125, 95, 16, 0.28);
+  /* Banner ink: navy in the light theme (was white, which forced the field to
+   * stay navy). Consumed only by the hero and module-hero, so overriding them
+   * here re-inks the banner without touching the photo tiles. */
+  --hero-ink: #0f2b48;
+  --hero-ink-muted: #4a5568;
+  --hero-ink-accent: #7d5f10;
+  /*
+   * Light-theme navigation rail. The owner's Execution 20 directive requires
+   * the sidebar to switch completely with the theme: an ivory/white field, navy
+   * ink, navy/gold icons, subtle separators, light hover and a clearly marked
+   * active item. Gold stays an accent (active marker, icon tint), never the
+   * field, so the rail reads as light chrome rather than a navy slab. The lockup
+   * uses its on-light colourway (see the `.oryx-sidebar` overrides below).
+   */
+  --nav-bg: linear-gradient(180deg, #ffffff 0%, #faf7f1 60%, #f4efe6 100%);
+  --nav-solid: #f7f4ed;
+  --nav-border: rgba(15, 43, 72, 0.12);
+  --nav-text: #33465c;
+  --nav-text-strong: #0f2b48;
+  --nav-text-faint: #6b7b8f;
+  --nav-hover: rgba(15, 43, 72, 0.06);
+  --nav-active: rgba(212, 175, 55, 0.2);
+  --nav-active-border: rgba(125, 95, 16, 0.5);
+  --nav-danger: #b42318;
+  /* A warm gold bloom rather than the dark theme's blue one, so the ivory field
+   * does not pick up a cold cast. */
+  --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
+    radial-gradient(900px 460px at 6% 4%, rgba(125, 95, 16, 0.05), transparent 58%);
 }
 
 * {
@@ -93,9 +448,27 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--oryx-font-sans);
-  font-size: 14px;
+  font-size: var(--font-size-base);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * UI text scale.
+ *
+ * The interface is authored in absolute pixel sizes across many Tailwind
+ * utilities, so a root `font-size` change would only move the handful of
+ * `rem`-based values. `zoom` scales the whole shell — every card, table, badge
+ * and control — in one place, which is what a text-size preference is expected
+ * to do. The inline bootstrap script sets the same attribute before first paint
+ * so a reload never flashes the default size.
+ */
+html[data-font-scale='SM'] {
+  zoom: 0.92;
+}
+
+html[data-font-scale='LG'] {
+  zoom: 1.12;
 }
 
 /* Ambient navy/gold wash behind the app shell, as in the reference. */
@@ -105,15 +478,7 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background:
-    radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.09), transparent 62%),
-    radial-gradient(900px 460px at 6% 4%, rgba(74, 168, 255, 0.06), transparent 58%);
-}
-
-:root[data-theme='light'] body::before {
-  background:
-    radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
-    radial-gradient(900px 460px at 6% 4%, rgba(0, 22, 43, 0.05), transparent 58%);
+  background: var(--ambient-wash);
 }
 
 /* ------------------------------------------------------------- primitives */
@@ -125,14 +490,591 @@ body::before {
   box-shadow: var(--shadow-card);
 }
 
+/* A header dropdown rendered in a portal: fixed at a measured position, above
+ * every shell layer, and scrollable when the menu is taller than the viewport.
+ * `data-dir="up"` flips it to grow upward from its anchor. */
+.oryx-menu {
+  position: fixed;
+  z-index: 90;
+  padding: 12px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.oryx-menu[data-dir='up'] {
+  transform: translateY(-100%);
+}
+
 .oryx-card--flat {
   box-shadow: none;
 }
 
-.oryx-panel-title {
+/* ------------------------------------------------------------- point of sale */
+
+/* A POS workspace is wider than a form dialog: the grid and the cart share it. */
+/* Full-screen editing workspaces keep their header/X and save bar visible. */
+.oryx-modal-backdrop:has(.oryx-modal--full) {
+  padding: 0;
+  place-items: stretch;
+}
+.oryx-modal--full {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.oryx-modal--full > div:first-child {
+  flex: 0 0 auto;
+}
+.oryx-modal--full > div:nth-child(2) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.oryx-modal--full > div:nth-child(3) {
+  flex: 0 0 auto;
+}
+
+/*
+ * The invoice/quotation form is laid out like the printed page it produces: a
+ * two-panel information band, a five-column item table and a right-aligned
+ * summary. It needs more room than a plain form so those blocks keep the
+ * proportions the document prints with.
+ */
+.oryx-modal--document {
+  width: min(1080px, 100%);
+}
+
+.oryx-doc-form__section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.oryx-doc-form__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/*
+ * The inspection cover form.
+ *
+ * The printed vehicle-inspection report opens with a "Vehicle Information"
+ * table: a navy title band over a bordered four-column grid, each cell carrying
+ * a small bilingual label above its value. This block is that table's input
+ * mirror — the same title band, the same four-column rhythm and the same
+ * label-above-field cell — so the screen an operator fills and the sheet the
+ * customer receives present the identification identically.
+ */
+.oryx-doc-form__cover {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-raised);
+}
+
+.oryx-doc-form__cover-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--navy);
+  color: var(--on-media);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.oryx-doc-form__cover-band .ltr {
+  margin-inline-start: 8px;
+  color: var(--gold-soft);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.oryx-doc-form__cover-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gold-soft);
+}
+
+.oryx-doc-form__cover-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.oryx-doc-form__cover-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-inline-end: 1px solid var(--border);
+  border-block-end: 1px solid var(--border);
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+/* VIN spans the final two columns, exactly as the report prints it. */
+.oryx-doc-form__cover-cell--wide {
+  grid-column: span 2;
+}
+
+.oryx-doc-form__cover-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.oryx-doc-form__cover-label .ltr {
+  color: var(--text);
+}
+
+.oryx-doc-form__cover-label .var {
+  direction: rtl;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.oryx-doc-form__cover-cell .oryx-input {
+  height: 34px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oryx-doc-form__cover-cell .oryx-input:disabled {
+  opacity: 0.75;
+}
+
+@media (max-width: 860px) {
+  .oryx-doc-form__cover-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .oryx-doc-form__cover-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .oryx-doc-form__cover-cell--wide {
+    grid-column: span 1;
+  }
+}
+
+/* The mirror of the printed five-column table (Description, Quantity, Unit
+   Price, Taxes, Amount) plus the per-line discount input that feeds the printed
+   "Discount" totals row and a narrow row-action column. Description leads and
+   the numeric columns stay close to equal, exactly as the document lays them out. */
+.oryx-doc-form__grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 3.2fr) minmax(70px, .7fr) minmax(115px, 1fr) minmax(115px, .9fr) minmax(112px, .8fr) minmax(115px, 1fr) 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.oryx-doc-form__grid--head {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  padding: 0 2px;
+}
+
+@media (max-width: 720px) {
+  .oryx-doc-form__grid,
+  .oryx-doc-form__grid--head {
+    grid-template-columns: 1fr;
+  }
+  .oryx-doc-form__grid--head {
+    display: none;
+  }
+}
+
+/*
+ * The POS terminal. A till is read at arm's length across a counter, so the
+ * layout is dense, high-contrast and touch-first: a product grid that fills the
+ * width, a fixed-width order rail, and a wide always-visible tender block. The
+ * whole terminal is scoped under `.oryx-pos` so no rule leaks into other screens.
+ */
+.oryx-pos {
+  --pos-ink: var(--text);
+  --pos-soft: var(--muted);
+  --pos-line: var(--border);
+  --pos-raised: var(--surface-raised);
+  --pos-panel: var(--surface);
+  padding: 14px;
+  overflow: hidden;
+}
+
+.oryx-pos__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--pos-line);
+  border-radius: 14px;
+  background: var(--pos-panel);
+  flex: 0 0 auto;
+}
+
+.oryx-pos__search {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.oryx-pos__search .oryx-input {
+  height: 46px;
+  padding-inline-start: 42px;
+  font-size: 15px;
+}
+
+.oryx-pos__search-icon {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--pos-soft);
+  pointer-events: none;
+}
+
+.oryx-pos__chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-block: 2px;
+  scrollbar-width: thin;
+}
+
+.oryx-pos__chips .oryx-chip {
+  flex: 0 0 auto;
+  height: 34px;
+  padding-inline: 14px;
+  font-size: 12.5px;
+}
+
+/* The product grid: as many columns as the width allows, each tile square-ish. */
+.oryx-pos__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-inline-end: 4px;
+  align-content: start;
+}
+
+/*
+ * A product tile in the POS grid. The media box keeps a fixed aspect so a row
+ * of tiles lines up whether or not each product has a photograph, and the whole
+ * tile is the hit target so a mis-aimed tap still adds the product.
+ */
+.oryx-pos-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--pos-line);
+  border-radius: 16px;
+  background: var(--pos-panel);
+  padding: 0;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.oryx-pos-tile:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-2px);
+}
+
+.oryx-pos-tile:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.oryx-pos-tile:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.oryx-pos-tile__media {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  overflow: hidden;
+  background: var(--pos-raised);
+}
+
+.oryx-pos-tile__media img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.oryx-pos-tile__badge {
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-start: 6px;
+}
+
+.oryx-pos-tile__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px 10px;
+}
+
+.oryx-pos-tile__name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.oryx-pos-tile__price {
+  margin-block-start: 3px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent-strong, var(--text));
+}
+
+/* The on-hand figure under the price, so a cashier reads availability at a glance. */
+.oryx-pos-tile__stock {
+  font-size: 10.5px;
+  color: var(--pos-soft);
+}
+
+/* The order rail that holds the live cart and the tender controls. */
+.oryx-pos__rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--pos-line);
+  border-radius: 16px;
+  background: var(--pos-panel);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.oryx-pos__rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--pos-line);
+  background: var(--pos-raised);
+}
+
+.oryx-pos__rail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.oryx-pos__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px;
+}
+
+.oryx-pos__empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--pos-soft);
+  font-size: 12.5px;
+}
+
+.oryx-pos__line {
+  border: 1px solid var(--pos-line);
+  border-radius: 12px;
+  background: var(--pos-raised);
+  padding: 10px;
+}
+
+.oryx-pos__line-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.oryx-pos__line-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.oryx-pos__line-remove {
+  flex: 0 0 auto;
+}
+
+/* The tender block: totals plus the payment controls, always at the foot. */
+.oryx-pos__tender {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--pos-line);
+  background: var(--pos-raised);
+  padding: 12px 14px;
+}
+
+.oryx-pos__totals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.oryx-pos__grand {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--pos-line);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.oryx-pos__change {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oryx-pos__pay {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.oryx-pos__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.oryx-pos__complete {
+  grid-column: 1 / -1;
+  height: 52px;
   font-size: 15px;
   font-weight: 700;
+}
+
+@media (min-width: 1024px) {
+  .oryx-pos__pay {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/*
+ * A category chip above the POS grid. The active chip uses the accent fill so
+ * the current filter is unmistakable on a busy till screen.
+ */
+.oryx-chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.oryx-chip:hover {
+  border-color: var(--gold);
+}
+
+.oryx-chip--active {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, var(--gold-fill-from), var(--gold-fill-to));
+  color: var(--on-gold);
+}
+
+/*
+ * A payment-method button in the POS cart. Selecting one highlights it; the
+ * cashier taps a method rather than opening a dropdown mid-sale.
+ */
+.oryx-pay-method {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 6px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.oryx-pay-method:hover {
+  border-color: var(--gold);
+}
+
+.oryx-pay-method--active {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, var(--gold-fill-from), var(--gold-fill-to));
+  color: var(--on-gold);
+}
+
+.oryx-panel-title {
+  font-size: calc(var(--font-size-base) * 1.05);
+  font-weight: 700;
   letter-spacing: 0.01em;
+}
+
+/* The page title shown by SectionHeader, and its supporting line. Both read the
+ * typography scale so the settings panel moves every page heading at once. */
+.oryx-section-title {
+  font-size: calc(var(--font-size-base) * var(--font-size-heading));
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.oryx-section-subtitle {
+  max-width: 72ch;
+  font-size: calc(var(--font-size-base) * var(--font-size-desc));
+  line-height: 1.55;
 }
 
 .oryx-muted {
@@ -188,14 +1130,27 @@ body::before {
 }
 
 .oryx-btn--primary {
-  background: linear-gradient(180deg, var(--gold-soft), var(--gold));
-  border-color: var(--gold-deep);
-  color: var(--text-inverse);
+  background: var(--primary);
+  border-color: var(--primary-border);
+  color: var(--on-primary);
 }
 
 .oryx-btn--primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
-  border-color: var(--gold-deep);
+  background: var(--primary-hover);
+  border-color: var(--primary-border);
+}
+
+/* The secondary action: a gray control, distinct from the navy primary and the
+ * transparent ghost. */
+.oryx-btn--secondary {
+  background: var(--secondary);
+  border-color: var(--secondary-hover);
+  color: #fff;
+}
+
+.oryx-btn--secondary:hover:not(:disabled) {
+  background: var(--secondary-hover);
+  border-color: var(--secondary-hover);
 }
 
 .oryx-btn--ghost {
@@ -209,7 +1164,7 @@ body::before {
 }
 
 .oryx-btn--danger {
-  border-color: rgba(242, 85, 90, 0.5);
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
   color: var(--danger);
 }
 
@@ -224,7 +1179,7 @@ body::before {
 .oryx-label {
   display: block;
   margin-bottom: 6px;
-  font-size: 12.5px;
+  font-size: calc(var(--font-size-base) * var(--font-size-form));
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -233,13 +1188,15 @@ body::before {
 .oryx-select,
 .oryx-textarea {
   width: 100%;
-  min-height: 38px;
+  min-height: var(--control-h);
   padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface-raised);
   color: var(--text);
-  font: inherit;
+  font-family: inherit;
+  font-size: calc(var(--font-size-base) * var(--font-size-form));
+  line-height: 1.5;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -248,12 +1205,63 @@ body::before {
   resize: vertical;
 }
 
+/*
+ * Native date and time fields.
+ *
+ * The calendar/clock glyph the browser paints on a date field is a native
+ * control: at the shared control height it is drawn small and sits hard against
+ * the field edge, which is what made the inspection booking picker awkward to
+ * hit. Enlarging the indicator and giving it a consistent box keeps it usable on
+ * a touch screen, and `color-scheme` (set on `:root` per theme) keeps the popup
+ * itself legible instead of always light.
+ */
+.oryx-input--date,
+input[type='date'].oryx-input,
+input[type='time'].oryx-input,
+input[type='datetime-local'].oryx-input {
+  min-height: var(--control-h);
+  padding-inline-end: 8px;
+}
+
+.oryx-input--date::-webkit-calendar-picker-indicator,
+input[type='date'].oryx-input::-webkit-calendar-picker-indicator,
+input[type='time'].oryx-input::-webkit-calendar-picker-indicator,
+input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator {
+  width: 20px;
+  height: 20px;
+  padding: 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.oryx-input--date::-webkit-calendar-picker-indicator:hover,
+input[type='date'].oryx-input::-webkit-calendar-picker-indicator:hover,
+input[type='time'].oryx-input::-webkit-calendar-picker-indicator:hover,
+input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: var(--surface-hover);
+}
+
+/*
+ * The dropdown panel for `SearchableSelect`. It floats over the field, so it
+ * needs its own raised surface and shadow; `--surface-raised` already flips with
+ * the theme, which keeps the panel legible in both light and dark.
+ */
+.oryx-popover {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.55);
+}
+
 .oryx-input:focus,
 .oryx-select:focus,
 .oryx-textarea:focus {
   outline: none;
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .oryx-input::placeholder,
@@ -307,9 +1315,9 @@ body::before {
 }
 
 .oryx-badge--gold {
-  color: var(--gold);
-  background: color-mix(in srgb, var(--gold) 15%, transparent);
-  border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+  color: var(--gold-on-tint);
+  background: var(--tint-fill);
+  border-color: var(--tint-badge-line);
 }
 
 .oryx-badge--neutral {
@@ -320,17 +1328,66 @@ body::before {
 
 /* ------------------------------------------------------------------ tables */
 
-.oryx-table {
+/* Horizontal scroll container for every data table. `overscroll-behavior-x`
+ * stops a sideways swipe from triggering browser back/forward navigation on a
+ * touch device, and the focus ring makes the pan area reachable by keyboard. */
+.oryx-table-scroll {
   width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.oryx-table-container {
+  min-width: 0;
+  position: relative;
+}
+
+.oryx-table-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+}
+
+.oryx-table-scroll-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  width: 100%;
+  height: 18px;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  scrollbar-width: auto;
+  overscroll-behavior-x: contain;
+}
+
+.oryx-table-scroll-dock::-webkit-scrollbar,
+.oryx-table-scroll::-webkit-scrollbar {
+  height: 14px;
+}
+
+.oryx-table-scroll:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+
+.oryx-table {
+  /* A table must not be squeezed to fit its card: squeezing is what clipped the
+   * rightmost columns at narrow widths. `max-content` lets it take the width its
+   * columns need and `min-width: 100%` keeps a narrow table filling the card;
+   * the scroll container above pans anything wider. */
+  width: max-content;
+  min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 13.5px;
+  font-size: calc(var(--font-size-base) * var(--font-size-table));
 }
 
 .oryx-table thead th {
   text-align: start;
-  padding: 11px 14px;
-  font-size: 11.5px;
+  padding: 9px 12px;
+  font-size: calc(var(--font-size-base) * var(--font-size-table) * 0.85);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -340,30 +1397,39 @@ body::before {
 }
 
 .oryx-table tbody td {
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border-soft);
   vertical-align: middle;
 }
 
 .oryx-table tbody tr:hover {
-  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  background: var(--row-hover);
 }
 
 /* ------------------------------------------------------------------- tiles */
 
 /*
- * Image-led module tile. The photograph sits behind a navy gradient so the
- * caption keeps contrast in both themes, matching the reference dashboard.
+ * Module tile — the approved two-part card.
+ *
+ * Top: the module's own artwork, a fixed plate that is byte-identical in both
+ * themes (the brief forbids the photograph changing colour with the theme), with
+ * the module glyph chip over it.
+ * Bottom: a separate information band. This is the only part that tracks the
+ * theme — a navy plate on the dark theme, an ivory plate on the light one — so
+ * no fixed dark plate survives a theme switch while the artwork stays put.
+ * Text never sits over the photograph, which is why there is no full-cover
+ * scrim any more.
  */
 .oryx-tile {
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid var(--border);
-  min-height: 178px;
+  background: var(--surface);
   text-decoration: none;
-  color: #fff;
+  color: var(--tile-band-ink);
   isolation: isolate;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
@@ -371,59 +1437,123 @@ body::before {
 .oryx-tile:hover {
   transform: translateY(-3px);
   border-color: var(--border-strong);
-  box-shadow: 0 24px 48px -26px rgba(0, 0, 0, 0.9);
+  box-shadow: var(--shadow-tile);
+}
+
+/* A module catalog card's artwork chip. The tile SVGs carry their own navy
+ * field, so this frame keeps the same size in both themes and only the border
+ * and shadow follow the theme. */
+.oryx-module-badge {
+  display: block;
+  width: 92px;
+  height: 62px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-deep);
+  box-shadow: var(--shadow-tile);
+}
+
+.oryx-module-badge--lg {
+  width: 100%;
+  height: 150px;
+  border-radius: 14px;
+}
+
+.oryx-tile:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .oryx-tile__media {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
+  position: relative;
+  display: block;
+  height: 150px;
+  flex: none;
+  overflow: hidden;
+  background-color: var(--bg-deep);
   background-size: cover;
   background-position: center;
+  transition: transform 0.4s ease;
 }
 
-.oryx-tile__scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--tile-overlay);
-}
-
-.oryx-tile__body {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 6px;
-  min-height: 178px;
-  padding: 17px;
+.oryx-tile:hover .oryx-tile__media {
+  transform: scale(1.05);
 }
 
 .oryx-tile__icon {
+  position: absolute;
+  inset-inline-start: 14px;
+  inset-block-start: 14px;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  margin-bottom: auto;
-  border-radius: 11px;
-  background: rgba(0, 15, 30, 0.55);
-  border: 1px solid rgba(212, 175, 55, 0.5);
-  color: var(--gold-soft);
-  backdrop-filter: blur(3px);
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: var(--media-chip-bg);
+  border: 1px solid var(--media-chip-border);
+  color: var(--on-media-accent);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(4px);
+}
+
+.oryx-tile__band {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  padding: 15px 17px 16px;
+  background: var(--tile-band);
+  border-block-start: 1px solid var(--tile-band-line);
 }
 
 .oryx-tile__title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: 0.01em;
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+  letter-spacing: 0.005em;
+  color: var(--tile-band-ink);
 }
 
 .oryx-tile__desc {
-  font-size: 12.5px;
-  color: rgba(233, 240, 248, 0.82);
-  line-height: 1.5;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+  font-size: 13.5px;
+  color: var(--tile-band-ink-muted);
+  line-height: 1.55;
+  /* Keep every band the same height so the grid rows stay aligned. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.oryx-tile__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.oryx-tile__state {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tile-state-ink);
+  background: var(--tile-state-bg);
+  border: 1px solid var(--tile-state-border);
+}
+
+.oryx-tile__meta > svg {
+  color: var(--tile-band-ink-muted);
+}
+
+/* The forward chevron follows the reading direction. */
+[dir='rtl'] .oryx-tile__meta > svg {
+  transform: scaleX(-1);
 }
 
 .oryx-tile--planned .oryx-tile__media {
@@ -469,12 +1599,12 @@ body::before {
   grid-template-columns: var(--sidebar-w) 1fr;
   grid-template-rows: var(--header-h) 1fr;
   grid-template-areas: 'sidebar header' 'sidebar main';
+  transition: grid-template-columns 0.2s ease;
 }
 
-:root[data-dir='rtl'] .oryx-shell {
-  grid-template-columns: 1fr var(--sidebar-w);
-  grid-template-areas: 'header sidebar' 'main sidebar';
-}
+/* Grid columns follow the inline axis, so an RTL document already renders
+ * column 1 — the sidebar — on the right. No direction override is needed here;
+ * adding one would swap the columns back and push the sidebar to the left. */
 
 .oryx-header {
   grid-area: header;
@@ -487,26 +1617,131 @@ body::before {
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
-  z-index: 30;
-  /* Never let header content widen the page on narrow screens. */
+  z-index: 60;
+  /* The header must not widen the page on narrow screens, but it *must* let its
+   * menus escape downward. `overflow: hidden` clipped the user menu the moment
+   * it opened; `min-width: 0` plus the shrinking context selector already stop
+   * the content widening the page, so the clip is unnecessary. */
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .oryx-sidebar {
   grid-area: sidebar;
-  background: color-mix(in srgb, var(--bg-deep) 92%, transparent);
-  border-inline-end: 1px solid var(--border);
+  background: var(--nav-bg);
+  border-inline-end: 1px solid var(--nav-border);
+  color: var(--nav-text);
   padding: 16px 12px 28px;
   overflow-y: auto;
+  overflow-x: hidden;
   position: sticky;
   top: 0;
   height: 100vh;
+  transition: width 0.2s ease, padding 0.2s ease;
+  /* A column so the sign-out footer can be pushed to the bottom with
+   * `margin-top: auto` while the nav list keeps its natural order. */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Collapsed (icon-only) rail. The width lives on the shell so the grid column
+ * and the rail stay in step; only one property needs to change. */
+.oryx-shell[data-nav='collapsed'] {
+  --sidebar-w: 78px;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-sidebar {
+  padding: 16px 8px 28px;
+}
+
+.oryx-sidebar__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 12px;
+  border: 1px solid var(--nav-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-sidebar__brand {
+  align-items: center;
+  padding: 12px 6px;
+}
+
+.oryx-nav-group-label__text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-nav-group-label__text,
+.oryx-shell[data-nav='collapsed'] .oryx-sidebar__brand-text,
+.oryx-shell[data-nav='collapsed'] .oryx-nav-item__label,
+.oryx-shell[data-nav='collapsed'] .oryx-nav-item .oryx-badge {
+  display: none;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-nav-item {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-nav-group-label {
+  justify-content: center;
+  padding: 14px 0 6px;
+}
+
+/* The active marker stays visible in the collapsed rail via the icon colour. */
+.oryx-shell[data-nav='collapsed'] .oryx-nav-item[aria-current='page'] {
+  background: var(--nav-active);
+}
+
+/* Sign-out sits at the bottom of the rail. `margin-top: auto` pushes it down
+ * when the nav list is short; when the list is long the rail scrolls and the
+ * sticky footer keeps the control reachable. */
+.oryx-sidebar > * {
+  flex-shrink: 0;
+}
+
+.oryx-sidebar__footer {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--nav-border);
+  position: sticky;
+  bottom: 0;
+  /* Opaque, so nav items scrolling underneath cannot bleed through. */
+  background: var(--nav-solid);
+}
+
+.oryx-nav-item--logout {
+  width: 100%;
+  cursor: pointer;
+  background: none;
+  color: var(--nav-danger);
+}
+
+.oryx-nav-item--logout:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--nav-danger) 16%, transparent);
+  color: var(--nav-danger);
+}
+
+.oryx-nav-item--logout:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-nav-item--logout {
+  justify-content: center;
+  padding: 10px 0;
 }
 
 .oryx-main {
   grid-area: main;
-  padding: 22px;
+  padding: 18px;
   min-width: 0;
 }
 
@@ -516,7 +1751,7 @@ body::before {
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--nav-text-faint);
 }
 
 .oryx-nav-item {
@@ -526,7 +1761,7 @@ body::before {
   padding: 9px 12px;
   margin-bottom: 2px;
   border-radius: 10px;
-  color: var(--text-muted);
+  color: var(--nav-text);
   text-decoration: none;
   font-size: 13.5px;
   font-weight: 600;
@@ -535,18 +1770,20 @@ body::before {
 }
 
 .oryx-nav-item:hover {
-  background: var(--surface-raised);
-  color: var(--text);
+  background: var(--nav-hover);
+  color: var(--nav-text-strong);
 }
 
+/* The active item is marked by a gold wash that fades out, so the marker reads
+ * on the navy rail without painting an opaque block. */
 .oryx-nav-item[aria-current='page'] {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 20%, transparent), transparent);
-  color: var(--text);
-  border-color: var(--border-strong);
+  background: linear-gradient(90deg, var(--nav-active), transparent);
+  color: var(--nav-text-strong);
+  border-color: var(--nav-active-border);
 }
 
 :root[data-dir='rtl'] .oryx-nav-item[aria-current='page'] {
-  background: linear-gradient(270deg, color-mix(in srgb, var(--gold) 20%, transparent), transparent);
+  background: linear-gradient(270deg, var(--nav-active), transparent);
 }
 
 .oryx-nav-item__dot {
@@ -563,7 +1800,7 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0, 10, 20, 0.66);
+  background: var(--backdrop);
   backdrop-filter: blur(3px);
   display: grid;
   place-items: center;
@@ -577,57 +1814,1193 @@ body::before {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 18px;
-  box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+  box-shadow: var(--shadow-modal);
+}
+
+/* Company and branch entry forms: use available viewport space without
+   hiding the title, close control or save actions when fields are numerous. */
+.oryx-modal.oryx-modal--form {
+  width: min(940px, 100%);
+  max-width: 100%;
+  max-height: min(92dvh, 950px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.oryx-modal--form > div:first-child,
+.oryx-modal--form > div:last-child {
+  flex-shrink: 0;
+}
+.oryx-modal--form > div:nth-child(2) {
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.oryx-modal-close { color: var(--text); cursor: pointer; }
+.oryx-modal-close:hover { background: var(--bg); }
+@media (max-width: 640px) {
+  .oryx-modal-backdrop:has(.oryx-modal--form) { padding: 8px; }
+  .oryx-modal.oryx-modal--form { max-height: calc(100dvh - 16px); border-radius: 12px; }
+  .oryx-modal--form > div:first-child,
+  .oryx-modal--form > div:last-child { padding-inline: 12px; }
+  .oryx-modal--form > div:nth-child(2) { padding-inline: 12px; }
+}
+
+/*
+ * The POS terminal takes the whole viewport. A till is operated at speed behind
+ * a counter, and a centred dialog wastes the edges of a wide screen that the
+ * product grid needs. The dialog becomes a full-height flex column so the grid
+ * and the cart scroll on their own while the header and the tender bar stay
+ * pinned. Declared after `.oryx-modal` so it wins on equal specificity.
+ */
+.oryx-modal-backdrop--pos {
+  padding: 0;
+  place-items: stretch;
+}
+
+.oryx-modal--pos {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  border: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* On tablet keep the cart visible next to the catalogue. On phones the same
+ * screen scrolls as one document rather than clipping the order rail below the
+ * grid. Both colour schemes inherit the existing ORYX surface/text tokens. */
+@media (max-width: 767px) {
+  .oryx-pos {
+    overflow-y: auto;
+    align-content: start;
+  }
+  .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    max-height: 42vh;
+    overflow-y: auto;
+  }
+  .oryx-pos__rail { overflow: visible; min-height: 0; }
+  .oryx-pos__lines { max-height: 24vh; overflow-y: auto; }
+  .oryx-pos__toolbar { flex-wrap: wrap; }
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .oryx-pos { padding: 8px; }
+  .oryx-pos__grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 7px; }
+  .oryx-pos__rail-head { padding: 8px; }
+  .oryx-pos__tender { padding: 8px; gap: 6px; }
+}
+
+/*
+ * A document preview needs the full width and height of the viewport: an A4
+ * page rendered into a 720px modal is illegible, and the point of a preview is
+ * to read the page before printing it. The frame holds the browser's own PDF
+ * viewer, so it inherits that viewer's toolbar and zoom.
+ */
+.oryx-doc-preview {
+  display: block;
+  width: 100%;
+  height: min(72vh, 900px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+/* A modal that holds a document preview widens to suit the page. */
+.oryx-modal:has(.oryx-doc-preview) {
+  width: min(1100px, 100%);
+}
+
+/* ----------------------------------------------------------- brand lockup */
+
+/*
+ * The official lockup ships as one raster image, so the two colourways are
+ * stacked and swapped by theme. Both images occupy the same box; the inactive
+ * one is hidden rather than removed so it is already decoded on switch.
+ */
+.oryx-brand-logo {
+  position: relative;
+  display: inline-block;
+  flex: none;
+}
+
+.oryx-brand-logo img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  object-position: left center;
+}
+
+:root[data-dir='rtl'] .oryx-brand-logo img {
+  object-position: right center;
+}
+
+.oryx-brand-logo__on-light {
+  display: none;
+}
+
+:root[data-theme='light'] .oryx-brand-logo__on-dark {
+  display: none;
+}
+
+:root[data-theme='light'] .oryx-brand-logo__on-light {
+  display: block;
+}
+
+/*
+ * The dashboard banner is theme-adaptive: its field is ivory in the light theme
+ * and navy in the dark one. It therefore uses the on-light (navy/gold) colourway
+ * on ivory and the on-dark colourway on navy — the same default swap the rest of
+ * the light theme gets, so no override is needed here.
+ */
+
+/*
+ * The navigation rail is light in the light theme (see the `--nav-*` tokens),
+ * so its lockup uses the on-light (navy/gold) colourway. The dark theme keeps
+ * the navy rail and the on-dark colourway.
+ */
+:root[data-theme='light'] .oryx-sidebar .oryx-brand-logo__on-dark {
+  display: none;
+}
+
+:root[data-theme='light'] .oryx-sidebar .oryx-brand-logo__on-light {
+  display: block;
+}
+
+/* A tenant-uploaded logo is centred in the lockup slot; the packaged ORYX
+ * lockup is anchored to the reading edge instead. */
+.oryx-brand-logo--custom img {
+  object-position: center;
+}
+
+/*
+ * Tenant brand colours.
+ *
+ * Nothing here applies unless `BrandingProvider` has put real, validated colours
+ * on the shell, so a platform principal and a company with no stored branding
+ * render the approved palette byte for byte. The overrides are scoped to the
+ * shell rather than `:root` so switching tenant cannot leak a colour onto a
+ * screen that is showing the platform's own identity.
+ */
+.oryx-shell[data-branded='true'] .oryx-btn--primary {
+  background: var(--brand-primary);
+  border-color: color-mix(in srgb, var(--brand-primary) 78%, var(--brand-shade));
+  color: var(--brand-primary-foreground);
+}
+
+.oryx-shell[data-branded='true'] .oryx-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-primary) 86%, var(--brand-shade));
+}
+
+.oryx-shell[data-branded='true'] .oryx-nav-item[aria-current='page'] {
+  background: color-mix(in srgb, var(--brand-primary) 16%, transparent);
+}
+
+/* A colour swatch in the branding editor, showing the value before it is saved. */
+.oryx-brand-preview {
+  display: inline-block;
+  height: 24px;
+  width: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
 }
 
 /* -------------------------------------------------------------------- misc */
 
-.oryx-kpi-value {
-  font-size: 26px;
+/* ---------------------------------------------------------------- stat tiles
+ *
+ * One tile, one density. The label is small and uppercased, the value is the
+ * only large type, and the optional caption is a single faint line. The tile
+ * has a fixed compact height so a row of eight KPIs reads as one band rather
+ * than eight tall panels; the value never wraps and never changes the height.
+ */
+.oryx-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 66px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+
+.oryx-stat-card__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  color: var(--gold);
+}
+
+.oryx-stat-card--gold .oryx-stat-card__icon {
+  color: var(--gold-soft);
+}
+
+.oryx-stat-card--success .oryx-stat-card__icon {
+  color: var(--success);
+}
+
+.oryx-stat-card--danger .oryx-stat-card__icon {
+  color: var(--danger);
+}
+
+.oryx-stat-card__body {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* The label sits above the value. At the compact card width a long label such
+ * as "Monthly recurring revenue" cannot fit on one line, and an ellipsis would
+ * silently hide the metric name, so it wraps to at most two lines instead. */
+.oryx-stat-card__label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  color: var(--text-muted);
+  font-size: calc(var(--font-size-base) * 0.72);
+  font-weight: 700;
+  letter-spacing: var(--oryx-label-tracking);
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.oryx-stat-card__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(var(--font-size-base) * 1.2);
   font-weight: 800;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 
+.oryx-stat-card--gold .oryx-stat-card__value {
+  color: var(--gold-soft);
+}
+
+.oryx-stat-card--success .oryx-stat-card__value {
+  color: var(--success);
+}
+
+.oryx-stat-card--danger .oryx-stat-card__value {
+  color: var(--danger);
+}
+
+.oryx-stat-card__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: 10.5px;
+}
+
+/* KPI band.
+ *
+ * The tracks are sized, not stretched. `repeat(auto-fill, minmax(190px, 192px))`
+ * packs as many columns as fit and then caps each one at `--stat-card-max`, so a
+ * card holds a compact, constant 192px instead of inflating to a quarter of the
+ * dashboard. `justify-content: start` is what makes the cap visible: without it
+ * the leftover space is redistributed and the cards grow again — the defect this
+ * replaces, where a four-column `1fr` grid produced 278px cards at 1440 and
+ * 398px at 1920.
+ *
+ * `auto-fill` (not `auto-fit`) also means a short grid — the three-card report
+ * rows — keeps its card width and leaves the remaining tracks empty rather than
+ * stretching three cards across the panel.
+ *
+ * `grid-auto-rows: 1fr` makes a wrapped second row the same height as the
+ * first, so an odd card count (seven, five) does not leave a shorter trailing
+ * row under an even one.
+ */
+.oryx-stat-grid {
+  --stat-card-min: 190px;
+  --stat-card-max: 192px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--stat-card-min), var(--stat-card-max)));
+  grid-auto-rows: 1fr;
+  justify-content: start;
+  gap: 10px;
+}
+
+/* ================================================= inspection workspace (P2)
+ * The interactive inspection screens. The diagrams are drawn with SVG and
+ * positioned markers in normalised percentages, so the same markup works at any
+ * size and a marker lands on the same panel on a phone and a tablet. Colours
+ * come from the palette tokens, so the dark and light themes both work without
+ * a second set of rules.
+ */
+
+/* ------------------------------------------------------------ the rail */
+.oryx-rail-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.oryx-rail-item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.oryx-rail-item.is-active {
+  border-color: var(--border-strong);
+  background: var(--tint-fill);
+  color: var(--gold-on-tint);
+}
+
+.oryx-rail-item.is-complete {
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+}
+
+.oryx-rail-item__dot {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border-soft);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-inverse);
+}
+
+.oryx-rail-item.is-complete .oryx-rail-item__dot {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.oryx-rail-item__count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* ------------------------------------------------------- the checklist */
+.oryx-checklist {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.oryx-checklist__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.oryx-checklist__row:last-child {
+  border-bottom: 0;
+}
+
+.oryx-checklist__row:nth-child(even) {
+  background: var(--tint-wash);
+}
+
+.oryx-checklist__label {
+  font-size: 13px;
+  min-width: 0;
+}
+
+/* A failed item is visible at a glance while scrolling a long checklist. */
+.oryx-checklist__row[data-result='FAIL'] {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.oryx-result-btn {
+  min-width: 58px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.oryx-result-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.oryx-result-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.oryx-result-btn--pass.is-active {
+  background: color-mix(in srgb, var(--success) 22%, transparent);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.oryx-result-btn--fail.is-active {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.oryx-result-btn--na.is-active {
+  background: var(--tint-fill);
+  border-color: var(--border-strong);
+  color: var(--gold-on-tint);
+}
+
+/* -------------------------------------------------------- the diagrams */
+.oryx-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oryx-diagram__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Pushes the undo/redo/clear group to the trailing edge of the toolbar. */
+.oryx-diagram__spacer {
+  flex: 1 1 auto;
+}
+
+.oryx-paint-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.oryx-paint-tool:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.oryx-paint-tool.is-active {
+  border-color: var(--border-strong);
+  background: var(--tint-fill);
+  color: var(--gold-on-tint);
+}
+
+.oryx-paint-tool__dot {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.oryx-paint-tool__label-rtl {
+  opacity: 0.6;
+  font-weight: 500;
+}
+
+/* The canvas is the positioned ancestor for every marker. `touch-action: none`
+ * stops the browser scrolling the page while a marker is dragged. */
+.oryx-diagram__canvas {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* The body canvas takes the approved artwork's own proportions, so the drawing
+ * is never stretched: the top-view scheme is taller than it is wide. */
+.oryx-diagram__canvas--body {
+  aspect-ratio: 323 / 436;
+  max-width: 420px;
+  margin: 0 auto;
+  background: #fff;
+}
+
+.oryx-diagram__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The approved ORYX body-panel drawing, served as an image. `contain` keeps its
+ * aspect inside the canvas, which is authored at the same ratio. */
+.oryx-diagram__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.oryx-diagram__body {
+  fill: color-mix(in srgb, var(--text) 8%, transparent);
+  stroke: var(--border-strong);
+  stroke-width: 3;
+}
+
+.oryx-diagram__glass {
+  fill: color-mix(in srgb, var(--info) 22%, transparent);
+  stroke: var(--border-soft);
+  stroke-width: 2;
+}
+
+.oryx-diagram__panel {
+  stroke: var(--border-soft);
+  stroke-width: 2;
+  fill: none;
+}
+
+/* A panel seam and a chassis rail read as the same technical line. */
+.oryx-diagram__seam {
+  stroke: color-mix(in srgb, var(--text) 30%, transparent);
+  stroke-width: 2;
+  fill: none;
+}
+
+.oryx-diagram__wheel {
+  fill: color-mix(in srgb, var(--text-inverse) 60%, transparent);
+  stroke: var(--border-soft);
+  stroke-width: 2;
+}
+
+.oryx-diagram__rim {
+  fill: color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.oryx-diagram__marker {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.oryx-diagram__marker.is-selected {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  z-index: 2;
+}
+
+.oryx-diagram__marker:active {
+  cursor: grabbing;
+}
+
+.oryx-diagram__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.oryx-diagram__selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------- the chassis view */
+.oryx-chassis {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  margin: 0 auto;
+  /* The approved underbody drawing's own proportions, so the artwork is never
+   * stretched and each hotspot lands on the region it names. */
+  aspect-ratio: 1567 / 2144;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+/* The approved ORYX underbody safety drawing, served as an image. */
+.oryx-chassis__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* A region hotspot is a circular marker on the drawing. Its colour is the
+ * condition; the marker colours are fixed technical indicators and do not
+ * follow the theme. */
+.oryx-chassis-hotspot {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  transition: transform 0.12s ease;
+}
+
+.oryx-chassis-hotspot:hover:not(:disabled) {
+  transform: scale(1.12);
+}
+
+.oryx-chassis-hotspot.is-unset {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+
+.oryx-chassis-hotspot:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* The accessible control list mirrors the diagram, so a region can be set with
+ * the keyboard and read by a screen reader. */
+.oryx-chassis-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.oryx-chassis-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12.5px;
+}
+
+.oryx-chassis-list__row:last-child {
+  border-bottom: 0;
+}
+
+.oryx-chassis-list__name {
+  min-width: 0;
+}
+
+/* ------------------------------------------- inspection type picker */
+.oryx-job-type {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.oryx-job-type:hover {
+  background: var(--surface-hover);
+}
+
+.oryx-job-type.is-selected {
+  border-color: var(--border-strong);
+  background: var(--tint-fill);
+}
+
+.oryx-job-type input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* The four grouped checks that print on one report page are edited as one form;
+   a hairline separates them without reading as four separate documents. */
+.oryx-group-section {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.oryx-group-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* --------------------------------------------- searchable vehicle picker */
+.oryx-combo {
+  position: absolute;
+  z-index: 40;
+  inset-inline: 0;
+  margin-top: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+
+.oryx-combo-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: start;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.oryx-combo-item:hover,
+.oryx-combo-item.is-selected {
+  background: var(--surface-hover);
+}
+
+.oryx-combo-empty {
+  padding: 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.oryx-input--invalid {
+  border-color: var(--danger, #d64545) !important;
+}
+
+/* ----------------------------------------------------- diagnostics */
+.oryx-diagnostic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--tint-wash);
+}
+
+/* ---------------------------------------------------- attachments */
+.oryx-attachment {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-raised);
+}
+
+.oryx-attachment__thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.oryx-attachment__file {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-faint);
+}
+
+.oryx-attachment__remove {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Below 480px there is no room for a 190px floor, so the band becomes an
+ * explicit two-column split. Above it `auto-fill` is left to decide, which
+ * keeps the card at its compact width instead of stretching two columns across
+ * a 640px tablet. */
+@media (max-width: 479px) {
+  .oryx-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+/* Legacy KPI classes are kept so a screen that has not been migrated still
+ * renders; they now match the tile above instead of the old 22px value. */
+.oryx-kpi-value {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The label sits above the value; it truncates at wide sizes where the card is
+ * wide, and is allowed to wrap at narrow widths (see the 480px query). */
+.oryx-kpi-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The dashboard banner.
+ *
+ * The owner's brief is explicit: no vehicle image, the ORYX mark centred, and a
+ * background that reads correctly in both themes. The banner is therefore a
+ * pure CSS composition — a navy field with a soft gold bloom — rather than a
+ * raster. Nothing here depends on a photograph, so there is no asset to fall
+ * back to and no crop to keep aligned with the copy.
+ */
 .oryx-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
-  border: 1px solid var(--border);
+  border-radius: 20px;
+  border: 1px solid var(--hero-border);
   min-height: 232px;
   display: flex;
-  align-items: flex-end;
-  color: #fff;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: start;
+  color: var(--hero-ink);
+  background: var(--hero-field);
+  box-shadow: var(--shadow-card);
   isolation: isolate;
 }
 
-.oryx-hero__media {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  background-size: cover;
-  background-position: center;
-}
-
-.oryx-hero__scrim {
+/* A faint gold sweep behind the lockup, drawn with a pseudo-element so the
+ * banner needs no image request and no scrim layer. */
+.oryx-hero::before {
+  content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(
-    100deg,
-    rgba(0, 15, 30, 0.95) 6%,
-    rgba(0, 18, 34, 0.78) 46%,
-    rgba(0, 22, 43, 0.42) 100%
-  );
+  background: var(--hero-bloom);
+  pointer-events: none;
 }
 
-:root[data-dir='rtl'] .oryx-hero__scrim {
-  background: linear-gradient(
-    260deg,
-    rgba(0, 15, 30, 0.95) 6%,
-    rgba(0, 18, 34, 0.78) 46%,
-    rgba(0, 22, 43, 0.42) 100%
-  );
+/* A hairline gold rule along the bottom edge — the one decorative element the
+ * banner carries. It reads on both the navy and the ivory field. */
+.oryx-hero::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--gold) 22%, var(--gold) 78%, transparent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.oryx-hero__content {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 32px;
+  width: 100%;
+  max-width: 100%;
+  padding: 36px 44px;
+}
+
+/* The logo sits in its own panel on the reading-start edge, separated from the
+ * identity block by a hairline so the banner has a defined logo area. */
+.oryx-hero__lockup {
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding-inline-end: 32px;
+  border-inline-end: 1px solid color-mix(in srgb, var(--hero-ink) 16%, transparent);
+}
+
+.oryx-hero__identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.oryx-hero__logo {
+  align-self: center;
+  margin: 0;
+}
+
+.oryx-hero__title {
+  font-size: calc(clamp(28px, 3.1vw, 40px) * var(--font-size-heading));
+  font-weight: var(--oryx-heading-weight);
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+}
+
+.oryx-hero__body {
+  max-width: 68ch;
+  font-size: calc(clamp(14px, 1.15vw, 16.5px) * var(--font-size-desc));
+  line-height: 1.65;
+  color: var(--hero-ink-muted);
+}
+
+.oryx-hero__eyebrow {
+  font-size: calc(var(--font-size-base) * 0.82);
+  font-weight: 800;
+  letter-spacing: calc(0.18em + var(--oryx-label-tracking));
+  text-transform: uppercase;
+  color: var(--hero-ink-accent);
+}
+
+/* The lockup is a fixed-aspect raster (1404×320). At its 64px desktop height it
+ * is ~281px wide, which cannot sit beside the identity block on a phone, so the
+ * banner stacks and the mark scales to the available width instead of pushing
+ * the page sideways. */
+@media (max-width: 640px) {
+  .oryx-hero__content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 26px 22px;
+  }
+
+  .oryx-hero__lockup {
+    width: 100%;
+    justify-items: start;
+    padding-inline-end: 0;
+    padding-block-end: 16px;
+    border-inline-end: 0;
+    border-block-end: 1px solid color-mix(in srgb, var(--hero-ink) 16%, transparent);
+  }
+
+  /* The height and width are inline attributes on the lockup slot; the aspect
+   * ratio keeps the artwork proportional once the width is capped. */
+  .oryx-hero__logo {
+    width: min(240px, 100%) !important;
+    height: auto !important;
+    aspect-ratio: 1404 / 320;
+  }
+}
+
+/* ------------------------------------------------ module dashboard banner */
+
+/* Every module dashboard opens with this banner: the ORYX lockup, the module's
+ * bilingual name and a one-line description over the themed field, with the
+ * module's own tile artwork bled in behind a scrim. It reuses the hero tokens,
+ * so it is navy in the dark theme and ivory in the light one, exactly like the
+ * homepage banner. */
+.oryx-module-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid var(--hero-border);
+  min-height: 188px;
+  display: flex;
+  align-items: center;
+  color: var(--hero-ink);
+  background: var(--hero-field);
+  box-shadow: var(--shadow-card);
+  isolation: isolate;
+}
+
+.oryx-module-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--hero-bloom);
+  pointer-events: none;
+}
+
+.oryx-module-hero__art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.16;
+}
+
+.oryx-module-hero__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.oryx-module-hero__content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  flex-wrap: wrap;
+  padding: 28px 34px;
+  width: 100%;
+}
+
+.oryx-module-hero__lockup {
+  display: inline-flex;
+  align-items: center;
+  padding-inline-end: 26px;
+  border-inline-end: 1px solid color-mix(in srgb, var(--hero-ink) 16%, transparent);
+}
+
+.oryx-module-hero__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.oryx-module-hero__logo {
+  margin: 0;
+}
+
+.oryx-module-hero__eyebrow {
+  font-size: calc(var(--font-size-base) * 0.8);
+  font-weight: 800;
+  letter-spacing: calc(0.16em + var(--oryx-label-tracking));
+  text-transform: uppercase;
+  color: var(--hero-ink-accent);
+}
+
+.oryx-module-hero__title {
+  font-size: calc(clamp(24px, 2.3vw, 32px) * var(--font-size-heading));
+  font-weight: var(--oryx-heading-weight);
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+}
+
+.oryx-module-hero__body {
+  font-size: calc(clamp(13.5px, 1.05vw, 15.5px) * var(--font-size-desc));
+  line-height: 1.6;
+  color: var(--hero-ink-muted);
+  max-width: 68ch;
+}
+
+.oryx-shortcut {
+  text-decoration: none;
+}
+
+/* ------------------------------------------------------- function cards */
+/* The module's main functional areas. A responsive grid of cards, each with
+ * an icon, a title and a one-line description, so a module dashboard reads as
+ * a map of what the section does rather than a bare list of links. */
+.oryx-function-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.oryx-function-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 0.14s ease, background 0.14s ease, transform 0.14s ease;
+}
+
+.oryx-function-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+  transform: translateY(-1px);
+}
+
+.oryx-function-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 11px;
+  background: var(--tint-fill);
+  color: var(--gold-on-tint, var(--gold));
+}
+
+.oryx-function-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.oryx-function-card__title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.oryx-function-card__desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.oryx-function-card__chevron {
+  color: var(--text-muted);
+  flex: none;
+  margin-top: 2px;
+}
+
+:root[data-dir='rtl'] .oryx-function-card__chevron {
+  transform: scaleX(-1);
 }
 
 .oryx-focus-ring:focus-visible {
@@ -643,12 +3016,53 @@ body::before {
   }
 }
 
+/* Between 861px and 1024px the desktop rail is still docked, but the context
+ * selector's two selects plus their labels wrap to a second row inside the
+ * 68px header. Grow the header row here (without switching to the mobile
+ * drawer) so the selectors are never clipped. */
+@media (max-width: 1023px) and (min-width: 861px) {
+  :root {
+    --header-h: 104px;
+  }
+}
+
 @media (max-width: 860px) {
+  /* The context selector wraps to two rows once the rail collapses, so the
+   * 68px desktop header would clip it. Grow the row here; the shell's grid
+   * track and the drawer's offset both read this token, so they follow. */
+  :root {
+    --header-h: 92px;
+  }
+
   .oryx-shell,
   :root[data-dir='rtl'] .oryx-shell {
     grid-template-columns: 1fr;
     grid-template-rows: var(--header-h) 1fr;
     grid-template-areas: 'header' 'main';
+  }
+
+  /* The collapse toggle only applies to the docked desktop rail. The mobile
+   * drawer is always full width with labels, whatever the stored preference
+   * says, or a persisted collapse would render an unlabelled drawer. */
+  .oryx-nav-collapse-toggle {
+    display: none;
+  }
+
+  .oryx-shell[data-nav='collapsed'] .oryx-sidebar__brand,
+  .oryx-shell[data-nav='collapsed'] .oryx-nav-item {
+    justify-content: flex-start;
+    padding-inline: 12px;
+  }
+
+  .oryx-shell[data-nav='collapsed'] .oryx-nav-group-label {
+    justify-content: space-between;
+    padding: 16px 12px 6px;
+  }
+
+  .oryx-shell[data-nav='collapsed'] .oryx-nav-group-label__text,
+  .oryx-shell[data-nav='collapsed'] .oryx-sidebar__brand-text,
+  .oryx-shell[data-nav='collapsed'] .oryx-nav-item__label {
+    display: block;
   }
 
   .oryx-sidebar {
@@ -674,4 +3088,2304 @@ body::before {
   .oryx-main {
     padding: 16px;
   }
+}
+
+/* --------------------------------------------------------- narrow viewports */
+/* Below 480px the 2-up KPI grid leaves each card roughly 130px wide, and a
+ * long uppercase label plus its value overflow the card. Let both wrap and
+ * break rather than push the page wide. */
+@media (max-width: 480px) {
+  .oryx-kpi-label,
+  .oryx-kpi-value {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .oryx-kpi-label {
+    display: block;
+  }
+
+  /* A stat tile keeps its fixed height at 320px, so the label must be allowed to
+   * wrap onto a second line rather than overflow the tile. */
+  .oryx-stat-card {
+    align-items: flex-start;
+  }
+
+  .oryx-stat-card__label,
+  .oryx-stat-card__value,
+  .oryx-stat-card__sub {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* A long action label ("Enable two-factor authentication") cannot fit a
+   * 320px viewport on one line. Let buttons wrap their text and grow. */
+  .oryx-btn {
+    height: auto;
+    min-height: 38px;
+    white-space: normal;
+    text-align: center;
+    padding: 8px 14px;
+  }
+
+  .oryx-btn--sm {
+    min-height: 32px;
+  }
+
+  /* Badges carry long platform copy ("Required for Super Admin accounts"). */
+  .oryx-badge {
+    white-space: normal;
+    text-align: start;
+  }
+
+  /* Flex rows that pair a text block with an action button must stack, or the
+   * button's intrinsic width keeps the row wider than the viewport. */
+  .oryx-card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ------------------------------------------------------------------ verify
+ * Public document verification, reached by scanning a printed QR code.
+ *
+ * The route sits outside the authenticated shell, so it owns its own centred
+ * column and its own background: there is no sidebar, no topbar and no theme
+ * toggle on this page. Everything is drawn from the same identity variables the
+ * console uses, so it reads as the same product in both themes.
+ */
+.oryx-verify {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: 620px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 56px 20px 72px;
+}
+
+.oryx-verify__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.oryx-verify__head h1 {
+  margin: 6px 0 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.oryx-verify__head p {
+  margin: 0;
+  max-width: 48ch;
+  font-size: 13px;
+}
+
+.oryx-verify__form,
+.oryx-verify__result {
+  width: 100%;
+}
+
+.oryx-verify__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.oryx-verify__row label {
+  flex: 1 1 auto;
+}
+
+.oryx-verify__result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* A status stripe on the leading edge, so the verdict reads before the words. */
+.oryx-verify__result--valid {
+  border-inline-start: 3px solid var(--success);
+}
+.oryx-verify__result--revoked,
+.oryx-verify__result--cancelled,
+.oryx-verify__result--error {
+  border-inline-start: 3px solid var(--danger);
+}
+.oryx-verify__result--superseded {
+  border-inline-start: 3px solid var(--warning);
+}
+.oryx-verify__result--notfound {
+  border-inline-start: 3px solid var(--border-strong);
+}
+
+.oryx-verify__status p {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.oryx-verify__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.oryx-verify__fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.oryx-verify__fact dt {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.oryx-verify__fact dd {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.oryx-verify__privacy {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+@media (max-width: 520px) {
+  .oryx-verify__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Compact variant used inside dense panels (document category picker). */
+.oryx-input--sm {
+  padding-block: 4px;
+  padding-inline: 8px;
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------- Reports */
+/* The report catalogue tile: a card that selects a report and exposes its
+   own export actions without leaving the index. */
+.oryx-report-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+.oryx-report-tile:hover {
+  border-color: var(--tint-line);
+  box-shadow: 0 2px 10px var(--tint-glow);
+}
+.oryx-report-tile:focus-visible {
+  outline: 2px solid var(--tint-ring);
+  outline-offset: 1px;
+}
+.oryx-report-tile--active {
+  border-color: var(--gold);
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+.oryx-report-tile__title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+}
+.oryx-report-tile__desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  flex: 1 1 auto;
+}
+.oryx-report-tile__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+.oryx-report-tile__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  padding: 2px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.oryx-report-tile__action:hover {
+  color: var(--gold-deep);
+  background: var(--tint-wash);
+}
+
+/* A single server-resolved total shown above a report table. */
+.oryx-report-total {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 130px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--tint-wash);
+}
+
+
+/*
+ * POS workstation layout correction (2026-11-18).
+ * Avoid a nested grid auto-minimum pushing the cart outside the viewport.
+ * Product tiles scroll independently, while the cart and checkout remain
+ * accessible across desktop, tablet and mobile widths.
+ */
+.oryx-modal--pos {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-width: 0;
+}
+.oryx-modal--pos > div:nth-child(2) {
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.oryx-modal--pos .oryx-pos {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 34%);
+  align-items: stretch;
+}
+.oryx-modal--pos .oryx-pos > div:first-child {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.oryx-modal--pos .oryx-pos__grid {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.oryx-modal--pos .oryx-pos__rail {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.oryx-modal--pos .oryx-pos__tender {
+  flex-shrink: 0;
+  max-height: 55%;
+  overflow-y: auto;
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .oryx-modal--pos .oryx-pos {
+    grid-template-columns: minmax(0, 1fr) minmax(290px, 40%);
+  }
+}
+@media (max-width: 767px) {
+  .oryx-modal--pos > div:nth-child(2) { overflow-y: auto; }
+  .oryx-modal--pos .oryx-pos {
+    height: auto;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+  .oryx-modal--pos .oryx-pos > div:first-child { overflow: visible; }
+  .oryx-modal--pos .oryx-pos__grid {
+    max-height: min(50dvh, 520px);
+    overflow-y: auto;
+    flex: none;
+  }
+  .oryx-modal--pos .oryx-pos__rail {
+    height: auto;
+    min-height: 380px;
+    overflow: visible;
+  }
+  .oryx-modal--pos .oryx-pos__lines { max-height: 35dvh; }
+  .oryx-modal--pos .oryx-pos__tender { max-height: none; }
+}
+
+
+/* Cashier workstation v2: retain a visible, scrollable cart while showing
+ * significantly more merchandise per screen. Only affects the POS modal. */
+@media (min-width: 768px) {
+  .oryx-modal--pos .oryx-pos {
+    grid-template-columns: minmax(0, 1fr) clamp(350px, 31vw, 455px);
+    gap: 10px;
+    padding: 10px;
+  }
+  .oryx-modal--pos .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    gap: 9px;
+    scrollbar-width: thin;
+  }
+  .oryx-modal--pos .oryx-pos-tile__media { aspect-ratio: 16 / 10; }
+  .oryx-modal--pos .oryx-pos__rail { min-height: 0; }
+  .oryx-modal--pos .oryx-pos__lines {
+    min-height: 90px;
+    flex: 1 1 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .oryx-modal--pos .oryx-pos__tender {
+    flex: 0 1 auto;
+    max-height: 48%;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .oryx-modal--pos .oryx-pos__toolbar { padding: 7px 9px; }
+  .oryx-modal--pos .oryx-pos__search .oryx-input { height: 40px; }
+  .oryx-modal--pos .oryx-pos__chips .oryx-chip { height: 30px; }
+}
+@media (max-width: 767px) {
+  .oryx-modal--pos .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  }
+  .oryx-modal--pos .oryx-pos__rail {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+  .oryx-modal--pos .oryx-pos__lines {
+    max-height: 35dvh;
+    overflow-y: auto;
+  }
+}
+
+/* POS cart visibility: compact line summaries leave room for several selected
+ * products on shorter desktop screens; item details open on demand. */
+@media (min-width: 768px) {
+  .oryx-modal--pos .oryx-pos__rail {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .oryx-modal--pos .oryx-pos__rail-head { flex: 0 0 auto; padding: 8px 10px; }
+  .oryx-modal--pos .oryx-pos__lines {
+    flex: 1 1 auto;
+    min-height: 135px;
+    padding: 7px;
+    gap: 5px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .oryx-modal--pos .oryx-pos__lines > [data-testid^="pos-cart-line-"] {
+    flex-shrink: 0;
+  }
+  .oryx-modal--pos .oryx-pos__customer-warehouse {
+    flex: 0 0 auto;
+    padding: 7px 9px;
+    gap: 6px;
+  }
+  .oryx-modal--pos .oryx-pos__tender {
+    flex: 0 1 auto;
+    max-height: 32%;
+    min-height: 100px;
+    padding: 8px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+ * ORYX POS: respect the approved navy/gold identity in both UI themes.
+ * CSS variables intentionally inherit from the existing root tokens. The
+ * cashier layout and all its responsive dimensions remain unchanged.
+ * -------------------------------------------------------------------------- */
+:root .oryx-modal--pos:has(.oryx-pos--premium) {
+  --pos-panel: var(--surface);
+  --pos-raised: var(--surface-raised);
+  --pos-ink: var(--text);
+  --pos-soft: var(--text-muted);
+  --pos-line: var(--border);
+  --pos-bg: var(--bg);
+  --pos-tint: var(--tint-fill);
+  --pos-accent: var(--gold);
+  --pos-action: var(--primary);
+  --pos-action-ink: var(--on-primary);
+  color-scheme: inherit;
+}
+:root[data-theme='dark'] .oryx-modal--pos:has(.oryx-pos--premium) {
+  --pos-action: var(--gold-fill-to);
+  --pos-action-ink: var(--on-gold);
+}
+.oryx-modal--pos:has(.oryx-pos--premium) {
+  color: var(--pos-ink);
+  background: var(--pos-bg);
+  color-scheme: inherit;
+}
+.oryx-modal--pos:has(.oryx-pos--premium) > div:first-child {
+  background: var(--pos-panel);
+  color: var(--pos-ink);
+  border-bottom: 1px solid var(--pos-line);
+}
+.oryx-modal--pos:has(.oryx-pos--premium) > div:last-child {
+  background: var(--pos-panel);
+  color: var(--pos-ink);
+  border-top: 1px solid var(--pos-line);
+}
+.oryx-modal--pos:has(.oryx-pos--premium) .oryx-btn--primary {
+  background: var(--pos-action);
+  border-color: var(--pos-action);
+  color: var(--pos-action-ink);
+}
+.oryx-modal--pos .oryx-pos--premium {
+  display: grid;
+  direction: rtl;
+  /* Keep the approved three-panel layout, but reserve more screen width for
+     the actual product catalogue instead of limiting it to three tiles. */
+  grid-template-columns: clamp(122px, 10vw, 160px) minmax(0, 1fr) minmax(310px, 30%);
+  grid-template-areas: "categories catalog cart";
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 14px;
+  min-height: 0;
+  color: var(--pos-ink);
+  background: var(--pos-bg);
+}
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__catalog {
+  grid-area: catalog;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.oryx-pos--premium .oryx-pos__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  gap: 12px;
+  padding: 3px 5px 0;
+}
+.oryx-pos--premium .oryx-pos__section-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.oryx-pos--premium .oryx-pos__section-heading strong {
+  color: var(--pos-ink);
+  font-size: 17px;
+  font-weight: 800;
+}
+.oryx-pos--premium .oryx-pos__section-heading span {
+  color: var(--pos-soft);
+  font-size: 11px;
+}
+.oryx-pos--premium .oryx-pos__catalog-count {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--pos-tint);
+  color: var(--pos-accent) !important;
+  font-weight: 700;
+}
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__toolbar {
+  padding: 8px;
+  background: var(--pos-panel);
+  border: 1px solid var(--pos-line);
+  border-radius: 14px;
+  box-shadow: 0 3px 16px color-mix(in srgb, var(--pos-accent) 10%, transparent);
+}
+.oryx-pos--premium .oryx-pos__search .oryx-input {
+  height: 44px;
+  background: var(--pos-raised);
+  border: 1px solid var(--pos-line);
+  border-radius: 10px;
+  color: var(--pos-ink);
+}
+.oryx-pos--premium .oryx-pos__search-icon { color: var(--pos-soft); }
+.oryx-pos--premium .oryx-pos__toolbar .oryx-btn {
+  background: var(--pos-tint);
+  border: 1px solid var(--pos-line);
+  color: var(--pos-accent);
+  border-radius: 10px;
+}
+.oryx-pos--premium .oryx-pos__categories {
+  grid-area: categories;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 8px;
+  border: 1px solid var(--pos-line);
+  border-radius: 16px;
+  background: var(--pos-panel);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--pos-accent) 10%, transparent);
+  scrollbar-width: thin;
+}
+.oryx-pos--premium .oryx-pos__categories-title {
+  margin: 0 0 6px;
+  padding: 6px 11px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--pos-ink);
+}
+.oryx-pos--premium .oryx-pos__category {
+  width: 100%;
+  min-height: 45px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: start;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--pos-ink);
+  padding: 10px;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.oryx-pos--premium .oryx-pos__category svg { flex: 0 0 auto; color: var(--pos-soft); }
+.oryx-pos--premium .oryx-pos__category:hover {
+  background: var(--pos-tint);
+}
+.oryx-pos--premium .oryx-pos__category--active {
+  color: var(--pos-accent);
+  border-color: var(--pos-line);
+  background: var(--pos-tint);
+}
+.oryx-pos--premium .oryx-pos__category--active svg { color: var(--pos-accent); }
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 9px;
+  padding: 2px 3px 12px;
+  align-content: start;
+  overflow-y: auto;
+}
+.oryx-pos--premium .oryx-pos__grid > div { min-width: 0; }
+.oryx-pos--premium .oryx-pos-tile {
+  position: relative;
+  background: var(--pos-panel);
+  border: 1px solid var(--pos-line);
+  border-radius: 14px;
+  box-shadow: 0 3px 14px color-mix(in srgb, var(--pos-accent) 10%, transparent);
+  color: var(--pos-ink);
+  min-height: 194px;
+}
+.oryx-pos--premium .oryx-pos-tile:hover:not(:disabled) {
+  border-color: var(--pos-accent);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--pos-accent) 10%, transparent);
+}
+.oryx-pos--premium .oryx-pos-tile--selected {
+  border-color: var(--pos-accent);
+  box-shadow: 0 0 0 1px var(--pos-line);
+}
+.oryx-pos--premium .oryx-pos-tile__media {
+  aspect-ratio: 16 / 10;
+  background: var(--pos-raised);
+}
+.oryx-pos--premium .oryx-pos-tile__media img { object-fit: contain; padding: 5px; }
+.oryx-pos--premium .oryx-pos-tile__body { padding: 9px 11px 42px; gap: 4px; }
+.oryx-pos--premium .oryx-pos-tile__name { color: var(--pos-ink); font-size: 12.5px; min-height: 30px; }
+.oryx-pos--premium .oryx-pos-tile__price { color: var(--pos-accent); font-size: 14px; }
+.oryx-pos--premium .oryx-pos-tile__stock { color: var(--pos-soft); }
+.oryx-pos--premium .oryx-pos-tile__add {
+  position: absolute;
+  bottom: 9px;
+  left: 10px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--pos-action-ink);
+  background: var(--pos-action);
+}
+.oryx-pos--premium .oryx-pos-tile__selected {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  border-radius: 999px;
+  background: var(--pos-action);
+  color: var(--pos-action-ink);
+  min-width: 24px;
+  padding: 3px 7px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__rail {
+  grid-area: cart;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid var(--pos-line);
+  border-radius: 16px;
+  background: var(--pos-panel);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--pos-accent) 10%, transparent);
+  overflow: hidden;
+}
+.oryx-pos--premium .oryx-pos__rail-head {
+  min-height: 57px;
+  padding: 10px 13px !important;
+  background: var(--pos-panel);
+  border-bottom: 1px solid var(--pos-line);
+}
+.oryx-pos--premium .oryx-pos__rail-title { color: var(--pos-ink); font-size: 15px; }
+.oryx-pos--premium .oryx-pos__lines {
+  min-height: 105px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 9px 10px;
+  gap: 8px;
+  background: var(--pos-panel);
+}
+.oryx-pos--premium .oryx-pos__lines > [data-testid^="pos-cart-line-"] {
+  background: var(--pos-raised);
+  border: 1px solid var(--pos-line);
+  color: var(--pos-ink);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.oryx-pos--premium .oryx-pos__empty { flex: 1; }
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__customer-warehouse {
+  background: var(--pos-panel);
+  border-color: var(--pos-line);
+  padding: 8px;
+  gap: 8px;
+}
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__tender {
+  background: var(--pos-panel);
+  border-top: 1px solid var(--pos-line);
+  padding: 10px 12px;
+  gap: 7px;
+  max-height: 43%;
+  min-height: 0;
+  overflow-y: auto;
+  flex: 0 1 auto;
+}
+.oryx-pos--premium .oryx-pos__totals { font-size: 12px; gap: 2px; }
+.oryx-pos--premium .oryx-pos__grand {
+  margin-top: 2px;
+  padding: 11px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--pos-tint);
+  color: var(--pos-accent);
+  font-size: 18px;
+}
+.oryx-pos--premium .oryx-pay-method {
+  background: var(--pos-tint);
+  color: var(--pos-soft);
+  border-color: var(--pos-line);
+  border-radius: 9px;
+  min-height: 35px;
+}
+.oryx-pos--premium .oryx-pay-method--active {
+  color: var(--pos-action-ink);
+  background: var(--pos-action);
+  border-color: var(--pos-action);
+}
+.oryx-pos--premium .oryx-pos__tender .oryx-btn--primary {
+  min-height: 45px;
+  border-radius: 11px;
+  background: var(--pos-action);
+  color: var(--pos-action-ink);
+}
+.oryx-pos--premium input,
+.oryx-pos--premium button { font-family: inherit; }
+@media (min-width: 901px) {
+  .oryx-modal--pos .oryx-pos--premium { grid-template-columns: clamp(122px,10vw,160px) minmax(0,1fr) minmax(310px,30%); }
+}
+@media (max-width: 1100px) and (min-width: 901px) {
+  .oryx-modal--pos .oryx-pos--premium { grid-template-columns: 140px minmax(0,1fr) minmax(305px,34%); gap: 8px; padding: 9px; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__grid { grid-template-columns: repeat(auto-fill, minmax(126px,1fr)); gap: 8px; }
+}
+@media (max-width: 900px) {
+  .oryx-modal--pos .oryx-pos--premium {
+    display: grid;
+    height: auto;
+    min-height: 100%;
+    grid-template-columns: minmax(0,1fr) minmax(300px,42%);
+    grid-template-areas: "categories categories" "catalog cart";
+    gap: 9px;
+  }
+  .oryx-pos--premium .oryx-pos__categories {
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-height: 55px;
+    padding: 6px;
+  }
+  .oryx-pos--premium .oryx-pos__categories-title { display: none; }
+  .oryx-pos--premium .oryx-pos__category { width: auto; white-space: nowrap; min-height: 40px; flex-shrink: 0; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__catalog { min-height: 460px; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__rail { min-height: 460px; }
+}
+@media (max-width: 650px) {
+  .oryx-modal--pos .oryx-pos--premium {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    padding: 8px;
+    gap: 10px;
+  }
+  .oryx-pos--premium .oryx-pos__categories { order: 0; width: 100%; flex: 0 0 auto; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__catalog { order: 1; min-height: 380px; overflow: visible; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__grid { max-height: 45dvh; grid-template-columns: repeat(auto-fill, minmax(128px,1fr)); }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__rail { order: 2; height: auto; min-height: 440px; overflow: visible; }
+  .oryx-pos--premium .oryx-pos__lines { max-height: 36dvh; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__tender { max-height: none; overflow: visible; }
+  .oryx-pos--premium .oryx-pos__section-heading { padding: 4px 2px; }
+}
+
+
+/* Visible quantity +/- controls in the approved three-product cart layout. */
+.oryx-pos--premium .oryx-pos__line-quick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+.oryx-pos--premium .oryx-pos__line-quick > strong {
+  color: var(--pos-ink);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.oryx-pos--premium .oryx-pos__quantity-stepper {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--pos-line);
+  border-radius: 9px;
+  background: var(--pos-panel);
+}
+.oryx-pos--premium .oryx-pos__quantity-stepper button {
+  width: 27px;
+  min-height: 28px;
+  border: 0;
+  background: var(--pos-tint);
+  color: var(--pos-accent);
+  font-weight: 800;
+  cursor: pointer;
+}
+.oryx-pos--premium .oryx-pos__quantity-stepper button:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+.oryx-pos--premium .oryx-pos__quantity-stepper span {
+  min-width: 26px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--pos-ink);
+}
+
+
+/* --------------------------------------------------------------------------
+   ORYX POS COMMAND — cashier-first redesign.
+   Scoped to the new command class. All colors resolve from the approved
+   ORYX light/dark semantic tokens; no hard-coded lavender or white surfaces.
+   -------------------------------------------------------------------------- */
+.oryx-modal--pos .oryx-pos--command {
+  grid-template-areas:
+    "command command command"
+    "categories catalog cart";
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: 178px minmax(0, 1fr) minmax(350px, 34%);
+  gap: 14px;
+  padding: 16px;
+  background: var(--pos-bg);
+}
+.oryx-pos--command .oryx-pos__command-bar {
+  grid-area: command;
+  min-width: 0;
+  min-height: 73px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  background: linear-gradient(115deg, var(--pos-panel), var(--pos-raised));
+  border: 1px solid var(--pos-line);
+  border-bottom: 3px solid var(--pos-accent);
+  border-radius: 18px;
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--pos-ink) 6%, transparent);
+}
+.oryx-pos--command .oryx-pos__command-identity,
+.oryx-pos--command .oryx-pos__command-status,
+.oryx-pos--command .oryx-pos__command-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.oryx-pos--command .oryx-pos__command-identity > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.oryx-pos--command .oryx-pos__command-identity strong {
+  color: var(--pos-ink);
+  font-size: 20px;
+  font-weight: 850;
+  line-height: 1.15;
+}
+.oryx-pos--command .oryx-pos__command-identity span:not(.oryx-pos__command-monogram) {
+  font-size: 10px;
+  color: var(--pos-soft);
+  letter-spacing: .04em;
+}
+.oryx-pos--command .oryx-pos__command-monogram {
+  width: 43px;
+  height: 43px;
+  flex: 0 0 43px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--pos-action);
+  color: var(--pos-action-ink);
+  font: 900 25px/1 Arial,sans-serif;
+  border: 1px solid var(--pos-accent);
+}
+.oryx-pos--command .oryx-pos__command-status {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px 13px;
+  border: 1px solid var(--pos-line);
+  border-radius: 12px;
+  background: var(--pos-tint);
+  color: var(--pos-ink);
+}
+.oryx-pos--command .oryx-pos__command-status b {
+  color: var(--pos-soft);
+  font-size: 11px;
+}
+.oryx-pos--command .oryx-pos__command-indicator {
+  width: 8px;
+  height: 8px;
+  background: var(--success);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 18%, transparent);
+}
+.oryx-pos--command .oryx-pos__command-stats { gap: 8px; }
+.oryx-pos--command .oryx-pos__command-stats > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 96px;
+  padding: 6px 13px;
+  border-inline-start: 1px solid var(--pos-line);
+  color: var(--pos-soft);
+  font-size: 10px;
+}
+.oryx-pos--command .oryx-pos__command-stats strong {
+  color: var(--pos-ink);
+  font-size: 17px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.oryx-pos--command .oryx-pos__categories {
+  border-radius: 18px;
+  padding: 13px 9px;
+  box-shadow: none;
+  border-top: 3px solid var(--pos-accent);
+}
+.oryx-pos--command .oryx-pos__categories-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  padding: 7px 10px 13px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--pos-line);
+}
+.oryx-pos--command .oryx-pos__category {
+  min-height: 51px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding-inline: 13px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.oryx-pos--command .oryx-pos__category--active {
+  background: var(--pos-action);
+  color: var(--pos-action-ink);
+  border-color: var(--pos-action);
+}
+.oryx-pos--command .oryx-pos__category--active svg { color: var(--pos-action-ink); }
+.oryx-pos--command .oryx-pos__catalog {
+  background: transparent;
+  gap: 12px;
+}
+.oryx-pos--command .oryx-pos__section-heading {
+  min-height: 44px;
+  align-items: center;
+  padding-inline: 8px;
+}
+.oryx-pos--command .oryx-pos__section-heading strong { font-size: 18px; }
+.oryx-pos--command .oryx-pos__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 15px;
+  box-shadow: none;
+}
+.oryx-pos--command .oryx-pos__search { flex: 1 1 220px; min-width: 0; }
+.oryx-pos--command .oryx-pos__search .oryx-input {
+  height: 48px;
+  font-size: 13px;
+}
+.oryx-pos--command .oryx-pos__toolbar .oryx-btn { min-height: 45px; font-weight: 700; }
+.oryx-modal--pos .oryx-pos--command .oryx-pos__grid {
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 13px;
+  padding: 2px 4px 15px;
+}
+.oryx-pos--command .oryx-pos-tile {
+  min-height: 225px;
+  border-radius: 17px;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--pos-ink) 5%, transparent);
+  overflow: hidden;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+.oryx-pos--command .oryx-pos-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--pos-ink) 11%, transparent);
+}
+.oryx-pos--command .oryx-pos-tile__media {
+  aspect-ratio: 16/11;
+  border-bottom: 1px solid var(--pos-line);
+  background: var(--pos-raised);
+}
+.oryx-pos--command .oryx-pos-tile__media img { object-fit: contain; padding: 10px; }
+.oryx-pos--command .oryx-pos-tile__body { padding: 11px 13px 47px; gap: 6px; }
+.oryx-pos--command .oryx-pos-tile__name { font-size: 13px; font-weight: 800; min-height: 35px; }
+.oryx-pos--command .oryx-pos-tile__price { font-size: 17px; font-weight: 900; color: var(--pos-ink); }
+.oryx-pos--command .oryx-pos-tile__add {
+  width: 35px;
+  height: 35px;
+  bottom: 10px;
+  left: 10px;
+  border-radius: 11px;
+}
+.oryx-modal--pos .oryx-pos--command .oryx-pos__rail {
+  border-radius: 18px;
+  box-shadow: 0 3px 19px color-mix(in srgb, var(--pos-ink) 7%, transparent);
+  border-top: 3px solid var(--pos-accent);
+}
+.oryx-pos--command .oryx-pos__rail-head {
+  min-height: 68px;
+  padding: 13px 16px !important;
+  background: var(--pos-raised);
+}
+.oryx-pos--command .oryx-pos__rail-title { font-size: 17px; font-weight: 850; gap: 9px; }
+.oryx-pos--command .oryx-pos__rail-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  color: var(--pos-action-ink);
+  background: var(--pos-action);
+}
+.oryx-pos--command .oryx-pos__lines { gap: 10px; padding: 12px; }
+.oryx-pos--command .oryx-pos__lines > [data-testid^="pos-cart-line-"] {
+  border-radius: 13px;
+  padding: 11px;
+}
+.oryx-modal--pos .oryx-pos--command .oryx-pos__customer-warehouse {
+  background: var(--pos-raised);
+  padding: 12px;
+  gap: 10px;
+}
+.oryx-modal--pos .oryx-pos--command .oryx-pos__tender {
+  background: var(--pos-panel);
+  padding: 14px 16px;
+  gap: 9px;
+  max-height: 52%;
+}
+.oryx-pos--command .oryx-pos__totals { gap: 6px; font-size: 12.5px; }
+.oryx-pos--command .oryx-pos__grand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 13px;
+  padding: 14px;
+  border: 1px solid var(--pos-accent);
+  background: var(--pos-tint);
+  color: var(--pos-ink);
+  font-size: 17px;
+  font-weight: 900;
+}
+.oryx-pos--command .oryx-pos__grand .tabular-nums { font-size: 23px; color: var(--pos-ink); }
+.oryx-pos--command .oryx-pos__pay { gap: 6px; }
+.oryx-pos--command .oryx-pay-method { min-height: 43px; padding: 7px 9px; font-weight: 750; }
+.oryx-pos--command .oryx-pos__tender .oryx-btn--primary {
+  min-height: 54px;
+  border-radius: 13px;
+  font-weight: 850;
+  font-size: 14px;
+}
+.oryx-pos--command button:focus-visible,
+.oryx-pos--command input:focus-visible {
+  outline: 2px solid var(--pos-accent);
+  outline-offset: 2px;
+}
+@media (max-width: 1180px) and (min-width: 901px) {
+  .oryx-modal--pos .oryx-pos--command {
+    grid-template-columns: 148px minmax(0,1fr) minmax(315px,36%);
+    gap: 9px;
+    padding: 10px;
+  }
+  .oryx-pos--command .oryx-pos__command-status { display:none; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px,1fr));
+    gap: 9px;
+  }
+}
+@media (max-width: 900px) {
+  .oryx-modal--pos .oryx-pos--command {
+    grid-template-areas: "command command" "categories categories" "catalog cart";
+    grid-template-columns: minmax(0,1fr) minmax(300px,42%);
+    grid-template-rows: auto auto minmax(0,1fr);
+  }
+  .oryx-pos--command .oryx-pos__categories { border-top: 1px solid var(--pos-line); }
+  .oryx-pos--command .oryx-pos__categories-title { display:none; }
+  .oryx-pos--command .oryx-pos__command-stats { margin-inline-start: auto; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(138px,1fr));
+  }
+}
+@media (max-width: 650px) {
+  .oryx-modal--pos .oryx-pos--command { display:flex; flex-direction:column; gap:10px; padding:8px; }
+  .oryx-pos--command .oryx-pos__command-bar { width:100%; padding:11px 13px; gap:10px; }
+  .oryx-pos--command .oryx-pos__command-status { display:none; }
+  .oryx-pos--command .oryx-pos__command-stats { width:100%; justify-content:space-between; }
+  .oryx-pos--command .oryx-pos__command-stats > span { min-width:0; flex:1; }
+  .oryx-pos--command .oryx-pos__categories { width:100%; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__catalog { min-height:380px; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__grid { grid-template-columns:repeat(auto-fill,minmax(135px,1fr)); }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__rail { min-height:460px; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__tender { max-height:none; }
+}
+
+
+/* PR61: full-screen invoice form and POS layout acceptance.
+   Keep these at the end: the generic .oryx-modal rule is declared AFTER
+   .oryx-modal--full earlier in this file and otherwise resets width to 720px. */
+.oryx-modal-backdrop:has(.oryx-modal--full) {
+  padding: 0;
+  place-items: stretch;
+}
+.oryx-modal.oryx-modal--full {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.oryx-modal.oryx-modal--full > div:nth-child(2) {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.oryx-modal.oryx-modal--full > div:first-child,
+.oryx-modal.oryx-modal--full > div:last-child {
+  flex-shrink: 0;
+}
+
+/* POS: the catalog, category picker and live cart each own a distinct
+   region. The products and cart rows scroll independently, never overlap. */
+@media (min-width: 901px) {
+  .oryx-modal--pos .oryx-pos--command {
+    grid-template-areas: "command command command" "categories catalog cart";
+    grid-template-columns: clamp(110px, 10vw, 140px) minmax(0, 1fr) clamp(315px, 27vw, 370px);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+    overflow: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__catalog,
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__categories,
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__rail {
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__grid {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+    gap: 8px;
+  }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__rail {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__lines {
+    min-height: 90px;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__customer-warehouse { flex: 0 0 auto; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__tender {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 42%;
+    overflow-y: auto;
+  }
+}
+@media (min-width: 651px) and (max-width: 900px) {
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__catalog,
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__rail { min-height: 0; min-width: 0; overflow: hidden; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__grid { overflow-y: auto; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__lines { min-height: 80px; overflow-y: auto; }
+}
+
+
+/* ORYX CASHIER WORKSTATION V4 — clean isolated layout.
+   Previous command/premium layouts are intentionally overridden here; this
+   workspace has only three independently scrolling areas with no overlap. */
+.oryx-modal--pos:has(.oryx-pos--workspace-v4) {
+  width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+.oryx-modal--pos:has(.oryx-pos--workspace-v4) > div:nth-child(2) {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 {
+  display: grid;
+  grid-template-areas: "command command" "categories categories" "catalog cart";
+  grid-template-columns: minmax(0, 1fr) clamp(330px, 28vw, 400px);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  direction: rtl;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  max-height: 100%;
+  margin: 0;
+  padding: 12px;
+  gap: 12px;
+  overflow: hidden;
+  background: var(--pos-bg);
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__command-bar {
+  grid-area: command;
+  min-width: 0;
+  min-height: 0;
+  padding: 9px 16px;
+  border-radius: 12px;
+  box-shadow: none;
+  gap: 12px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__command-identity strong { font-size: 17px; }
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__command-monogram {
+  width: 36px; height: 36px; flex-basis: 36px; border-radius: 10px; font-size: 21px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__categories,
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__catalog,
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__rail {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  background: var(--pos-panel);
+  border: 1px solid var(--pos-line);
+  border-radius: 13px;
+  box-shadow: none;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__categories {
+  grid-area: categories;
+  display: flex;
+  flex-direction: row;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  height: auto;
+  max-height: 55px;
+  padding: 6px 9px;
+  overflow-y: hidden;
+  overflow-x: auto;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__categories-title {
+  font-size: 12px; display: flex; flex:0 0 auto; margin: 0; padding: 6px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__category {
+  display: flex;
+  width: auto;
+  min-height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  border-radius: 9px;
+  padding: 7px;
+  text-align: start;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__catalog {
+  grid-area: catalog;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__section-heading {
+  min-height: 0; flex: 0 0 auto; padding: 0 2px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__section-heading strong { font-size: 16px; }
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 7px;
+  flex-wrap: nowrap;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__search { flex: 1 1 0; min-width: 0; }
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__search input { min-width: 0; height: 40px; }
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__toolbar .oryx-btn {
+  flex: 0 0 auto; min-height: 40px; padding-inline: 8px; white-space: nowrap;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__grid {
+  display: grid;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  max-height: none;
+  grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 10px;
+  padding: 2px 3px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__grid > div { min-width: 0; }
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos-tile {
+  display: flex; flex-direction: column; width: 100%; min-height: 0;
+  border-radius: 12px; overflow: hidden; box-shadow: none;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos-tile__media { aspect-ratio: 3 / 2; }
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos-tile__body {
+  min-height: 85px; padding: 8px 10px 35px; gap: 4px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos-tile__name {
+  font-size: 12px; min-height: 0; overflow-wrap: anywhere;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos-tile__price { font-size: 15px; }
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__rail {
+  grid-area: cart;
+  display: flex;
+  flex-direction: column;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__rail-head {
+  flex: 0 0 auto; min-height: 0; padding: 10px 12px !important;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__rail-title {
+  flex-wrap: wrap; min-width: 0; font-size: 14px; gap: 5px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__lines {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 105px;
+  max-height: none;
+  gap: 6px;
+  padding: 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__lines > [data-testid^="pos-cart-line-"] {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 8px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__line-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__customer-warehouse {
+  flex: 0 0 auto; min-width: 0; max-width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 7px; gap: 6px; overflow-x: hidden;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__customer-warehouse > *,
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__customer-warehouse input,
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__customer-warehouse button {
+  min-width: 0; max-width: 100%;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__tender {
+  flex: 0 1 auto;
+  min-height: 125px;
+  max-height: 43%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 9px 12px;
+  gap: 6px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__grand {
+  padding: 9px; font-size: 14px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__grand .tabular-nums { font-size: 18px; }
+@media (min-width: 901px) and (max-width: 1170px) {
+  .oryx-modal--pos .oryx-pos--workspace-v4 {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 7px; padding: 8px;
+  }
+  .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)); gap: 7px;
+  }
+}
+@media (min-width: 651px) and (max-width: 900px) {
+  .oryx-modal--pos .oryx-pos--workspace-v4 {
+    grid-template-areas: "command command" "categories categories" "catalog cart";
+    grid-template-columns: minmax(0, 1fr) minmax(290px, 42%);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 7px; padding: 8px;
+  }
+  .oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__categories {
+    flex-direction: row; overflow-x: auto; overflow-y: hidden; height: auto; max-height: 65px;
+    padding: 5px; align-items: center;
+  }
+  .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__categories-title { display: none; }
+  .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__category {
+    width: auto; white-space: nowrap; min-height: 35px;
+  }
+  .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(125px, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .oryx-modal--pos:has(.oryx-pos--workspace-v4) > div:nth-child(2) { overflow-y: auto; }
+  .oryx-modal--pos .oryx-pos--workspace-v4 {
+    display: flex; flex-direction: column; height: auto; max-height: none;
+    min-height: 100%; overflow: visible; gap: 8px; padding: 8px;
+  }
+  .oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__command-bar { flex: 0 0 auto; }
+  .oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__categories {
+    order: 0; flex: 0 0 auto; width: 100%; height: auto; max-height: 62px;
+    display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__categories-title { display: none; }
+  .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__category {
+    flex: 0 0 auto; width: auto; white-space: nowrap;
+  }
+  .oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__catalog {
+    order: 1; flex: 0 0 auto; min-height: 410px; max-height: none; height: auto;
+  }
+  .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__toolbar { flex-wrap: wrap; }
+  .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__grid {
+    min-height: 260px; max-height: 50dvh;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+  .oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__rail {
+    order: 2; flex: 0 0 auto; min-height: 440px; max-height: none; height: auto;
+  }
+  .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__lines { min-height: 120px; max-height: 34dvh; }
+  .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__tender {
+    flex: 0 0 auto; min-height: 0; max-height: none;
+  }
+}
+
+
+/* Full-screen usability correction: the close control must remain reachable,
+   and the actual editor fields must fit inside the viewport instead of merely
+   stretching their old, oversized containers. */
+.oryx-modal-backdrop:has(.oryx-modal--full),
+.oryx-modal-backdrop--pos {
+  width: 100dvw;
+  max-width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+  min-width: 0;
+}
+.oryx-modal.oryx-modal--full,
+.oryx-modal.oryx-modal--pos {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+.oryx-modal--full > div:first-child,
+.oryx-modal--pos > div:first-child {
+  position: relative;
+  z-index: 20;
+  min-width: 0;
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 16px;
+  background: var(--surface);
+  flex: 0 0 auto;
+}
+.oryx-modal--full > div:first-child h2,
+.oryx-modal--pos > div:first-child h2 {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.oryx-modal--full > div:first-child button[aria-label],
+.oryx-modal--pos > div:first-child button[aria-label] {
+  display: grid;
+  place-items: center;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  position: sticky;
+  inset-inline-end: 0;
+  z-index: 30;
+  border: 2px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.oryx-modal--full > div:nth-child(2) {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 14px;
+}
+.oryx-modal--full > div:last-child {
+  min-height: 58px;
+  padding: 9px 16px;
+  background: var(--surface);
+  flex: 0 0 auto;
+}
+.oryx-modal--full .oryx-doc-form__section { min-width: 0; }
+.oryx-modal--full .oryx-doc-form__section-head { padding-block: 8px; }
+.oryx-modal--full .oryx-doc-form__section > div.grid { gap: 8px; padding: 10px; }
+.oryx-modal--full .oryx-doc-form__grid {
+  grid-template-columns:
+    minmax(180px, 3fr) minmax(56px, .65fr) minmax(90px, 1fr)
+    minmax(90px, 1fr) minmax(100px, 1fr) minmax(88px, 1fr) 32px;
+  gap: 6px;
+  min-width: 0;
+}
+.oryx-modal--full .oryx-doc-form__grid > *,
+.oryx-modal--full .oryx-doc-form__grid input,
+.oryx-modal--full .oryx-doc-form__grid button {
+  min-width: 0;
+  max-width: 100%;
+}
+.oryx-modal--full .oryx-doc-form__grid--head { position: sticky; top: 0; z-index: 2; background: var(--surface); }
+@media (max-width: 850px) {
+  .oryx-modal--full .oryx-doc-form__grid {
+    grid-template-columns: minmax(150px, 2fr) repeat(5, minmax(78px, 1fr)) 32px;
+  }
+  .oryx-modal--full [data-testid$="-items"] > div:last-child { overflow-x: auto; }
+  .oryx-modal--full .oryx-doc-form__grid { min-width: 720px; }
+}
+@media (max-width: 600px) {
+  .oryx-modal--full .oryx-doc-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+  .oryx-modal--full .oryx-doc-form__grid--head { display: none; }
+}
+
+/* POS viewport: the screenshot shows the header/X left outside the visible
+   scroll area and a cut-off cart; the workspace must never expand the page. */
+.oryx-modal--pos:has(.oryx-pos--workspace-v4) > div:nth-child(2) {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 8px;
+  gap: 8px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__command-bar {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__command-identity,
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__command-status,
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__command-stats {
+  min-width: 0;
+  max-width: 100%;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__catalog,
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__rail {
+  overflow-x: hidden;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__rail-head {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* V5 is a deliberately new POS header, not the old premium/banner shell. */
+.oryx-modal--pos .oryx-pos--new-cashier {
+  display: grid;
+  grid-template-areas: "quickbar quickbar" "categories categories" "catalog cart";
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 29vw, 390px);
+  grid-template-rows: minmax(0, auto) auto minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  align-content: stretch;
+  overflow: hidden;
+  direction: rtl;
+}
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+  grid-area: quickbar;
+  display: flex;
+  min-width: 0;
+  min-height: 54px;
+  max-height: 70px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 13px;
+  border: 1px solid var(--pos-line);
+  border-radius: 12px;
+  background: var(--pos-panel);
+}
+.oryx-pos__quickbar-heading {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+.oryx-pos__quickbar-heading > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.oryx-pos__quickbar-heading strong { font-size: 16px; line-height: 1.2; }
+.oryx-pos__quickbar-heading span:not(.oryx-pos__quickbar-mark) {
+  color: var(--pos-soft); font-size: 11px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.oryx-pos__quickbar-mark {
+  flex: 0 0 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #061a30;
+}
+.oryx-pos__quickbar-session {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--pos-soft);
+}
+.oryx-pos__quickbar-session b { color: var(--pos-ink); }
+.oryx-pos__quickbar-live {
+  display: block; flex: 0 0 7px; width: 7px; height: 7px;
+  border-radius: 50%; background: #22c55e;
+}
+.oryx-pos__quickbar-summary {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 12px;
+  min-width: 0;
+  font-size: 12px;
+}
+.oryx-pos__quickbar-summary b { font-size: 14px; }
+.oryx-pos__quickbar-summary > strong {
+  font-size: 17px; color: var(--accent); white-space: nowrap;
+}
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__catalog,
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__rail {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+  min-height: 40px; max-height: 50px; overflow-x: auto;
+}
+@media (max-width: 980px) {
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    grid-template-columns: minmax(0, 1fr) 315px;
+  }
+  .oryx-pos__quickbar-session { display: none; }
+}
+@media (max-width: 720px) {
+  .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:nth-child(2) {
+    overflow-y: auto;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+    flex: 0 0 auto; width: 100%; max-height: none; flex-wrap: wrap;
+  }
+  .oryx-pos__quickbar-summary { flex-wrap: wrap; }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+    flex: 0 0 auto; width: 100%;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__catalog {
+    flex: 0 0 auto; height: auto; min-height: 420px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__rail {
+    flex: 0 0 auto; height: auto; min-height: 440px;
+  }
+}
+
+/* Four real section navigation tabs remain visible while entering invoices and
+   quotations, instead of requiring the operator to hunt down a tall form. */
+.oryx-modal--full .oryx-doc-form__section-tabs {
+  position: sticky;
+  top: -10px;
+  z-index: 15;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 10px;
+  padding: 8px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.oryx-modal--full .oryx-doc-form__section-tab {
+  min-height: 40px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  color: var(--text);
+  background: var(--surface-raised);
+}
+.oryx-modal--full .oryx-doc-form__section-tab:hover,
+.oryx-modal--full .oryx-doc-form__section-tab:focus-visible {
+  border-color: var(--accent);
+  outline-offset: 1px;
+}
+.oryx-modal--full .oryx-doc-form__section {
+  scroll-margin-top: 84px;
+}
+@media (max-width: 560px) {
+  .oryx-modal--full .oryx-doc-form__section-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+
+/* POS cart visibility fix (cashier screenshots, 19 Nov 2026).
+   Three stacked top strips and oversized rail controls left room for one
+   basket row at a 720px screen. Compact the chrome and let CART lines own the
+   remaining height; never require scrolling the whole terminal. */
+@media (min-width: 721px) {
+  .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:first-child {
+    min-height: 0;
+    height: 48px;
+    padding: 4px 12px;
+  }
+  .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:first-child h2 {
+    font-size: 14px;
+  }
+  .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:first-child button[aria-label] {
+    flex-basis: 44px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    grid-template-rows: 42px 38px minmax(0, 1fr);
+    gap: 5px;
+    padding: 5px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+    min-height: 0;
+    max-height: 42px;
+    padding: 4px 10px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+    min-height: 0;
+    height: 38px;
+    max-height: 38px;
+    padding: 2px 8px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__category {
+    min-height: 30px;
+    padding-block: 4px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__rail {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__rail-head {
+    flex: 0 0 40px;
+    min-height: 40px;
+    padding: 4px 8px !important;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__lines {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 4px;
+    gap: 4px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__lines > [data-testid^="pos-cart-line-"] {
+    padding: 5px;
+    gap: 3px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__lines > [data-testid^="pos-cart-line-"] > div:first-child {
+    gap: 6px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__lines > [data-testid^="pos-cart-line-"] > div:first-child > div:first-child {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__customer-warehouse {
+    flex: 0 0 auto;
+    min-height: 0;
+    padding: 4px 6px;
+    gap: 5px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__customer-warehouse .oryx-input {
+    min-height: 30px;
+    height: 32px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__tender {
+    flex: 0 1 auto;
+    min-height: 85px;
+    max-height: 29%;
+    padding: 6px 8px;
+    gap: 3px;
+    overflow-y: auto;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__grand {
+    padding: 5px 7px;
+  }
+}
+
+
+/*
+ * Cashier workspace: the modal title, duplicate POS heading and category ribbon
+ * used to stack into three separate bars. Put the POS state and category filter
+ * side by side in ONE strip, then dedicate the remaining height to catalogue
+ * and cart. The category filter still scrolls horizontally as necessary.
+ */
+@media (min-width: 721px) {
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    grid-template-areas: "quickbar categories" "catalog cart";
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 29vw, 390px);
+    grid-template-rows: 38px minmax(0, 1fr);
+    gap: 5px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+    min-height: 0;
+    height: 38px;
+    max-height: 38px;
+    padding: 3px 8px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+    height: 38px;
+    max-height: 38px;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    padding: 2px 6px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories > * {
+    flex-shrink: 0;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__section-heading {
+    display: none; /* its redundant heading duplicated the modal and search */
+  }
+}
+@media (min-width: 721px) and (max-width: 980px) {
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    grid-template-columns: minmax(0, 1fr) 315px;
+  }
+}
+
+/*
+ * All data-entry modals use the full viewport and independent field scrolling.
+ * CSS :has keeps existing confirmation/alert dialogs compact, while covering
+ * both current and future company, branch, stock, HR, settings and sales forms
+ * without modifying their submit handlers, permissions or state.
+ * A nested form opened from another modal retains the current z-index stacking.
+ */
+.oryx-modal-backdrop:has(.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"]))) {
+  padding: 0;
+  place-items: stretch;
+  width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+}
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100dvw;
+  min-width: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:first-child {
+  flex: 0 0 auto;
+  min-height: 52px;
+  padding: 4px 16px;
+}
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(2) {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 12px 18px;
+}
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(3) {
+  flex: 0 0 auto;
+  min-height: 56px;
+  padding: 8px 16px;
+  background: var(--surface);
+}
+@media (max-width: 600px) {
+  .oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(2) {
+    padding: 10px;
+  }
+  .oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(3) {
+    gap: 6px;
+    padding: 8px;
+  }
+}
+
+
+/*
+ * Stable fullscreen targeting for company and branch editors.
+ * Their form controls can be rendered through nested component wrappers, so
+ * relying solely on generic input detection can miss these real dialogs.
+ * Explicit test ids provide a deterministic fallback without expanding
+ * confirmation/preview dialogs or changing their submit handlers.
+ */
+.oryx-modal-backdrop:has([data-testid="create-company-submit"]),
+.oryx-modal-backdrop:has([data-testid="create-branch-submit"]) {
+  padding: 0;
+  place-items: stretch;
+  width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+}
+.oryx-modal:has([data-testid="create-company-submit"]),
+.oryx-modal:has([data-testid="create-branch-submit"]) {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100dvw;
+  max-width: 100dvw;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+}
+.oryx-modal:has([data-testid="create-company-submit"]) > div:nth-child(2),
+.oryx-modal:has([data-testid="create-branch-submit"]) > div:nth-child(2) {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+
+/*
+ * Production follow-up to #66: one deterministic desktop POS grid.
+ * Earlier broad .oryx-pos rules conflict with newer quickbar/category selectors.
+ * Keep the cashier header, category strip, catalogue and cart in the viewport;
+ * the product grid and cart lines scroll, not the entire dialog.
+ */
+@media (min-width: 721px) {
+  .oryx-modal--pos .oryx-pos--premium.oryx-pos--new-cashier {
+    display: grid;
+    grid-template-areas: "quickbar categories" "catalog cart";
+    grid-template-columns: minmax(0, 1fr) clamp(310px, 30vw, 410px);
+    grid-template-rows: 38px minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+    gap: 8px;
+    padding: 8px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar,
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+    height: 38px;
+    max-height: 38px;
+    min-height: 0;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+    gap: 6px;
+    padding: 4px 8px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 3px 6px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories > * {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__catalog {
+    grid-area: catalog;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__grid {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    align-content: start;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__rail {
+    grid-area: cart;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__lines {
+    flex: 1 1 0;
+    min-height: 96px;
+    max-height: none;
+    overflow-y: auto;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__customer-warehouse {
+    flex: 0 0 auto;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__tender {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 38%;
+    overflow-y: auto;
+  }
+}
+@media (max-width: 720px) {
+  .oryx-modal--pos .oryx-pos--premium.oryx-pos--new-cashier {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100%;
+    max-height: none;
+    overflow: visible;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+    height: auto;
+    max-height: none;
+    flex-wrap: wrap;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    height: auto;
+    min-height: 42px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories > * {
+    flex: 0 0 auto;
+    width: auto;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__rail {
+    min-height: 360px;
+    height: auto;
+    overflow: visible;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__lines {
+    flex: 0 1 auto;
+    min-height: 100px;
+    max-height: 35dvh;
+    overflow-y: auto;
+  }
+}
+
+
+/* Cashier v5: clearer catalog, visible cart and payment hierarchy.
+   Scoped to POS v5 so existing invoices, modals and other routes stay intact. */
+.oryx-pos--cashier-v5 .oryx-pos__viewbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  padding: 0 3px;
+  color: var(--pos-soft);
+  font-size: 12px;
+}
+.oryx-pos--cashier-v5 .oryx-pos__viewbar-result,
+.oryx-pos--cashier-v5 .oryx-pos__viewbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.oryx-pos--cashier-v5 .oryx-pos__viewbar-actions {
+  padding: 3px;
+  border: 1px solid var(--pos-line);
+  border-radius: 10px;
+  background: var(--pos-panel);
+}
+.oryx-pos--cashier-v5 .oryx-pos__viewbar-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 29px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--pos-soft);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+.oryx-pos--cashier-v5 .oryx-pos__viewbar-actions button.is-active {
+  color: var(--pos-action-ink);
+  background: var(--pos-action);
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid {
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 12px;
+  padding: 4px 6px 20px;
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile {
+  min-height: 228px;
+  border-radius: 15px;
+  overflow: hidden;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile__media {
+  aspect-ratio: 4 / 3;
+  border-bottom: 1px solid var(--pos-line);
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile__media img {
+  object-fit: contain;
+  padding: 12px;
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile__body {
+  padding: 11px 12px 44px;
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile__name {
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.oryx-pos--cashier-v5 .oryx-pos-tile__price {
+  font-size: 16px;
+  font-weight: 800;
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list {
+  grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
+  gap: 9px;
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list > div {
+  min-width: 0;
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list .oryx-pos-tile {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-height: 120px;
+  text-align: start;
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list .oryx-pos-tile__media {
+  width: 112px;
+  min-width: 112px;
+  align-self: stretch;
+  aspect-ratio: auto;
+  border-bottom: 0;
+  border-inline-end: 1px solid var(--pos-line);
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list .oryx-pos-tile__body {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 10px 37px;
+}
+.oryx-pos--cashier-v5 .oryx-pos__grid--list .oryx-pos-tile__add {
+  bottom: 7px;
+}
+.oryx-pos--cashier-v5 .oryx-pos__empty--onboarding {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 25px 16px;
+  text-align: center;
+  color: var(--pos-ink);
+}
+.oryx-pos--cashier-v5 .oryx-pos__empty--onboarding strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+.oryx-pos--cashier-v5 .oryx-pos__empty--onboarding > span:not(.oryx-pos__empty-art) {
+  max-width: 250px;
+  font-size: 12px;
+  color: var(--pos-soft);
+  line-height: 1.6;
+}
+.oryx-pos--cashier-v5 .oryx-pos__empty-art {
+  width: 66px;
+  height: 66px;
+  border: 1px solid var(--pos-line);
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--pos-accent);
+  background: var(--pos-tint);
+}
+.oryx-pos--cashier-v5 .oryx-pos__payment-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--pos-soft);
+}
+.oryx-pos--cashier-v5 .oryx-pos__payment-title .oryx-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  color: var(--pos-ink);
+}
+.oryx-pos--cashier-v5 .oryx-pos__tender .oryx-btn--primary {
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.oryx-pos--cashier-v5 button:focus-visible,
+.oryx-pos--cashier-v5 input:focus-visible {
+  outline: 2px solid var(--pos-action);
+  outline-offset: 2px;
+}
+@media (min-width: 721px) {
+  .oryx-modal--pos .oryx-pos--cashier-v5 .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 12px;
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v5 .oryx-pos__grid--list {
+    grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v5 .oryx-pos__lines {
+    min-height: 115px;
+  }
+}
+@media (max-width: 720px) {
+  .oryx-modal--pos .oryx-pos--cashier-v5 .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v5 .oryx-pos__grid--list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .oryx-pos--cashier-v5 .oryx-pos__viewbar {
+    flex-wrap: wrap;
+  }
+  .oryx-pos--cashier-v5 .oryx-pos__payment-title > span:last-child {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oryx-pos--cashier-v5 .oryx-pos-tile { transition: none; }
 }

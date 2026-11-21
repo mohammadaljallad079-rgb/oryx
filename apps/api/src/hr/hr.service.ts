@@ -1,8 +1,10 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { fromMinor, sumMinor } from '@oryx/shared';
 import type { Prisma } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { AttachmentsService, type UploadedFileLike } from '../attachments/attachments.service';
 import { AccountingPostingService, SYSTEM_ROLES } from '../common/accounting-posting.service';
 import { DocumentSequenceService, type Tx } from '../common/document-sequence.service';
 import { ErpContextService } from '../common/erp-context.service';
@@ -10,11 +12,15 @@ import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../commo
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import { computePayslip, leaveDaysBetween, type SalaryComponentInput } from './payroll-calculator';
+import { SALARY_READ_PERMISSION } from './hr.dto';
+import { deriveAttendance, zonedDateKey, zonedParts } from './attendance-calculator';
+import { verifyPunch, qrTokenFor, type PunchLocation } from './attendance-verification';
 import type {
   AdjustBalanceDto,
   CreateAdvanceDto,
   CreateContractDto,
   CreateDepartmentDto,
+  UpdateDepartmentDto,
   CreateDocumentDto,
   CreateEmployeeDto,
   CreateJobTitleDto,
@@ -30,6 +36,13 @@ import type {
   SettleAdvanceDto,
   StartLifecycleDto,
   UpdateEmployeeDto,
+  UpdateLeaveRequestDto,
+  CreateWorkSiteDto,
+  UpdateWorkSiteDto,
+  UpdateAttendancePolicyDto,
+  SelfCheckInDto,
+  SelfCheckOutDto,
+  SelfBreakDto,
 } from './hr.dto';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -59,6 +72,7 @@ export class HrService {
     private readonly posting: AccountingPostingService,
     private readonly sequences: DocumentSequenceService,
     private readonly context: ErpContextService,
+    private readonly attachments: AttachmentsService,
   ) {}
 
   // ------------------------------------------------------------ departments
@@ -74,15 +88,70 @@ export class HrService {
   }
 
   async createDepartment(dto: CreateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
-    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'DEP');
+
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Enter a name in Arabic or English.');
+
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal, dto.companyId);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
-    const dup = await this.prisma.department.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Department code ${dto.code} already exists.`);
+    if (dto.parentId) await this.assertDepartment(companyId, dto.parentId);
+    const dup = await this.prisma.department.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Department code ${code} already exists.`);
     const dept = await this.prisma.department.create({
-      data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr, parentId: dto.parentId ?? null, branchId: dto.branchId ?? null },
+      data: { companyId, code: code, ...names, parentId: dto.parentId ?? null, branchId: dto.branchId ?? null },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.department_created', targetType: 'DEPARTMENT', targetId: dept.id, summary: `Created department ${dept.code}` });
     return dept;
+  }
+
+  async updateDepartment(id: string, dto: UpdateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const department = await this.prisma.department.findFirst({ where: { id, companyId } });
+    if (!department) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Department not found.');
+    if (dto.code && dto.code !== department.code) {
+      const duplicate = await this.prisma.department.findUnique({
+        where: { companyId_code: { companyId, code: dto.code } },
+      });
+      if (duplicate) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Department code ${dto.code} already exists.`);
+    }
+    const updated = await this.prisma.department.update({
+      where: { id },
+      data: {
+        ...(dto.code !== undefined ? { code: dto.code } : {}),
+        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+      },
+    });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId, action: 'hr.department_updated',
+      targetType: 'DEPARTMENT', targetId: id, summary: `Updated department ${updated.code}`,
+    });
+    return updated;
+  }
+
+  async deleteDepartment(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const department = await this.prisma.department.findFirst({
+      where: { id, companyId },
+      include: { _count: { select: {
+        employees: true, jobTitles: true, children: true, projects: true,
+        workOrders: true, customers: true,
+      } } },
+    });
+    if (!department) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Department not found.');
+    if (Object.values(department._count).some((count) => count > 0)) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT,
+        'This department has linked records. Reassign employees, job titles, child departments, projects, work orders and customers before permanent deletion.');
+    }
+    await this.prisma.department.delete({ where: { id } });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId, action: 'hr.department_deleted',
+      targetType: 'DEPARTMENT', targetId: id,
+      summary: `Permanently deleted department ${department.code}`,
+    });
+    return { id, deleted: true };
   }
 
   async listJobTitles(query: ListQueryDto, principal: RequestPrincipal) {
@@ -92,10 +161,17 @@ export class HrService {
   }
 
   async createJobTitle(dto: CreateJobTitleDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'JOB');
+
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Enter a name in Arabic or English.');
+
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.jobTitle.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Job title code ${dto.code} already exists.`);
-    const title = await this.prisma.jobTitle.create({ data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr, departmentId: dto.departmentId ?? null } });
+    if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
+    const dup = await this.prisma.jobTitle.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Job title code ${code} already exists.`);
+    const title = await this.prisma.jobTitle.create({ data: { companyId, code: code, ...names, departmentId: dto.departmentId ?? null } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.job_title_created', targetType: 'JOB_TITLE', targetId: title.id, summary: `Created job title ${title.code}` });
     return title;
   }
@@ -140,6 +216,10 @@ export class HrService {
 
   async getEmployee(id: string, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    // Pay and advances are withheld unless the caller holds salary access. The
+    // fields are omitted, not blanked, so the screen can tell "not recorded"
+    // from "not permitted". The dedicated file endpoints are the read path.
+    const salaryVisible = principal.grantedPermissions.includes(SALARY_READ_PERMISSION);
     const employee = await this.prisma.employee.findFirst({
       where: { id, companyId },
       include: {
@@ -150,31 +230,46 @@ export class HrService {
         documents: { orderBy: { createdAt: 'desc' } },
         lifecycle: { include: { items: true }, orderBy: { startedAt: 'desc' } },
         leaveBalances: { include: { leaveType: true } },
-        salaryStructures: { include: { components: true }, orderBy: { effectiveFrom: 'desc' } },
-        advances: { orderBy: { issuedAt: 'desc' } },
+        ...(salaryVisible
+          ? {
+              salaryStructures: { include: { components: true }, orderBy: { effectiveFrom: 'desc' } },
+              advances: { orderBy: { issuedAt: 'desc' } },
+            }
+          : {}),
       },
     });
     if (!employee) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found.');
-    return toEmployeeDetailDto(employee);
+    const detail = toEmployeeDetailDto(employee);
+    return salaryVisible ? detail : { ...detail, salaryVisible: false };
   }
 
   async createEmployee(dto: CreateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'EMP');
+
+    const names = { nameEn: dto.fullNameEn?.trim() || dto.fullNameAr?.trim() || '', nameAr: dto.fullNameAr?.trim() || dto.fullNameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Employee name is required in Arabic or English.');
+
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
-    const dup = await this.prisma.employee.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Employee code ${dto.code} already exists.`);
+    if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
+    if (dto.jobTitleId) await this.assertJobTitle(companyId, dto.jobTitleId, dto.departmentId);
+    const dup = await this.prisma.employee.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Employee code ${code} already exists.`);
     if (dto.managerId) await this.assertEmployee(companyId, dto.managerId);
 
     const employee = await this.posting.withTransaction(async (tx) => {
       const created = await tx.employee.create({
         data: {
           companyId,
-          code: dto.code,
-          fullNameEn: dto.fullNameEn,
-          fullNameAr: dto.fullNameAr,
+          code: code,
+          fullNameEn: names.nameEn,
+          fullNameAr: names.nameAr,
           email: dto.email ?? null,
           phone: dto.phone ?? null,
+          secondaryPhone: dto.secondaryPhone ?? null,
           nationalId: dto.nationalId ?? null,
+          nationality: dto.nationality ?? null,
           departmentId: dto.departmentId ?? null,
           jobTitleId: dto.jobTitleId ?? null,
           branchId: dto.branchId ?? null,
@@ -204,9 +299,14 @@ export class HrService {
   }
 
   async updateEmployee(id: string, dto: UpdateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
-    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     const employee = await this.prisma.employee.findFirst({ where: { id, companyId } });
     if (!employee) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found.');
+    if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
+    const effectiveJobTitleId = dto.jobTitleId ?? employee.jobTitleId;
+    const effectiveDepartmentId = dto.departmentId !== undefined ? dto.departmentId : employee.departmentId;
+    if (effectiveJobTitleId) await this.assertJobTitle(companyId, effectiveJobTitleId, effectiveDepartmentId);
     if (dto.managerId) {
       if (dto.managerId === id) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'An employee cannot report to itself.');
       await this.assertEmployee(companyId, dto.managerId);
@@ -218,6 +318,14 @@ export class HrService {
         ...(dto.fullNameAr !== undefined ? { fullNameAr: dto.fullNameAr } : {}),
         ...(dto.email !== undefined ? { email: dto.email } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.secondaryPhone !== undefined ? { secondaryPhone: dto.secondaryPhone } : {}),
+        ...(dto.nationalId !== undefined ? { nationalId: dto.nationalId || null } : {}),
+        ...(dto.dateOfBirth !== undefined ? { dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null } : {}),
+        ...(dto.gender !== undefined ? { gender: dto.gender || null } : {}),
+        ...(dto.nationality !== undefined ? { nationality: dto.nationality || null } : {}),
+        ...(dto.bankName !== undefined ? { bankName: dto.bankName || null } : {}),
+        ...(dto.bankAccountName !== undefined ? { bankAccountName: dto.bankAccountName || null } : {}),
+        ...(dto.bankIban !== undefined ? { bankIban: dto.bankIban || null } : {}),
         ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
         ...(dto.jobTitleId !== undefined ? { jobTitleId: dto.jobTitleId } : {}),
         ...(dto.branchId !== undefined ? { branchId: dto.branchId } : {}),
@@ -232,11 +340,53 @@ export class HrService {
     return this.getEmployee(id, principal);
   }
 
+  /**
+   * Permanently delete an employee and their HR detail rows.
+   *
+   * Contracts, documents, leave, attendance, shifts, salary history and
+   * lifecycle all cascade with the employee. Payroll history does not: a payslip
+   * or an advance is a financial record that must survive, so an employee that
+   * has any is refused and should be terminated (status TERMINATED) instead.
+   */
+  async deleteEmployee(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.prisma.employee.findFirst({ where: { id, companyId } });
+    if (!employee) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found.');
+
+    const [payslips, advances] = await Promise.all([
+      this.prisma.payslip.count({ where: { employeeId: id } }),
+      this.prisma.employeeAdvance.count({ where: { employeeId: id } }),
+    ]);
+    if (payslips + advances > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This employee has payroll history (payslips or advances) and cannot be deleted. Terminate the record instead so the payroll history is preserved.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.entityAttachment.deleteMany({ where: { companyId, entityType: 'EMPLOYEE', entityId: id } });
+      await tx.entityComment.deleteMany({ where: { companyId, entityType: 'EMPLOYEE', entityId: id } });
+      await tx.employee.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'hr.employee_deleted',
+      targetType: 'EMPLOYEE',
+      targetId: id,
+      summary: `Permanently deleted employee ${employee.code}`,
+    });
+    return { id, deleted: true };
+  }
+
   // -------------------------------------------------------------- contracts
 
   async createContract(employeeId: string, dto: CreateContractDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertEmployee(companyId, employeeId);
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const dup = await this.prisma.employmentContract.findUnique({ where: { companyId_contractNumber: { companyId, contractNumber: dto.contractNumber } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Contract number ${dto.contractNumber} already exists.`);
     const contract = await this.prisma.employmentContract.create({
@@ -249,7 +399,7 @@ export class HrService {
         startDate: new Date(dto.startDate),
         endDate: dto.endDate ? new Date(dto.endDate) : null,
         baseSalaryMinor: dto.baseSalaryMinor,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? companyCurrency,
         probationDays: dto.probationDays ?? 0,
         notes: dto.notes ?? null,
       },
@@ -269,12 +419,56 @@ export class HrService {
       where: { companyId, employeeId, ...(canSeeConfidential ? {} : { isConfidential: false }) },
       orderBy: { createdAt: 'desc' },
     });
-    return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
+    // Attach the stored-file metadata so the list can offer preview/download
+    // without a second round trip. The bytes never travel here — only the
+    // name, type and size of the file the record points at.
+    const assetIds = rows.map((r) => r.fileAssetId).filter((x): x is string => Boolean(x));
+    const assets = assetIds.length
+      ? await this.prisma.entityAttachment.findMany({ where: { companyId, id: { in: assetIds } } })
+      : [];
+    const byId = new Map(assets.map((a) => [a.id, a]));
+    return {
+      items: rows.map((r) => {
+        const asset = r.fileAssetId ? byId.get(r.fileAssetId) : undefined;
+        return {
+          ...r,
+          fileName: asset?.fileName ?? null,
+          mimeType: asset?.mimeType ?? null,
+          sizeBytes: asset?.sizeBytes ?? null,
+          hasFile: Boolean(asset),
+        };
+      }),
+      total: rows.length,
+      page: 1,
+      pageSize: rows.length,
+    };
   }
 
-  async createDocument(employeeId: string, dto: CreateDocumentDto, principal: RequestPrincipal, actor: ActorContext) {
+  /**
+   * Create an employee document, optionally with a real uploaded file.
+   *
+   * The binary goes through the shared attachment store (which validates the
+   * MIME type, enforces the size ceiling and writes an opaque server-named
+   * file); the document row keeps only the attachment id. A document may still
+   * be recorded with no file — a physical certificate that lives in a folder —
+   * in which case `fileRef` carries the free-text reference.
+   */
+  async createDocument(
+    employeeId: string,
+    dto: CreateDocumentDto,
+    file: UploadedFileLike | undefined,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertEmployee(companyId, employeeId);
+
+    let fileAssetId: string | null = null;
+    if (file && file.size > 0) {
+      const asset = await this.attachments.upload('EMPLOYEE', employeeId, file, principal);
+      fileAssetId = asset.id;
+    }
+
     const doc = await this.prisma.employeeDocument.create({
       data: {
         companyId,
@@ -282,14 +476,55 @@ export class HrService {
         category: dto.category as never,
         title: dto.title,
         fileRef: dto.fileRef ?? null,
+        fileAssetId,
         issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : null,
         expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
         isConfidential: dto.isConfidential ?? false,
         notes: dto.notes ?? null,
       },
     });
-    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.document_created', targetType: 'EMPLOYEE_DOCUMENT', targetId: doc.id, summary: `Added document ${doc.title} for employee` });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.document_created', targetType: 'EMPLOYEE_DOCUMENT', targetId: doc.id, summary: `Added document ${doc.title} for employee${fileAssetId ? ' (file attached)' : ''}` });
     return doc;
+  }
+
+  /**
+   * Resolve a document's stored file for streaming.
+   *
+   * The confidential flag is re-checked here, not only in the list: a caller
+   * who knows the document id must not be able to read a confidential file
+   * without the explicit permission, exactly as the list hides it.
+   */
+  async resolveDocumentFile(employeeId: string, documentId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.assertEmployee(companyId, employeeId);
+    const doc = await this.prisma.employeeDocument.findFirst({ where: { id: documentId, companyId, employeeId } });
+    if (!doc) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee document not found.');
+    if (doc.isConfidential && !principal.grantedPermissions.includes('erp.hr.document.confidential')) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'This document is confidential.');
+    }
+    if (!doc.fileAssetId) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'This document has no stored file.');
+    return this.attachments.resolveForDownload('EMPLOYEE', employeeId, doc.fileAssetId, principal);
+  }
+
+  /** A readable stream of a resolved document file. */
+  streamDocumentFile(path: string): ReturnType<AttachmentsService['stream']> {
+    return this.attachments.stream(path);
+  }
+
+  /** Remove an employee document and any file it stored. */
+  async deleteDocument(employeeId: string, documentId: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.assertEmployee(companyId, employeeId);
+    const doc = await this.prisma.employeeDocument.findFirst({ where: { id: documentId, companyId, employeeId } });
+    if (!doc) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee document not found.');
+    await this.prisma.employeeDocument.delete({ where: { id: doc.id } });
+    if (doc.fileAssetId) {
+      // The attachment row and its bytes go with the document; a failure here
+      // must not resurrect the deleted record, so it is best-effort.
+      await this.attachments.remove('EMPLOYEE', employeeId, doc.fileAssetId, principal).catch(() => undefined);
+    }
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.document_deleted', targetType: 'EMPLOYEE_DOCUMENT', targetId: documentId, summary: `Deleted document ${doc.title}` });
+    return { deleted: true };
   }
 
   // -------------------------------------------------------------- lifecycle
@@ -339,13 +574,14 @@ export class HrService {
   }
 
   async createLeaveType(dto: CreateLeaveTypeDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'LVT');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.leaveType.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Leave type ${dto.code} already exists.`);
+    const dup = await this.prisma.leaveType.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Leave type ${code} already exists.`);
     const type = await this.prisma.leaveType.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         nameEn: dto.nameEn,
         nameAr: dto.nameAr,
         annualEntitlementDays: dto.annualEntitlementDays ?? 0,
@@ -464,6 +700,89 @@ export class HrService {
     return request;
   }
 
+  /**
+   * Edit a pending leave request.
+   *
+   * Only a request that is still `SUBMITTED` may be edited: once a decision has
+   * moved days between pending and used, changing the dates would desynchronise
+   * the balance from the request. The days are recomputed and the balance
+   * adjusted by the difference, so the reservation stays exactly in step with
+   * the request. A leave-type change moves the reservation between balances.
+   */
+  async updateLeaveRequest(requestId: string, dto: UpdateLeaveRequestDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const result = await this.posting.withTransaction(async (tx) => {
+      const request = await tx.leaveRequest.findFirst({ where: { id: requestId, companyId } });
+      if (!request) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Leave request not found.');
+      if (request.status !== 'SUBMITTED') throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Only a submitted request can be edited.');
+
+      const leaveTypeId = dto.leaveTypeId ?? request.leaveTypeId;
+      const start = dto.startDate ? new Date(dto.startDate) : request.startDate;
+      const end = dto.endDate ? new Date(dto.endDate) : request.endDate;
+      if (end < start) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'End date must not precede the start date.');
+      const days = leaveDaysBetween(start, end);
+      const year = start.getUTCFullYear();
+
+      if (leaveTypeId !== request.leaveTypeId) {
+        const leaveType = await tx.leaveType.findFirst({ where: { id: leaveTypeId, companyId } });
+        if (!leaveType) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Leave type not found.');
+      }
+
+      // Release the old reservation before checking the new one, so an edit that
+      // keeps the same dates is never rejected against itself.
+      const oldBalance = await tx.leaveBalance.findUnique({
+        where: { employeeId_leaveTypeId_year: { employeeId: request.employeeId, leaveTypeId: request.leaveTypeId, year: request.startDate.getUTCFullYear() } },
+      });
+      if (oldBalance) {
+        await tx.leaveBalance.update({ where: { id: oldBalance.id }, data: { pendingDays: { decrement: request.days } } });
+      }
+
+      const overlap = await tx.leaveRequest.findFirst({
+        where: {
+          companyId,
+          employeeId: request.employeeId,
+          id: { not: request.id },
+          status: { in: ['SUBMITTED', 'APPROVED'] },
+          startDate: { lte: end },
+          endDate: { gte: start },
+        },
+      });
+      if (overlap) throw conflict(ERROR_CODES.LEAVE_OVERLAP, 'An overlapping leave request already exists.');
+
+      const leaveType = await tx.leaveType.findUniqueOrThrow({ where: { id: leaveTypeId } });
+      const balance = await tx.leaveBalance.upsert({
+        where: { employeeId_leaveTypeId_year: { employeeId: request.employeeId, leaveTypeId, year } },
+        create: {
+          companyId,
+          employeeId: request.employeeId,
+          leaveTypeId,
+          year,
+          entitledDays: leaveType.annualEntitlementDays,
+          accruedDays: leaveType.annualEntitlementDays,
+        },
+        update: {},
+      });
+      const available = balance.entitledDays + balance.accruedDays - balance.usedDays - balance.pendingDays;
+      if (days > available) {
+        throw forbidden(
+          ERROR_CODES.LEAVE_INSUFFICIENT_BALANCE,
+          `Insufficient leave balance: requested ${fromMinor(days, 2)} days, available ${fromMinor(available, 2)}.`,
+          { requested: days, available },
+        );
+      }
+
+      const updated = await tx.leaveRequest.update({
+        where: { id: request.id },
+        data: { leaveTypeId, startDate: start, endDate: end, days, reason: dto.reason ?? request.reason },
+      });
+      await tx.leaveBalance.update({ where: { id: balance.id }, data: { pendingDays: { increment: days } } });
+      return updated;
+    });
+
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.leave_updated', targetType: 'LEAVE_REQUEST', targetId: requestId, summary: 'Leave request edited' });
+    return result;
+  }
+
   /** Approve or reject a pending request, moving days between pending and used. */
   async decideLeave(requestId: string, dto: DecideLeaveDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
@@ -501,10 +820,11 @@ export class HrService {
   }
 
   async createShift(dto: CreateShiftDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'SHF');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.shift.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Shift ${dto.code} already exists.`);
-    const shift = await this.prisma.shift.create({ data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr, startTime: dto.startTime, endTime: dto.endTime, breakMinutes: dto.breakMinutes ?? 0 } });
+    const dup = await this.prisma.shift.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Shift ${code} already exists.`);
+    const shift = await this.prisma.shift.create({ data: { companyId, code: code, nameEn: dto.nameEn, nameAr: dto.nameAr, startTime: dto.startTime, endTime: dto.endTime, breakMinutes: dto.breakMinutes ?? 0 } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.shift_created', targetType: 'SHIFT', targetId: shift.id, summary: `Created shift ${shift.code}` });
     return shift;
   }
@@ -512,22 +832,37 @@ export class HrService {
   async listAttendance(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.attendanceRecord.findMany({
-      where: { companyId, ...(query.branchId ? { employee: { branchId: query.branchId } } : {}) },
+      where: {
+        companyId,
+        ...(query.branchId ? { employee: { branchId: query.branchId } } : {}),
+        ...(query.departmentId ? { employee: { departmentId: query.departmentId } } : {}),
+        ...(query.employeeId ? { employeeId: query.employeeId } : {}),
+        ...(query.status ? { status: query.status as never } : {}),
+        ...(query.from || query.to
+          ? { workDate: { ...(query.from ? { gte: new Date(query.from) } : {}), ...(query.to ? { lte: new Date(query.to) } : {}) } }
+          : {}),
+      },
       orderBy: { workDate: 'desc' },
-      take: 200,
+      take: 500,
       include: { employee: { select: { code: true, fullNameEn: true, fullNameAr: true } } },
     });
     return { items: rows.map(toAttendanceDto), total: rows.length, page: 1, pageSize: rows.length };
   }
 
-  /** Record (or update) one day of attendance for an employee. */
+  /** Record (or update) one day of attendance for an employee (manager path). */
   async recordAttendance(dto: RecordAttendanceDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertEmployee(companyId, dto.employeeId);
     const workDate = new Date(dto.workDate);
     const checkIn = dto.checkInAt ? new Date(dto.checkInAt) : null;
     const checkOut = dto.checkOutAt ? new Date(dto.checkOutAt) : null;
-    const workedMinutes = checkIn && checkOut ? Math.max(0, Math.round((checkOut.getTime() - checkIn.getTime()) / 60000)) : 0;
+    const shift = dto.shiftId ? await this.prisma.shift.findFirst({ where: { id: dto.shiftId, companyId } }) : null;
+    const policy = await this.ensurePolicy(companyId);
+
+    const derived =
+      checkIn && checkOut
+        ? deriveAttendance({ checkIn, checkOut, shift, graceMinutes: policy.graceMinutes, timeZone: await this.companyTimeZone(companyId) })
+        : null;
 
     const record = await this.prisma.attendanceRecord.upsert({
       where: { employeeId_workDate: { employeeId: dto.employeeId, workDate } },
@@ -538,18 +873,28 @@ export class HrService {
         workDate,
         checkInAt: checkIn,
         checkOutAt: checkOut,
-        workedMinutes,
-        overtimeMinutes: dto.overtimeMinutes ?? 0,
-        status: (dto.status as never) ?? 'PRESENT',
+        workedMinutes: derived?.workedMinutes ?? 0,
+        breakMinutes: derived?.breakMinutes ?? 0,
+        netMinutes: derived?.netMinutes ?? 0,
+        lateMinutes: derived?.lateMinutes ?? 0,
+        earlyLeaveMinutes: derived?.earlyLeaveMinutes ?? 0,
+        overtimeMinutes: dto.overtimeMinutes ?? derived?.overtimeMinutes ?? 0,
+        status: (dto.status as never) ?? derived?.status ?? 'PRESENT',
         notes: dto.notes ?? null,
+        checkInSource: checkIn ? 'MANUAL' : null,
+        checkOutSource: checkOut ? 'MANUAL' : null,
       },
       update: {
         shiftId: dto.shiftId ?? null,
         checkInAt: checkIn,
         checkOutAt: checkOut,
-        workedMinutes,
-        overtimeMinutes: dto.overtimeMinutes ?? 0,
-        ...(dto.status ? { status: dto.status as never } : {}),
+        workedMinutes: derived?.workedMinutes ?? 0,
+        breakMinutes: derived?.breakMinutes ?? 0,
+        netMinutes: derived?.netMinutes ?? 0,
+        lateMinutes: derived?.lateMinutes ?? 0,
+        earlyLeaveMinutes: derived?.earlyLeaveMinutes ?? 0,
+        overtimeMinutes: dto.overtimeMinutes ?? derived?.overtimeMinutes ?? 0,
+        ...(dto.status ? { status: dto.status as never } : derived ? { status: derived.status as never } : {}),
         notes: dto.notes ?? null,
       },
     });
@@ -557,25 +902,412 @@ export class HrService {
     return record;
   }
 
+  // ------------------------------------------------------------ self-service
+
+  /**
+   * Resolve the employee record for the signed-in user.
+   *
+   * A self-service punch is always for the caller's own employee row; the
+   * `employeeId` in the body is ignored unless the principal holds the
+   * attendance-manage permission, which lets a manager punch on behalf of a
+   * worker. This is what stops an employee recording another's time.
+   */
+  private async resolveSelfEmployee(
+    companyId: string,
+    principal: RequestPrincipal,
+    requestedEmployeeId: string | undefined,
+    canManage: boolean,
+  ) {
+    if (requestedEmployeeId && canManage) {
+      const employee = await this.prisma.employee.findFirst({ where: { id: requestedEmployeeId, companyId } });
+      if (!employee) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found in this company.');
+      return employee;
+    }
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId: principal.userId } });
+    if (!employee) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'No employee record is linked to your user account.');
+    }
+    return employee;
+  }
+
+  private async companyTimeZone(companyId: string): Promise<string> {
+    const company = await this.prisma.company.findUnique({ where: { id: companyId }, select: { timezone: true } });
+    return company?.timezone ?? 'Asia/Bahrain';
+  }
+
+  /** The company's attendance policy, creating the default row on first read. */
+  async ensurePolicy(companyId: string) {
+    const existing = await this.prisma.attendancePolicy.findUnique({ where: { companyId } });
+    if (existing) return existing;
+    return this.prisma.attendancePolicy.create({ data: { companyId } });
+  }
+
+  async getPolicy(principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    return this.ensurePolicy(companyId);
+  }
+
+  async updatePolicy(dto: UpdateAttendancePolicyDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.ensurePolicy(companyId);
+    const updated = await this.prisma.attendancePolicy.update({
+      where: { companyId },
+      data: {
+        ...(dto.graceMinutes !== undefined ? { graceMinutes: dto.graceMinutes } : {}),
+        ...(dto.standardDailyHours !== undefined ? { standardDailyHours: dto.standardDailyHours } : {}),
+        ...(dto.standardWeeklyHours !== undefined ? { standardWeeklyHours: dto.standardWeeklyHours } : {}),
+        ...(dto.workingDays !== undefined ? { workingDays: dto.workingDays } : {}),
+        ...(dto.overtimeEnabled !== undefined ? { overtimeEnabled: dto.overtimeEnabled } : {}),
+        ...(dto.overtimeMultiplierBp !== undefined ? { overtimeMultiplierBp: dto.overtimeMultiplierBp } : {}),
+        ...(dto.overtimeThresholdHours !== undefined ? { overtimeThresholdHours: dto.overtimeThresholdHours } : {}),
+        ...(dto.deductLate !== undefined ? { deductLate: dto.deductLate } : {}),
+        ...(dto.deductEarlyLeave !== undefined ? { deductEarlyLeave: dto.deductEarlyLeave } : {}),
+        ...(dto.deductAbsence !== undefined ? { deductAbsence: dto.deductAbsence } : {}),
+        ...(dto.requireLocation !== undefined ? { requireLocation: dto.requireLocation } : {}),
+        ...(dto.allowFallback !== undefined ? { allowFallback: dto.allowFallback } : {}),
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_policy_updated', targetType: 'ATTENDANCE_POLICY', targetId: updated.id, summary: 'Updated attendance and payroll policy' });
+    return updated;
+  }
+
+  // -------------------------------------------------------------- worksites
+
+  async listWorkSites(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const rows = await this.prisma.workSite.findMany({ where: { companyId }, orderBy: { code: 'asc' } });
+    return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
+  }
+
+  async createWorkSite(dto: CreateWorkSiteDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'WST');
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
+    if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    const dup = await this.prisma.workSite.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Work site ${code} already exists.`);
+    const site = await this.prisma.workSite.create({
+      data: {
+        companyId,
+        branchId: dto.branchId ?? null,
+        code: code,
+        nameEn: dto.nameEn,
+        nameAr: dto.nameAr,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        radiusMeters: dto.radiusMeters ?? 150,
+        wifiSsids: dto.wifiSsids ?? null,
+        wifiBssids: dto.wifiBssids ?? null,
+        qrSecret: dto.qrSecret ?? null,
+        isActive: dto.isActive ?? true,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.worksite_created', targetType: 'WORK_SITE', targetId: site.id, summary: `Created work site ${site.code}` });
+    return site;
+  }
+
+  async updateWorkSite(id: string, dto: UpdateWorkSiteDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const existing = await this.prisma.workSite.findFirst({ where: { id, companyId } });
+    if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Work site not found.');
+    const site = await this.prisma.workSite.update({
+      where: { id },
+      data: {
+        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.latitude !== undefined ? { latitude: dto.latitude } : {}),
+        ...(dto.longitude !== undefined ? { longitude: dto.longitude } : {}),
+        ...(dto.radiusMeters !== undefined ? { radiusMeters: dto.radiusMeters } : {}),
+        ...(dto.wifiSsids !== undefined ? { wifiSsids: dto.wifiSsids } : {}),
+        ...(dto.wifiBssids !== undefined ? { wifiBssids: dto.wifiBssids } : {}),
+        ...(dto.qrSecret !== undefined ? { qrSecret: dto.qrSecret } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.worksite_updated', targetType: 'WORK_SITE', targetId: site.id, summary: `Updated work site ${site.code}` });
+    return site;
+  }
+
+  async deleteWorkSite(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const existing = await this.prisma.workSite.findFirst({ where: { id, companyId } });
+    if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Work site not found.');
+    await this.prisma.workSite.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.worksite_deleted', targetType: 'WORK_SITE', targetId: id, summary: `Deleted work site ${existing.code}` });
+    return { id, deleted: true };
+  }
+
+  /** The current rotating QR token for a worksite, for a kiosk display. */
+  async workSiteQrToken(siteId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const site = await this.prisma.workSite.findFirst({ where: { id: siteId, companyId } });
+    if (!site) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Work site not found.');
+    if (!site.qrSecret) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'This work site has no QR secret configured.');
+    const now = new Date();
+    return { siteId: site.id, token: qrTokenFor(site.qrSecret, now), expiresInSeconds: 60 };
+  }
+
+  // ------------------------------------------------------ attendance punches
+
+  private async activeShiftFor(companyId: string, employeeId: string): Promise<{ id: string; startTime: string; endTime: string; breakMinutes: number } | null> {
+    const assignment = await this.prisma.employeeShift.findFirst({
+      where: { companyId, employeeId, effectiveFrom: { lte: new Date() }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }] },
+      orderBy: { effectiveFrom: 'desc' },
+      include: { shift: true },
+    });
+    if (!assignment) return null;
+    return { id: assignment.shift.id, startTime: assignment.shift.startTime, endTime: assignment.shift.endTime, breakMinutes: assignment.shift.breakMinutes };
+  }
+
+  /** Resolve a shift for a punch: the requested one, the assignment, or null. */
+  private async shiftForPunch(companyId: string, employeeId: string, shiftId?: string) {
+    if (shiftId) {
+      const shift = await this.prisma.shift.findFirst({ where: { id: shiftId, companyId } });
+      if (shift) return { id: shift.id, startTime: shift.startTime, endTime: shift.endTime, breakMinutes: shift.breakMinutes };
+    }
+    return this.activeShiftFor(companyId, employeeId);
+  }
+
+  /** Verify a punch's location against the company's active worksites. */
+  private async verifyLocation(companyId: string, location: PunchLocation | undefined, at: Date) {
+    const sites = await this.prisma.workSite.findMany({ where: { companyId, isActive: true } });
+    return verifyPunch(
+      sites.map((s) => ({ id: s.id, latitude: s.latitude, longitude: s.longitude, radiusMeters: s.radiusMeters, wifiSsids: s.wifiSsids, wifiBssids: s.wifiBssids, qrSecret: s.qrSecret })),
+      location,
+      at,
+    );
+  }
+
+  /**
+   * Self check-in.
+   *
+   * The punch is rejected when the employee has already checked in today, when
+   * the policy requires a verified location and none matched, or when the
+   * location could not be verified and no fallback reason was given. The
+   * verification source and measured distance are stored, never inferred.
+   */
+  async selfCheckIn(dto: SelfCheckInDto, principal: RequestPrincipal, actor: ActorContext, canManage: boolean) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.resolveSelfEmployee(companyId, principal, dto.employeeId, canManage);
+    const policy = await this.ensurePolicy(companyId);
+    const tz = await this.companyTimeZone(companyId);
+    const at = dto.at ? new Date(dto.at) : new Date();
+    const workDate = zonedDateKey(at, tz);
+
+    const existing = await this.prisma.attendanceRecord.findUnique({ where: { employeeId_workDate: { employeeId: employee.id, workDate } } });
+    if (existing?.checkInAt) throw conflict(ERROR_CODES.ATTENDANCE_ALREADY_CHECKED_IN, 'You have already checked in today.');
+
+    const verification = await this.verifyLocation(companyId, dto.location, at);
+    if (policy.requireLocation && !verification.verified && !(policy.allowFallback && dto.location?.fallbackReason)) {
+      if (!dto.location?.fallbackReason) throw badRequest(ERROR_CODES.ATTENDANCE_LOCATION_REQUIRED, 'A verified location is required to check in.');
+      throw badRequest(ERROR_CODES.ATTENDANCE_LOCATION_UNVERIFIED, verification.detail);
+    }
+
+    const shift = await this.shiftForPunch(companyId, employee.id, dto.shiftId);
+    const record = await this.prisma.attendanceRecord.upsert({
+      where: { employeeId_workDate: { employeeId: employee.id, workDate } },
+      create: {
+        companyId,
+        employeeId: employee.id,
+        shiftId: shift?.id ?? null,
+        workDate,
+        checkInAt: at,
+        status: 'PRESENT',
+        notes: dto.notes ?? null,
+        checkInSource: verification.verified ? verification.source : dto.location?.fallbackReason ? 'FALLBACK' : 'MANUAL',
+        checkInLat: dto.location?.latitude ?? null,
+        checkInLng: dto.location?.longitude ?? null,
+        checkInAccuracy: dto.location?.accuracy ?? null,
+        checkInDistanceM: verification.distanceM,
+        checkInSiteId: verification.siteId,
+        fallbackReason: dto.location?.fallbackReason ?? null,
+      },
+      update: {
+        checkInAt: at,
+        shiftId: shift?.id ?? null,
+        status: 'PRESENT',
+        checkInSource: verification.verified ? verification.source : dto.location?.fallbackReason ? 'FALLBACK' : 'MANUAL',
+        checkInLat: dto.location?.latitude ?? null,
+        checkInLng: dto.location?.longitude ?? null,
+        checkInAccuracy: dto.location?.accuracy ?? null,
+        checkInDistanceM: verification.distanceM,
+        checkInSiteId: verification.siteId,
+        fallbackReason: dto.location?.fallbackReason ?? null,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_check_in', targetType: 'ATTENDANCE_RECORD', targetId: record.id, summary: `Check-in via ${record.checkInSource}${verification.distanceM !== null ? ` (${verification.distanceM} m)` : ''}` });
+    return { ...toAttendanceDto({ ...record, employee }), verification };
+  }
+
+  /**
+   * Self check-out. Requires an open check-in and no open break; the day's
+   * worked, break, late, early-leave and overtime minutes are derived from the
+   * shift and the policy and frozen on the record.
+   */
+  async selfCheckOut(dto: SelfCheckOutDto, principal: RequestPrincipal, actor: ActorContext, canManage: boolean) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.resolveSelfEmployee(companyId, principal, dto.employeeId, canManage);
+    const policy = await this.ensurePolicy(companyId);
+    const tz = await this.companyTimeZone(companyId);
+    const at = dto.at ? new Date(dto.at) : new Date();
+    const workDate = zonedDateKey(at, tz);
+
+    const record = await this.prisma.attendanceRecord.findUnique({
+      where: { employeeId_workDate: { employeeId: employee.id, workDate } },
+      include: { breaks: true },
+    });
+    if (!record || !record.checkInAt) throw badRequest(ERROR_CODES.ATTENDANCE_NOT_CHECKED_IN, 'You have not checked in today.');
+    if (record.checkOutAt) throw conflict(ERROR_CODES.ATTENDANCE_ALREADY_CHECKED_OUT, 'You have already checked out today.');
+    if (record.breaks.some((b) => !b.endedAt)) throw conflict(ERROR_CODES.ATTENDANCE_BREAK_OPEN, 'End your open break before checking out.');
+
+    const verification = await this.verifyLocation(companyId, dto.location, at);
+    const shift = record.shiftId
+      ? await this.prisma.shift.findFirst({ where: { id: record.shiftId, companyId } })
+      : await this.shiftForPunch(companyId, employee.id);
+    const takenBreak = record.breaks.reduce((sum, b) => sum + b.minutes, 0);
+    const derived = deriveAttendance({
+      checkIn: record.checkInAt,
+      checkOut: at,
+      shift,
+      breakMinutes: takenBreak,
+      graceMinutes: policy.graceMinutes,
+      timeZone: tz,
+    });
+
+    const updated = await this.prisma.attendanceRecord.update({
+      where: { id: record.id },
+      data: {
+        checkOutAt: at,
+        workedMinutes: derived.workedMinutes,
+        breakMinutes: derived.breakMinutes,
+        netMinutes: derived.netMinutes,
+        lateMinutes: derived.lateMinutes,
+        earlyLeaveMinutes: derived.earlyLeaveMinutes,
+        overtimeMinutes: derived.overtimeMinutes,
+        status: derived.status,
+        checkOutSource: verification.verified ? verification.source : dto.location?.fallbackReason ? 'FALLBACK' : 'MANUAL',
+        checkOutLat: dto.location?.latitude ?? null,
+        checkOutLng: dto.location?.longitude ?? null,
+        checkOutDistanceM: verification.distanceM,
+        checkOutSiteId: verification.siteId,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_check_out', targetType: 'ATTENDANCE_RECORD', targetId: updated.id, summary: `Check-out: ${derived.netMinutes} net minutes, ${derived.overtimeMinutes} overtime` });
+    return { ...toAttendanceDto({ ...updated, employee }), verification };
+  }
+
+  /** Start a break. Only one open break is allowed at a time. */
+  async selfBreakStart(dto: SelfBreakDto, principal: RequestPrincipal, actor: ActorContext, canManage: boolean) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.resolveSelfEmployee(companyId, principal, dto.employeeId, canManage);
+    const tz = await this.companyTimeZone(companyId);
+    const at = dto.at ? new Date(dto.at) : new Date();
+    const workDate = zonedDateKey(at, tz);
+    const record = await this.prisma.attendanceRecord.findUnique({ where: { employeeId_workDate: { employeeId: employee.id, workDate } }, include: { breaks: true } });
+    if (!record || !record.checkInAt) throw badRequest(ERROR_CODES.ATTENDANCE_NOT_CHECKED_IN, 'Check in before taking a break.');
+    if (record.checkOutAt) throw conflict(ERROR_CODES.ATTENDANCE_ALREADY_CHECKED_OUT, 'You have already checked out today.');
+    if (record.breaks.some((b) => !b.endedAt)) throw conflict(ERROR_CODES.ATTENDANCE_BREAK_OPEN, 'A break is already open.');
+
+    const created = await this.prisma.attendanceBreak.create({ data: { companyId, attendanceRecordId: record.id, employeeId: employee.id, startedAt: at } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_break_start', targetType: 'ATTENDANCE_BREAK', targetId: created.id, summary: 'Break started' });
+    return created;
+  }
+
+  /** End the open break and roll its minutes into the day's break total. */
+  async selfBreakEnd(dto: SelfBreakDto, principal: RequestPrincipal, actor: ActorContext, canManage: boolean) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.resolveSelfEmployee(companyId, principal, dto.employeeId, canManage);
+    const tz = await this.companyTimeZone(companyId);
+    const at = dto.at ? new Date(dto.at) : new Date();
+    const workDate = zonedDateKey(at, tz);
+    const record = await this.prisma.attendanceRecord.findUnique({ where: { employeeId_workDate: { employeeId: employee.id, workDate } }, include: { breaks: true } });
+    if (!record) throw badRequest(ERROR_CODES.ATTENDANCE_NOT_CHECKED_IN, 'No attendance record for today.');
+    const open = record.breaks.find((b) => !b.endedAt);
+    if (!open) throw badRequest(ERROR_CODES.ATTENDANCE_NO_OPEN_BREAK, 'There is no open break to end.');
+
+    const minutes = Math.max(0, Math.round((at.getTime() - open.startedAt.getTime()) / 60_000));
+    const ended = await this.prisma.attendanceBreak.update({ where: { id: open.id }, data: { endedAt: at, minutes } });
+    const totalBreak = record.breaks.filter((b) => b.endedAt).reduce((sum, b) => sum + b.minutes, 0) + minutes;
+    const netMinutes = record.checkOutAt ? Math.max(0, record.workedMinutes - totalBreak) : record.netMinutes;
+    await this.prisma.attendanceRecord.update({ where: { id: record.id }, data: { breakMinutes: totalBreak, netMinutes } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_break_end', targetType: 'ATTENDANCE_BREAK', targetId: ended.id, summary: `Break ended: ${minutes} minutes` });
+    return ended;
+  }
+
+  /** Today's attendance record for the signed-in employee, with breaks. */
+  async myAttendanceToday(principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId: principal.userId } });
+    if (!employee) return { employee: null, record: null };
+    const tz = await this.companyTimeZone(companyId);
+    const workDate = zonedDateKey(new Date(), tz);
+    const record = await this.prisma.attendanceRecord.findUnique({
+      where: { employeeId_workDate: { employeeId: employee.id, workDate } },
+      include: { breaks: true },
+    });
+    return {
+      employee: { id: employee.id, code: employee.code, fullNameEn: employee.fullNameEn, fullNameAr: employee.fullNameAr },
+      record: record ? { ...toAttendanceDto({ ...record, employee }), breaks: record.breaks.map((b) => ({ id: b.id, startedAt: b.startedAt.toISOString(), endedAt: b.endedAt ? b.endedAt.toISOString() : null, minutes: b.minutes })) } : null,
+    };
+  }
+
+  /** The signed-in employee's own attendance history. */
+  async myAttendanceHistory(principal: RequestPrincipal, from?: string, to?: string) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId: principal.userId } });
+    if (!employee) return { items: [], total: 0 };
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: { companyId, employeeId: employee.id, ...(from || to ? { workDate: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } } : {}) },
+      orderBy: { workDate: 'desc' },
+      take: 120,
+    });
+    return { items: rows.map((r) => toAttendanceDto({ ...r, employee })), total: rows.length };
+  }
+
+  /** The signed-in employee's own payslips (issued, i.e. posted or locked). */
+  async myPayslips(principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId: principal.userId } });
+    if (!employee) return { items: [], total: 0 };
+    const rows = await this.prisma.payslip.findMany({
+      where: { companyId, employeeId: employee.id, payrollRun: { status: { in: ['POSTED', 'LOCKED'] } } },
+      include: { lines: true, payrollRun: { select: { runNumber: true, status: true, period: { select: { code: true, nameEn: true, nameAr: true } } } } },
+      orderBy: { createdAt: 'desc' },
+      take: 60,
+    });
+    return { items: rows.map((p) => toPayslipDto(p)), total: rows.length };
+  }
+
   // --------------------------------------------------------- salary structure
 
   async createSalaryStructure(dto: CreateSalaryStructureDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertEmployee(companyId, dto.employeeId);
+    const companyCurrency = await this.context.companyCurrency(companyId);
+    const effectiveFrom = new Date(dto.effectiveFrom);
     const structure = await this.posting.withTransaction(async (tx) => {
       // Supersede the previous active structure rather than editing it, so
-      // historical payroll results stay intact.
+      // historical payroll results stay intact. The superseded row is stamped
+      // with the new structure's start so a history query can show the span.
+      const previous = await tx.salaryStructure.findFirst({
+        where: { companyId, employeeId: dto.employeeId, isActive: true },
+        orderBy: { effectiveFrom: 'desc' },
+      });
       await tx.salaryStructure.updateMany({
         where: { companyId, employeeId: dto.employeeId, isActive: true },
-        data: { isActive: false },
+        data: { isActive: false, effectiveTo: effectiveFrom },
       });
-      return tx.salaryStructure.create({
+      const created = await tx.salaryStructure.create({
         data: {
           companyId,
           employeeId: dto.employeeId,
-          effectiveFrom: new Date(dto.effectiveFrom),
+          effectiveFrom,
+          effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
           basicMinor: dto.basicMinor,
-          currency: dto.currency ?? 'SAR',
+          overtimeRateMinor: dto.overtimeRateMinor ?? null,
+          dailyHours: dto.dailyHours ?? null,
+          weeklyHours: dto.weeklyHours ?? null,
+          workingDays: dto.workingDays ?? null,
+          currency: dto.currency ?? companyCurrency,
           notes: dto.notes ?? null,
           components: {
             create: dto.components.map((c, i) => ({
@@ -593,9 +1325,65 @@ export class HrService {
         },
         include: { components: true },
       });
+      // The change log is append-only: it survives even if the structure row is
+      // later superseded, and it records who changed the pay and why.
+      await tx.salaryChangeLog.create({
+        data: {
+          companyId,
+          employeeId: dto.employeeId,
+          structureId: created.id,
+          previousBasicMinor: previous?.basicMinor ?? null,
+          newBasicMinor: dto.basicMinor,
+          currency: created.currency,
+          effectiveFrom,
+          reason: dto.changeReason ?? dto.notes ?? null,
+          changedById: actor.userId ?? 'system',
+        },
+      });
+      return created;
     });
-    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.salary_structure_created', targetType: 'SALARY_STRUCTURE', targetId: structure.id, summary: `Created salary structure effective ${dto.effectiveFrom.slice(0, 10)}` });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.salary_structure_created', targetType: 'SALARY_STRUCTURE', targetId: structure.id, summary: `Set salary effective ${dto.effectiveFrom.slice(0, 10)}` });
     return structure;
+  }
+
+  /** The effective salary structures for one employee, newest first. */
+  async listSalaryHistory(employeeId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.assertEmployee(companyId, employeeId);
+    const [structures, changes] = await Promise.all([
+      this.prisma.salaryStructure.findMany({
+        where: { companyId, employeeId },
+        orderBy: { effectiveFrom: 'desc' },
+        include: { components: true },
+      }),
+      this.prisma.salaryChangeLog.findMany({
+        where: { companyId, employeeId },
+        orderBy: { changedAt: 'desc' },
+        take: 100,
+      }),
+    ]);
+    return {
+      items: structures.map((s) => ({
+        id: s.id,
+        effectiveFrom: s.effectiveFrom.toISOString(),
+        effectiveTo: s.effectiveTo ? s.effectiveTo.toISOString() : null,
+        basicMinor: s.basicMinor,
+        overtimeRateMinor: s.overtimeRateMinor,
+        currency: s.currency,
+        isActive: s.isActive,
+        components: s.components.map((c) => ({ code: c.code, nameEn: c.nameEn, nameAr: c.nameAr, type: c.type, amountMinor: c.amountMinor, isPercentage: c.isPercentage, percentBp: c.percentBp })),
+      })),
+      changes: changes.map((c) => ({
+        id: c.id,
+        previousBasicMinor: c.previousBasicMinor,
+        newBasicMinor: c.newBasicMinor,
+        currency: c.currency,
+        effectiveFrom: c.effectiveFrom.toISOString(),
+        reason: c.reason,
+        changedById: c.changedById,
+        changedAt: c.changedAt.toISOString(),
+      })),
+    };
   }
 
   // ---------------------------------------------------------------- payroll
@@ -607,11 +1395,12 @@ export class HrService {
   }
 
   async createPayrollPeriod(dto: CreatePayrollPeriodDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'PAY');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.payrollPeriod.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Payroll period ${dto.code} already exists.`);
+    const dup = await this.prisma.payrollPeriod.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Payroll period ${code} already exists.`);
     const period = await this.prisma.payrollPeriod.create({
-      data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr, startDate: new Date(dto.startDate), endDate: new Date(dto.endDate) },
+      data: { companyId, code: code, nameEn: dto.nameEn, nameAr: dto.nameAr, startDate: new Date(dto.startDate), endDate: new Date(dto.endDate) },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.payroll_period_created', targetType: 'PAYROLL_PERIOD', targetId: period.id, summary: `Created payroll period ${period.code}` });
     return period;
@@ -652,12 +1441,26 @@ export class HrService {
     if (!period) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Payroll period not found.');
     if (period.status !== 'OPEN') throw forbidden(ERROR_CODES.PAYROLL_PERIOD_LOCKED, 'The payroll period is not open.');
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
+    const policy = await this.ensurePolicy(companyId);
     const employees = await this.prisma.employee.findMany({
       where: { companyId, status: { in: ['ACTIVE', 'ON_LEAVE'] } },
       include: {
         salaryStructures: { where: { isActive: true }, include: { components: true } },
         advances: { where: { status: { in: ['OPEN', 'PARTIALLY_SETTLED'] } } },
         attendance: { where: { workDate: { gte: period.startDate, lte: period.endDate } } },
+        leaveRequests: {
+          where: {
+            status: 'APPROVED',
+            leaveType: { isPaid: false },
+            startDate: { lte: period.endDate },
+            endDate: { gte: period.startDate },
+          },
+        },
+        // Only an approved bonus that no payslip has consumed joins the run.
+        // A bonus stamped with a payslip id has already been paid and must
+        // never be paid a second time by a later or retried run.
+        bonuses: { where: { payslipId: null, approvedAt: { not: null } } },
       },
     });
     if (employees.length === 0) throw badRequest(ERROR_CODES.PAYROLL_NO_EMPLOYEES, 'No active employees with a salary structure.');
@@ -665,7 +1468,7 @@ export class HrService {
     const result = await this.posting.withTransaction(async (tx) => {
       const runNumber = await this.sequences.next(tx, companyId, 'payrollRun');
       const run = await tx.payrollRun.create({
-        data: { companyId, periodId: period.id, runNumber, status: 'DRAFT', currency: 'SAR', createdById: actor.userId, notes: dto.notes ?? null },
+        data: { companyId, periodId: period.id, runNumber, status: 'DRAFT', currency: companyCurrency, createdById: actor.userId, notes: dto.notes ?? null },
       });
 
       let gross = 0;
@@ -690,8 +1493,18 @@ export class HrService {
         }));
 
         const overtimeMinutes = sumMinor(employee.attendance.map((a) => a.overtimeMinutes));
-        // Overtime hours are hundredths: minutes / 60 * 100 = minutes * 5 / 3.
-        const overtimeHours = Math.round((overtimeMinutes * 100) / 60);
+        const lateMinutes = sumMinor(employee.attendance.map((a) => a.lateMinutes));
+        const earlyLeaveMinutes = sumMinor(employee.attendance.map((a) => a.earlyLeaveMinutes));
+        const absenceDays = employee.attendance.filter((a) => a.status === 'ABSENT').length;
+        const workedMinutes = sumMinor(employee.attendance.map((a) => a.netMinutes));
+        // Unpaid approved leave inside the period is deducted at the daily rate.
+        const unpaidLeaveDays = employee.leaveRequests.reduce(
+          (sum, r) => sum + leaveDaysBetween(
+            r.startDate < period.startDate ? period.startDate : r.startDate,
+            r.endDate > period.endDate ? period.endDate : r.endDate,
+          ),
+          0,
+        );
 
         // One outstanding advance is settled per run, evenly across instalments.
         const advance = employee.advances[0];
@@ -702,12 +1515,34 @@ export class HrService {
             )
           : 0;
 
+        // An approved, unpaid bonus joins the run as its own earning line. The
+        // payslip id stamped below is what makes the payment single-use.
+        const bonusComponents: SalaryComponentInput[] = employee.bonuses.map((bonus, index) => ({
+          type: 'ALLOWANCE',
+          code: `BONUS_${bonus.type}`,
+          nameEn: `Bonus — ${bonus.reason}`,
+          nameAr: `مكافأة — ${bonus.reason}`,
+          amountMinor: bonus.amountMinor,
+          isPercentage: false,
+          percentBp: 0,
+          sortOrder: 8000 + index,
+        }));
+
         const slip = computePayslip({
           basicMinor: structure.basicMinor,
-          components,
-          overtimeHours,
-          overtimeMultiplierBp: dto.overtimeMultiplierBp ?? 10000,
+          components: [...components, ...bonusComponents],
+          overtimeRateMinor: structure.overtimeRateMinor,
+          unpaidLeaveDays,
           advanceDeductionMinor: advanceDeduction,
+          policy: {
+            overtimeEnabled: policy.overtimeEnabled,
+            overtimeMultiplierBp: dto.overtimeMultiplierBp ?? policy.overtimeMultiplierBp,
+            standardDailyHours: structure.dailyHours ?? policy.standardDailyHours,
+            deductLate: policy.deductLate,
+            deductEarlyLeave: policy.deductEarlyLeave,
+            deductAbsence: policy.deductAbsence,
+          },
+          attendance: { overtimeMinutes, lateMinutes, earlyLeaveMinutes, absenceDays, workedMinutes },
         });
 
         const payslip = await tx.payslip.create({
@@ -725,17 +1560,42 @@ export class HrService {
             netMinor: slip.netMinor,
             currency: structure.currency,
             advanceDeductionMinor: advanceDeduction,
+            overtimeMinutes,
+            lateMinutes,
+            absenceDays,
+            workedMinutes,
             snapshot: {
               structureId: structure.id,
               effectiveFrom: structure.effectiveFrom.toISOString(),
               basicMinor: structure.basicMinor,
               components: components as unknown as Prisma.InputJsonValue,
-              overtimeHours,
+              overtimeMinutes,
+              lateMinutes,
+              earlyLeaveMinutes,
+              absenceDays,
+              unpaidLeaveDays,
               advanceDeductionMinor: advanceDeduction,
+              bonuses: employee.bonuses.map((b) => ({ id: b.id, type: b.type, reason: b.reason, amountMinor: b.amountMinor })) as unknown as Prisma.InputJsonValue,
+              policy: {
+                overtimeEnabled: policy.overtimeEnabled,
+                overtimeMultiplierBp: dto.overtimeMultiplierBp ?? policy.overtimeMultiplierBp,
+                deductLate: policy.deductLate,
+                deductEarlyLeave: policy.deductEarlyLeave,
+                deductAbsence: policy.deductAbsence,
+              } as unknown as Prisma.InputJsonValue,
             },
             lines: { create: slip.lines.map((l) => ({ type: l.type as never, code: l.code, nameEn: l.nameEn, nameAr: l.nameAr, amountMinor: l.amountMinor, sortOrder: l.sortOrder })) },
           },
         });
+
+        // Stamp the consumed bonuses with this payslip inside the same
+        // transaction, so a retried run cannot pay them again.
+        if (employee.bonuses.length > 0) {
+          await tx.employeeBonus.updateMany({
+            where: { id: { in: employee.bonuses.map((b) => b.id) }, payslipId: null },
+            data: { payslipId: payslip.id },
+          });
+        }
 
         // Settle the advance inside the same transaction.
         if (advance && advanceDeduction > 0) {
@@ -920,32 +1780,325 @@ export class HrService {
 
   async workforceDashboard(principal: RequestPrincipal, companyIdInput?: string) {
     const { companyId } = await this.context.resolveCompanyScope(principal, companyIdInput);
-    const [total, active, onLeave, departments, byDepartment] = await Promise.all([
+    const tz = await this.companyTimeZone(companyId);
+    const today = zonedDateKey(new Date(), tz);
+
+    const [total, active, onLeave, departments, byDepartment, todayRecords, pendingLeave, latestRun, approvedRuns, pendingRuns] = await Promise.all([
       this.prisma.employee.count({ where: { companyId } }),
       this.prisma.employee.count({ where: { companyId, status: 'ACTIVE' } }),
       this.prisma.employee.count({ where: { companyId, status: 'ON_LEAVE' } }),
       this.prisma.department.findMany({ where: { companyId }, include: { _count: { select: { employees: true } } } }),
       this.prisma.employee.groupBy({ by: ['departmentId'], where: { companyId }, _count: true }),
+      this.prisma.attendanceRecord.findMany({ where: { companyId, workDate: today }, include: { employee: { select: { departmentId: true } } } }),
+      this.prisma.leaveRequest.count({ where: { companyId, status: 'SUBMITTED' } }),
+      this.prisma.payrollRun.findFirst({ where: { companyId }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.payrollRun.count({ where: { companyId, status: { in: ['POSTED', 'LOCKED'] } } }),
+      this.prisma.payrollRun.count({ where: { companyId, status: { in: ['DRAFT', 'APPROVED'] } } }),
     ]);
-    const pendingLeave = await this.prisma.leaveRequest.count({ where: { companyId, status: 'SUBMITTED' } });
-    const latestRun = await this.prisma.payrollRun.findFirst({ where: { companyId }, orderBy: { createdAt: 'desc' } });
+
+    const presentNow = todayRecords.filter((r) => r.checkInAt && !r.checkOutAt).length;
+    const lateToday = todayRecords.filter((r) => r.lateMinutes > 0).length;
+    const absentToday = todayRecords.filter((r) => r.status === 'ABSENT').length;
+    const missingCheckout = todayRecords.filter((r) => r.checkInAt && !r.checkOutAt).length;
+    const workedMinutesToday = todayRecords.reduce((sum, r) => sum + r.netMinutes, 0);
+    const overtimeMinutesToday = todayRecords.reduce((sum, r) => sum + r.overtimeMinutes, 0);
+
     return {
       totalEmployees: total,
       activeEmployees: active,
       onLeaveEmployees: onLeave,
       pendingLeaveRequests: pendingLeave,
       departmentCount: departments.length,
-      headcountByDepartment: byDepartment.map((g) => ({
-        departmentId: g.departmentId,
-        count: g._count,
-      })),
+      headcountByDepartment: byDepartment.map((g) => ({ departmentId: g.departmentId, count: g._count })),
+      attendanceToday: {
+        date: today.toISOString().slice(0, 10),
+        presentNow,
+        late: lateToday,
+        absent: absentToday,
+        missingCheckout,
+        workedMinutes: workedMinutesToday,
+        overtimeMinutes: overtimeMinutesToday,
+      },
+      payroll: {
+        approvedRuns,
+        pendingRuns,
+        dueNetMinor: latestRun?.netMinor ?? 0,
+      },
       latestPayroll: latestRun
         ? { id: latestRun.id, runNumber: latestRun.runNumber, status: latestRun.status, netMinor: latestRun.netMinor, employeeCount: latestRun.employeeCount }
         : null,
     };
   }
 
+  // ------------------------------------------------------------ HR reports
+
+  /**
+   * A date window for a report, defaulting to the current calendar month in the
+   * company's timezone. A report never guesses a window silently: the resolved
+   * from/to are returned so the caller can show what was aggregated.
+   */
+  private async reportWindow(companyId: string, from?: string, to?: string) {
+    const tz = await this.companyTimeZone(companyId);
+    const now = new Date();
+    const p = zonedParts(now, tz);
+    const start = from ? new Date(from) : new Date(Date.UTC(p.year, p.month - 1, 1));
+    const end = to ? new Date(to) : new Date(Date.UTC(p.year, p.month - 1, p.day));
+    return { start, end, tz };
+  }
+
+  async reportAttendance(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: {
+        companyId,
+        workDate: { gte: start, lte: end },
+        ...(query.employeeId ? { employeeId: query.employeeId } : {}),
+        ...(query.departmentId ? { employee: { departmentId: query.departmentId } } : {}),
+        ...(query.branchId ? { employee: { branchId: query.branchId } } : {}),
+      },
+      include: { employee: { select: { code: true, fullNameEn: true, fullNameAr: true, department: { select: { nameEn: true, nameAr: true } } } } },
+      orderBy: { workDate: 'asc' },
+    });
+    return { from: start.toISOString(), to: end.toISOString(), items: rows.map(toAttendanceDto), total: rows.length };
+  }
+
+  /** Late arrivals and absences, aggregated per employee for the window. */
+  async reportLateAbsence(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: {
+        companyId,
+        workDate: { gte: start, lte: end },
+        ...(query.departmentId ? { employee: { departmentId: query.departmentId } } : {}),
+        ...(query.branchId ? { employee: { branchId: query.branchId } } : {}),
+      },
+      include: { employee: { select: { code: true, fullNameEn: true, fullNameAr: true } } },
+    });
+    const byEmployee = new Map<string, { employeeCode: string; employeeNameEn: string; employeeNameAr: string; lateCount: number; lateMinutes: number; absentDays: number; earlyLeaveCount: number }>();
+    for (const r of rows) {
+      const key = r.employeeId;
+      const entry = byEmployee.get(key) ?? { employeeCode: r.employee.code, employeeNameEn: r.employee.fullNameEn, employeeNameAr: r.employee.fullNameAr, lateCount: 0, lateMinutes: 0, absentDays: 0, earlyLeaveCount: 0 };
+      if (r.lateMinutes > 0) { entry.lateCount += 1; entry.lateMinutes += r.lateMinutes; }
+      if (r.earlyLeaveMinutes > 0) entry.earlyLeaveCount += 1;
+      if (r.status === 'ABSENT') entry.absentDays += 1;
+      byEmployee.set(key, entry);
+    }
+    return { from: start.toISOString(), to: end.toISOString(), items: [...byEmployee.values()], total: byEmployee.size };
+  }
+
+  /** Overtime hours and estimated cost per employee for the window. */
+  async reportOvertime(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const policy = await this.ensurePolicy(companyId);
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: { companyId, workDate: { gte: start, lte: end }, overtimeMinutes: { gt: 0 } },
+      include: { employee: { select: { id: true, code: true, fullNameEn: true, fullNameAr: true, salaryStructures: { where: { isActive: true }, select: { basicMinor: true, overtimeRateMinor: true }, take: 1 } } } },
+    });
+    const byEmployee = new Map<string, { employeeCode: string; employeeNameEn: string; employeeNameAr: string; overtimeMinutes: number; overtimeCostMinor: number }>();
+    for (const r of rows) {
+      const structure = r.employee.salaryStructures[0];
+      const hourly = structure?.overtimeRateMinor ?? (structure ? Math.round((structure.basicMinor * 100) / Math.max(1, policy.standardDailyHours * 30)) : 0);
+      const cost = Math.round((r.overtimeMinutes * hourly) / 60);
+      const entry = byEmployee.get(r.employeeId) ?? { employeeCode: r.employee.code, employeeNameEn: r.employee.fullNameEn, employeeNameAr: r.employee.fullNameAr, overtimeMinutes: 0, overtimeCostMinor: 0 };
+      entry.overtimeMinutes += r.overtimeMinutes;
+      entry.overtimeCostMinor += cost;
+      byEmployee.set(r.employeeId, entry);
+    }
+    return { from: start.toISOString(), to: end.toISOString(), items: [...byEmployee.values()], total: byEmployee.size };
+  }
+
+  /** Net worked minutes per employee for the window. */
+  async reportWorkedHours(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: {
+        companyId,
+        workDate: { gte: start, lte: end },
+        ...(query.departmentId ? { employee: { departmentId: query.departmentId } } : {}),
+        ...(query.branchId ? { employee: { branchId: query.branchId } } : {}),
+      },
+      include: { employee: { select: { code: true, fullNameEn: true, fullNameAr: true } } },
+    });
+    const byEmployee = new Map<string, { employeeCode: string; employeeNameEn: string; employeeNameAr: string; workedMinutes: number; netMinutes: number; days: number }>();
+    for (const r of rows) {
+      const entry = byEmployee.get(r.employeeId) ?? { employeeCode: r.employee.code, employeeNameEn: r.employee.fullNameEn, employeeNameAr: r.employee.fullNameAr, workedMinutes: 0, netMinutes: 0, days: 0 };
+      entry.workedMinutes += r.workedMinutes;
+      entry.netMinutes += r.netMinutes;
+      entry.days += 1;
+      byEmployee.set(r.employeeId, entry);
+    }
+    return { from: start.toISOString(), to: end.toISOString(), items: [...byEmployee.values()], total: byEmployee.size };
+  }
+
+  /** Monthly payroll totals across runs in the window. */
+  async reportPayroll(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const runs = await this.prisma.payrollRun.findMany({
+      where: { companyId, createdAt: { gte: start, lte: end } },
+      include: { period: { select: { code: true, nameEn: true, nameAr: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return {
+      from: start.toISOString(),
+      to: end.toISOString(),
+      items: runs.map((r) => ({ id: r.id, runNumber: r.runNumber, status: r.status, periodCode: r.period.code, employeeCount: r.employeeCount, grossMinor: r.grossMinor, allowancesMinor: r.allowancesMinor, deductionsMinor: r.deductionsMinor, netMinor: r.netMinor, currency: r.currency, createdAt: r.createdAt.toISOString() })),
+      total: runs.length,
+    };
+  }
+
+  /** Deductions and allowances by component code across posted runs. */
+  async reportDeductionsAllowances(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const lines = await this.prisma.payslipLine.findMany({
+      where: { payslip: { companyId, payrollRun: { createdAt: { gte: start, lte: end }, status: { in: ['POSTED', 'LOCKED'] } } } },
+      select: { type: true, code: true, nameEn: true, nameAr: true, amountMinor: true },
+    });
+    const byCode = new Map<string, { type: string; code: string; nameEn: string; nameAr: string; totalMinor: number; count: number }>();
+    for (const l of lines) {
+      const entry = byCode.get(l.code) ?? { type: l.type, code: l.code, nameEn: l.nameEn, nameAr: l.nameAr, totalMinor: 0, count: 0 };
+      entry.totalMinor += l.amountMinor;
+      entry.count += 1;
+      byCode.set(l.code, entry);
+    }
+    return { from: start.toISOString(), to: end.toISOString(), items: [...byCode.values()], total: byCode.size };
+  }
+
+  /** A roster of employees with their current salary, for the payroll register. */
+  async reportEmployeePayroll(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const employees = await this.prisma.employee.findMany({
+      where: {
+        companyId,
+        ...(query.departmentId ? { departmentId: query.departmentId } : {}),
+        ...(query.branchId ? { branchId: query.branchId } : {}),
+        ...(query.status ? { status: query.status as never } : {}),
+      },
+      include: { salaryStructures: { where: { isActive: true }, include: { components: true }, take: 1 }, department: { select: { nameEn: true, nameAr: true } } },
+      orderBy: { code: 'asc' },
+    });
+    return {
+      items: employees.map((e) => {
+        const s = e.salaryStructures[0];
+        const allowances = (s?.components ?? []).filter((c) => c.type === 'ALLOWANCE');
+        const deductions = (s?.components ?? []).filter((c) => c.type === 'DEDUCTION');
+        return {
+          employeeId: e.id,
+          employeeCode: e.code,
+          employeeNameEn: e.fullNameEn,
+          employeeNameAr: e.fullNameAr,
+          departmentNameEn: e.department?.nameEn ?? null,
+          departmentNameAr: e.department?.nameAr ?? null,
+          status: e.status,
+          basicMinor: s?.basicMinor ?? 0,
+          allowancesMinor: sumMinor(allowances.map((c) => (c.isPercentage ? Math.round((s!.basicMinor * c.percentBp) / 10000) : c.amountMinor))),
+          deductionsMinor: sumMinor(deductions.map((c) => (c.isPercentage ? Math.round((s!.basicMinor * c.percentBp) / 10000) : c.amountMinor))),
+          currency: s?.currency ?? 'BHD',
+        };
+      }),
+      total: employees.length,
+    };
+  }
+
+  /** Payroll cost grouped by company, department and branch. */
+  async reportPayrollCost(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const payslips = await this.prisma.payslip.findMany({
+      where: { companyId, payrollRun: { createdAt: { gte: start, lte: end }, status: { in: ['POSTED', 'LOCKED'] } } },
+      include: { employee: { select: { department: { select: { nameEn: true, nameAr: true } }, branch: { select: { nameEn: true, nameAr: true } } } } },
+    });
+    const byDepartment = new Map<string, { nameEn: string; nameAr: string; grossMinor: number; netMinor: number; headcount: number }>();
+    const byBranch = new Map<string, { nameEn: string; nameAr: string; grossMinor: number; netMinor: number; headcount: number }>();
+    let totalGross = 0;
+    let totalNet = 0;
+    for (const p of payslips) {
+      const deptName = p.employee.department?.nameEn ?? 'Unassigned';
+      const deptAr = p.employee.department?.nameAr ?? 'غير محدد';
+      const d = byDepartment.get(deptName) ?? { nameEn: deptName, nameAr: deptAr, grossMinor: 0, netMinor: 0, headcount: 0 };
+      d.grossMinor += p.grossMinor; d.netMinor += p.netMinor; d.headcount += 1;
+      byDepartment.set(deptName, d);
+
+      const brName = p.employee.branch?.nameEn ?? 'Unassigned';
+      const brAr = p.employee.branch?.nameAr ?? 'غير محدد';
+      const b = byBranch.get(brName) ?? { nameEn: brName, nameAr: brAr, grossMinor: 0, netMinor: 0, headcount: 0 };
+      b.grossMinor += p.grossMinor; b.netMinor += p.netMinor; b.headcount += 1;
+      byBranch.set(brName, b);
+
+      totalGross += p.grossMinor;
+      totalNet += p.netMinor;
+    }
+    return {
+      from: start.toISOString(),
+      to: end.toISOString(),
+      totals: { grossMinor: totalGross, netMinor: totalNet, payslips: payslips.length },
+      byDepartment: [...byDepartment.values()],
+      byBranch: [...byBranch.values()],
+    };
+  }
+
   // ----------------------------------------------------------------- helpers
+
+  /**
+   * Assert a payslip may be read by this principal.
+   *
+   * A holder of the company-wide payslip permission may read any payslip in the
+   * tenant. An employee with only the self-service permission may read exactly
+   * their own; the check is by the payslip's own `employeeId`, so a peer's
+   * payslip id cannot be used to read theirs.
+   */
+  async assertPayslipReadable(payslipId: string, principal: RequestPrincipal): Promise<void> {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const payslip = await this.prisma.payslip.findFirst({ where: { id: payslipId, companyId }, select: { employeeId: true } });
+    if (!payslip) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Payslip not found.');
+    if (principal.grantedPermissions.includes('erp.hr.payslip.read')) return;
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId: principal.userId }, select: { id: true } });
+    if (!employee || employee.id !== payslip.employeeId) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'You may only read your own payslips.');
+    }
+  }
+
+  /** Dispatch a report by its slug, for the CSV export route. */
+  async runReport(kind: string, query: ListQueryDto, principal: RequestPrincipal) {
+    switch (kind) {
+      case 'attendance':
+        return this.reportAttendance(query, principal);
+      case 'late-absence':
+        return this.reportLateAbsence(query, principal);
+      case 'overtime':
+        return this.reportOvertime(query, principal);
+      case 'worked-hours':
+        return this.reportWorkedHours(query, principal);
+      case 'payroll':
+        return this.reportPayroll(query, principal);
+      case 'deductions-allowances':
+        return this.reportDeductionsAllowances(query, principal);
+      case 'employee-payroll':
+        return this.reportEmployeePayroll(query, principal);
+      case 'payroll-cost':
+        return this.reportPayrollCost(query, principal);
+      default:
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, `Unknown report "${kind}".`);
+    }
+  }
+
+  private async assertDepartment(companyId: string, departmentId: string) {
+    const department = await this.prisma.department.findFirst({ where: { id: departmentId, companyId }, select: { id: true } });
+    if (!department) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Department must belong to the current company.');
+  }
+
+  private async assertJobTitle(companyId: string, jobTitleId: string, departmentId?: string | null) {
+    const jobTitle = await this.prisma.jobTitle.findFirst({ where: { id: jobTitleId, companyId }, select: { id: true, departmentId: true } });
+    if (!jobTitle) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Job title must belong to the current company.');
+    if (departmentId && jobTitle.departmentId && jobTitle.departmentId !== departmentId) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Job title must belong to the selected department.');
+    }
+  }
 
   private async assertEmployee(companyId: string, employeeId: string) {
     const employee = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId } });
@@ -962,6 +2115,8 @@ function toEmployeeDto(e: {
   fullNameAr: string;
   email: string | null;
   phone: string | null;
+  secondaryPhone?: string | null;
+  terminationDate?: Date | null;
   status: string;
   hireDate: Date;
   departmentId: string | null;
@@ -978,8 +2133,10 @@ function toEmployeeDto(e: {
     fullNameAr: e.fullNameAr,
     email: e.email,
     phone: e.phone,
+    secondaryPhone: e.secondaryPhone ?? null,
     status: e.status,
     hireDate: e.hireDate.toISOString(),
+    terminationDate: e.terminationDate ? e.terminationDate.toISOString() : null,
     departmentId: e.departmentId,
     departmentNameEn: e.department?.nameEn ?? null,
     departmentNameAr: e.department?.nameAr ?? null,
@@ -1034,6 +2191,17 @@ function toAttendanceDto(a: {
   workedMinutes: number;
   overtimeMinutes: number;
   status: string;
+  checkInAt: Date | null;
+  checkOutAt: Date | null;
+  lateMinutes?: number;
+  earlyLeaveMinutes?: number;
+  breakMinutes?: number;
+  netMinutes?: number;
+  checkInSource?: string | null;
+  checkOutSource?: string | null;
+  checkInDistanceM?: number | null;
+  checkInSiteId?: string | null;
+  fallbackReason?: string | null;
   employee?: { code: string; fullNameEn: string; fullNameAr: string } | null;
 }) {
   return {
@@ -1043,8 +2211,19 @@ function toAttendanceDto(a: {
     employeeNameEn: a.employee?.fullNameEn ?? null,
     employeeNameAr: a.employee?.fullNameAr ?? null,
     workDate: a.workDate.toISOString(),
+    checkInAt: a.checkInAt ? a.checkInAt.toISOString() : null,
+    checkOutAt: a.checkOutAt ? a.checkOutAt.toISOString() : null,
     workedMinutes: a.workedMinutes,
     overtimeMinutes: a.overtimeMinutes,
+    lateMinutes: a.lateMinutes ?? 0,
+    earlyLeaveMinutes: a.earlyLeaveMinutes ?? 0,
+    breakMinutes: a.breakMinutes ?? 0,
+    netMinutes: a.netMinutes ?? 0,
+    checkInSource: a.checkInSource ?? null,
+    checkOutSource: a.checkOutSource ?? null,
+    checkInDistanceM: a.checkInDistanceM ?? null,
+    checkInSiteId: a.checkInSiteId ?? null,
+    fallbackReason: a.fallbackReason ?? null,
     status: a.status,
   };
 }
@@ -1134,5 +2313,53 @@ function toAdvanceDto(a: {
     currency: a.currency,
     issuedAt: a.issuedAt.toISOString(),
     reason: a.reason,
+  };
+}
+
+function toPayslipDto(p: {
+  id: string;
+  employeeId: string;
+  employeeCode: string;
+  employeeNameEn: string;
+  employeeNameAr: string;
+  basicMinor: number;
+  allowancesMinor: number;
+  deductionsMinor: number;
+  grossMinor: number;
+  netMinor: number;
+  currency: string;
+  advanceDeductionMinor: number;
+  overtimeMinutes: number;
+  lateMinutes: number;
+  absenceDays: number;
+  workedMinutes: number;
+  createdAt: Date;
+  lines?: Array<{ type: string; code: string; nameEn: string; nameAr: string; amountMinor: number; sortOrder: number }>;
+  payrollRun?: { runNumber: string; status: string; period?: { code: string; nameEn: string; nameAr: string } | null } | null;
+}) {
+  return {
+    id: p.id,
+    employeeId: p.employeeId,
+    employeeCode: p.employeeCode,
+    employeeNameEn: p.employeeNameEn,
+    employeeNameAr: p.employeeNameAr,
+    basicMinor: p.basicMinor,
+    allowancesMinor: p.allowancesMinor,
+    deductionsMinor: p.deductionsMinor,
+    grossMinor: p.grossMinor,
+    netMinor: p.netMinor,
+    currency: p.currency,
+    advanceDeductionMinor: p.advanceDeductionMinor,
+    overtimeMinutes: p.overtimeMinutes,
+    lateMinutes: p.lateMinutes,
+    absenceDays: p.absenceDays,
+    workedMinutes: p.workedMinutes,
+    runNumber: p.payrollRun?.runNumber ?? null,
+    runStatus: p.payrollRun?.status ?? null,
+    periodCode: p.payrollRun?.period?.code ?? null,
+    periodNameEn: p.payrollRun?.period?.nameEn ?? null,
+    periodNameAr: p.payrollRun?.period?.nameAr ?? null,
+    createdAt: p.createdAt.toISOString(),
+    lines: p.lines?.map((l) => ({ type: l.type, code: l.code, nameEn: l.nameEn, nameAr: l.nameAr, amountMinor: l.amountMinor, sortOrder: l.sortOrder })) ?? [],
   };
 }

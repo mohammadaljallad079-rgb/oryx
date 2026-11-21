@@ -1,5 +1,6 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
-import { checkLimit, type PlanLimits } from '@oryx/shared';
+import { checkLimit, DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY, DEFAULT_TIMEZONE, type PlanLimits } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { AuditService } from '../common/audit.service';
@@ -103,16 +104,64 @@ export class OrganizationsService {
     return this.toCompanyDto(company);
   }
 
+  /** Limited platform-only picker: existing active users, never password/token data. */
+  async availableCompanyManagers(search: string | undefined, actor: ActorContext) {
+    if (actor.kind !== 'PLATFORM') {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Only a platform administrator may list potential company managers.');
+    }
+    const query = (search ?? '').trim().slice(0, 100);
+    const users = await this.prisma.user.findMany({
+      where: {
+        status: 'ACTIVE',
+        ...(query ? {
+          OR: [
+            { email: { contains: query, mode: 'insensitive' as const } },
+            { fullNameEn: { contains: query, mode: 'insensitive' as const } },
+            { fullNameAr: { contains: query, mode: 'insensitive' as const } },
+          ],
+        } : {}),
+      },
+      orderBy: { fullNameEn: 'asc' },
+      take: 100,
+      select: { id: true, email: true, fullNameEn: true, fullNameAr: true },
+    });
+    return { items: users };
+  }
+
   async createCompany(dto: CreateCompanyDto, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a company or branch name in Arabic or English.');
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'CO');
     if (actor.kind !== 'PLATFORM') {
       throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Only a platform administrator may create companies.');
     }
-    const existing = await this.prisma.company.findUnique({ where: { code: dto.code } });
-    if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Company code "${dto.code}" already exists.`);
+    const existing = await this.prisma.company.findUnique({ where: { code: code } });
+    if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Company code "${code}" already exists.`);
+
+    if (dto.adminUserId && dto.adminEmail) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select an existing manager or invite a new manager, not both.');
+    }
+    if (dto.adminUserId) {
+      const manager = await this.prisma.user.findFirst({
+        where: { id: dto.adminUserId, status: 'ACTIVE' }, select: { id: true },
+      });
+      if (!manager) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Selected company manager is not an active user.');
+    }
 
     if (dto.parentCompanyId) {
       const parent = await this.prisma.company.findUnique({ where: { id: dto.parentCompanyId } });
       if (!parent) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Parent company not found.');
+    }
+
+    // The two company models are distinct and must not be conflated. A SaaS
+    // tenant is provisioned against a plan; an ORYX internal company is owned by
+    // the group, governed by the Platform Super Admin, and is never
+    // subscription-limited, so attaching a plan to it is a modelling error.
+    if (dto.type === 'INTERNAL' && dto.planId) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'An internal company is not subscription-limited and must not be given a plan.',
+      );
     }
 
     if (dto.planId) {
@@ -124,15 +173,14 @@ export class OrganizationsService {
     const company = await this.prisma.$transaction(async (tx) => {
       const created = await tx.company.create({
         data: {
-          code: dto.code,
-          nameEn: dto.nameEn,
-          nameAr: dto.nameAr,
+          code: code,
+          ...names,
           legalNameEn: dto.legalNameEn ?? null,
           type: dto.type,
           status: 'ACTIVE',
           industry: dto.industry ?? null,
-          countryCode: dto.countryCode ?? 'SA',
-          currency: dto.currency ?? 'SAR',
+          countryCode: dto.countryCode ?? DEFAULT_COUNTRY_CODE,
+          currency: dto.currency ?? DEFAULT_CURRENCY,
           parentCompanyId: dto.parentCompanyId ?? null,
           notes: dto.notes ?? null,
         },
@@ -140,6 +188,21 @@ export class OrganizationsService {
 
       // Default system roles for the new tenant.
       await this.createDefaultRoles(tx, created.id);
+      if (dto.adminUserId) {
+        const role = await tx.role.findFirstOrThrow({
+          where: { companyId: created.id, code: 'company_admin' },
+          select: { id: true },
+        });
+        await tx.membership.create({
+          data: {
+            companyId: created.id,
+            userId: dto.adminUserId,
+            roleId: role.id,
+            isActive: true,
+            invitedById: actor.userId,
+          },
+        });
+      }
 
       if (dto.planId) {
         const plan = await tx.plan.findUniqueOrThrow({ where: { id: dto.planId } });
@@ -181,7 +244,7 @@ export class OrganizationsService {
       action: 'company.created',
       targetType: 'COMPANY',
       targetId: company.id,
-      summary: `Created ${dto.type === 'INTERNAL' ? 'internal company' : 'SaaS tenant'} ${dto.nameEn} (${dto.code})`,
+      summary: `Created ${dto.type === 'INTERNAL' ? 'internal company' : 'SaaS tenant'} ${names.nameEn} (${code})`,
       metadata: { type: dto.type, planId: dto.planId ?? null },
       ipAddress: actor.ip ?? null,
       userAgent: actor.userAgent ?? null,
@@ -215,13 +278,19 @@ export class OrganizationsService {
     const updated = await this.prisma.company.update({
       where: { id },
       data: {
+        ...(dto.code !== undefined ? { code: dto.code } : {}),
         ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
         ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
         ...(dto.legalNameEn !== undefined ? { legalNameEn: dto.legalNameEn } : {}),
         ...(dto.industry !== undefined ? { industry: dto.industry } : {}),
         ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode } : {}),
         ...(dto.currency !== undefined ? { currency: dto.currency } : {}),
+        ...(dto.functionalCurrency !== undefined ? { functionalCurrency: dto.functionalCurrency || null } : {}),
+        ...(dto.defaultTaxRateBp !== undefined ? { defaultTaxRateBp: dto.defaultTaxRateBp } : {}),
+        ...(dto.roundingMode !== undefined ? { roundingMode: dto.roundingMode } : {}),
+        ...(dto.documentLocale !== undefined ? { documentLocale: dto.documentLocale } : {}),
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
+        ...(dto.crNumber !== undefined ? { crNumber: dto.crNumber } : {}),
         ...(dto.parentCompanyId !== undefined ? { parentCompanyId: dto.parentCompanyId } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       },
@@ -260,6 +329,51 @@ export class OrganizationsService {
     return this.getCompany(id, actor);
   }
 
+  /**
+   * Permanently remove a company and everything it owns.
+   *
+   * Platform-only and gated on an explicit confirmation flag, because the delete
+   * is irreversible: every branch, membership, document and ledger entry the
+   * tenant owns is removed with it. Two things are deliberately preserved:
+   * `AuditLog` rows are `SetNull`, so the record of who did what outlives the
+   * tenant, and child companies are detached (their `parentCompanyId` is
+   * `SetNull`) rather than cascaded, so deleting a group never silently destroys
+   * a separate tenant's data.
+   */
+  async deleteCompany(id: string, confirm: boolean, actor: ActorContext) {
+    if (actor.kind !== 'PLATFORM') {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Only a platform administrator may delete a company.');
+    }
+    if (!confirm) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Deleting a company requires an explicit confirmation.');
+    }
+    const company = await this.prisma.company.findUnique({
+      where: { id },
+      include: { _count: { select: { children: true, branches: true, memberships: true } } },
+    });
+    if (!company) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Company not found.');
+
+    // Written before the row disappears and with no tenant scope, so the trail
+    // survives the delete instead of being nulled by the cascade.
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId: null,
+      action: 'company.deleted',
+      targetType: 'COMPANY',
+      targetId: id,
+      summary: `Deleted company ${company.nameEn} (${company.code})`,
+      metadata: {
+        code: company.code,
+        nameEn: company.nameEn,
+        branches: company._count.branches,
+        memberships: company._count.memberships,
+        childrenDetached: company._count.children,
+      },
+    });
+    await this.prisma.company.delete({ where: { id } });
+    return { ok: true, code: company.code, childrenDetached: company._count.children };
+  }
+
   // -------------------------------------------------------------------- branches
 
   async listBranches(companyId: string, query: ListQueryDto, actor: ActorContext) {
@@ -286,7 +400,7 @@ export class OrganizationsService {
         orderBy: { nameEn: 'asc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { company: { select: { nameEn: true } }, _count: { select: { memberships: true } } },
+        include: { company: { select: { nameEn: true } }, responsibleUser: { select: { fullNameEn: true, fullNameAr: true } }, _count: { select: { memberships: true } } },
       }),
       this.prisma.branch.count({ where }),
     ]);
@@ -295,12 +409,16 @@ export class OrganizationsService {
   }
 
   async createBranch(companyId: string, dto: CreateBranchDto, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a company or branch name in Arabic or English.');
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'BR');
     this.assertCompanyAccess(companyId, actor);
+    if (dto.responsibleUserId) await this.assertBranchResponsibleUser(companyId, dto.responsibleUserId);
 
     const duplicate = await this.prisma.branch.findUnique({
-      where: { companyId_code: { companyId, code: dto.code } },
+      where: { companyId_code: { companyId, code: code } },
     });
-    if (duplicate) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Branch code "${dto.code}" already exists in this company.`);
+    if (duplicate) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Branch code "${code}" already exists in this company.`);
 
     // Plan limit enforcement — never trust the UI.
     const ent = await this.entitlements.forCompany(companyId);
@@ -324,16 +442,19 @@ export class OrganizationsService {
     const branch = await this.prisma.branch.create({
       data: {
         companyId,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...names,
         city: dto.city ?? null,
-        countryCode: dto.countryCode ?? 'SA',
+        countryCode: dto.countryCode ?? DEFAULT_COUNTRY_CODE,
         addressLine: dto.addressLine ?? null,
         phone: dto.phone ?? null,
-        timezone: dto.timezone ?? 'Asia/Riyadh',
+        phoneNumbers: dto.phoneNumbers ?? [],
+        crNumber: dto.crNumber ?? null,
+        specialty: dto.specialty ?? null,
+        responsibleUserId: dto.responsibleUserId ?? null,
+        timezone: dto.timezone ?? DEFAULT_TIMEZONE,
       },
-      include: { company: { select: { nameEn: true } }, _count: { select: { memberships: true } } },
+      include: { company: { select: { nameEn: true } }, responsibleUser: { select: { fullNameEn: true, fullNameAr: true } }, _count: { select: { memberships: true } } },
     });
 
     await this.audit.record({
@@ -352,6 +473,15 @@ export class OrganizationsService {
     const branch = await this.prisma.branch.findUnique({ where: { id: branchId } });
     if (!branch) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Branch not found.');
     this.assertCompanyAccess(branch.companyId, actor);
+    if (dto.code && dto.code !== branch.code) {
+      const duplicate = await this.prisma.branch.findUnique({
+        where: { companyId_code: { companyId: branch.companyId, code: dto.code } },
+      });
+      if (duplicate && duplicate.id !== branchId) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Branch code "${dto.code}" already exists in this company.`);
+      }
+    }
+    if (dto.responsibleUserId) await this.assertBranchResponsibleUser(branch.companyId, dto.responsibleUserId);
 
     const updated = await this.prisma.branch.update({
       where: { id: branchId },
@@ -359,11 +489,17 @@ export class OrganizationsService {
         ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
         ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
         ...(dto.city !== undefined ? { city: dto.city } : {}),
+        ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode } : {}),
         ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.phoneNumbers !== undefined ? { phoneNumbers: dto.phoneNumbers } : {}),
+        ...(dto.crNumber !== undefined ? { crNumber: dto.crNumber } : {}),
+        ...(dto.specialty !== undefined ? { specialty: dto.specialty } : {}),
+        ...(dto.responsibleUserId !== undefined ? { responsibleUserId: dto.responsibleUserId } : {}),
+        ...(dto.timezone !== undefined ? { timezone: dto.timezone } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
       },
-      include: { company: { select: { nameEn: true } }, _count: { select: { memberships: true } } },
+      include: { company: { select: { nameEn: true } }, responsibleUser: { select: { fullNameEn: true, fullNameAr: true } }, _count: { select: { memberships: true } } },
     });
 
     await this.audit.record({
@@ -383,20 +519,33 @@ export class OrganizationsService {
     if (!branch) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Branch not found.');
     this.assertCompanyAccess(branch.companyId, actor);
 
-    // Soft delete preserves referential history.
-    const updated = await this.prisma.branch.update({ where: { id: branchId }, data: { isActive: false } });
+    // A real delete, not a deactivation. Documents that point at the branch keep
+    // their history: their `branchId` is `SetNull`, so the row survives with the
+    // branch detached. The audit entry is written first so the branch's identity
+    // is on record before the row disappears.
     await this.audit.record({
       actorUserId: actor.userId,
       companyId: branch.companyId,
-      action: 'branch.deactivated',
+      action: 'branch.deleted',
       targetType: 'BRANCH',
       targetId: branchId,
-      summary: `Deactivated branch ${updated.nameEn}`,
+      summary: `Deleted branch ${branch.nameEn} (${branch.code})`,
     });
+    await this.prisma.branch.delete({ where: { id: branchId } });
     return { ok: true };
   }
 
   // -------------------------------------------------------------------- helpers
+
+  private async assertBranchResponsibleUser(companyId: string, userId: string): Promise<void> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, status: 'ACTIVE', memberships: { some: { companyId, isActive: true } } },
+      select: { id: true },
+    });
+    if (!user) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The responsible user must be an active member of this company.');
+    }
+  }
 
   private assertCompanyAccess(companyId: string, actor: ActorContext): void {
     if (actor.kind === 'PLATFORM') return;
@@ -450,6 +599,13 @@ export class OrganizationsService {
     industry: string | null;
     countryCode: string | null;
     currency: string;
+    functionalCurrency: string | null;
+    defaultTaxRateBp: number;
+    roundingMode: string;
+    documentLocale: string;
+    taxNumber: string | null;
+    crNumber: string | null;
+    notes: string | null;
     parentCompanyId: string | null;
     createdAt: Date;
     parent?: { nameEn: string } | null;
@@ -480,6 +636,13 @@ export class OrganizationsService {
       industry: c.industry,
       countryCode: c.countryCode,
       currency: c.currency,
+      functionalCurrency: c.functionalCurrency,
+      defaultTaxRateBp: c.defaultTaxRateBp,
+      roundingMode: c.roundingMode as CompanyDto['roundingMode'],
+      documentLocale: c.documentLocale as CompanyDto['documentLocale'],
+      taxNumber: c.taxNumber,
+      crNumber: c.crNumber,
+      notes: c.notes,
       parentCompanyId: c.parentCompanyId,
       parentCompanyNameEn: c.parent?.nameEn ?? null,
       createdAt: c.createdAt.toISOString(),
@@ -514,6 +677,13 @@ export class OrganizationsService {
     nameEn: string;
     nameAr: string;
     city: string | null;
+    addressLine: string | null;
+    phone: string | null;
+    phoneNumbers: string[];
+    crNumber: string | null;
+    specialty: string | null;
+    responsibleUserId: string | null;
+    responsibleUser?: { fullNameEn: string; fullNameAr: string } | null;
     countryCode: string | null;
     timezone: string;
     isActive: boolean;
@@ -529,6 +699,14 @@ export class OrganizationsService {
       nameEn: b.nameEn,
       nameAr: b.nameAr,
       city: b.city,
+      addressLine: b.addressLine,
+      phone: b.phone,
+      phoneNumbers: b.phoneNumbers ?? [],
+      crNumber: b.crNumber,
+      specialty: b.specialty,
+      responsibleUserId: b.responsibleUserId,
+      responsibleUserNameEn: b.responsibleUser?.fullNameEn ?? null,
+      responsibleUserNameAr: b.responsibleUser?.fullNameAr ?? null,
       countryCode: b.countryCode,
       timezone: b.timezone,
       isActive: b.isActive,

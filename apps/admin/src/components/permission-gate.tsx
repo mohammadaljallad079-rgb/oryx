@@ -31,7 +31,7 @@ export function PermissionGate({
   if (allowed) return <>{children}</>;
 
   return (
-    <div className="flex flex-col gap-5" data-testid="permission-denied">
+    <div className="flex flex-col gap-4" data-testid="permission-denied">
       <SectionHeader title={t('error.forbidden')} />
       <Card className="p-6">
         <div className="flex flex-col items-start gap-4 sm:flex-row">
@@ -50,7 +50,7 @@ export function PermissionGate({
             <p className="oryx-muted mt-1 mb-3 max-w-[70ch] text-[13px]">
               {isPlatform
                 ? t('users.delegationNote')
-                : 'This screen belongs to platform governance. Contact your platform administrator if you need access.'}
+                : t('error.platformGovernance')}
             </p>
             <Link href="/dashboard" className="oryx-btn oryx-btn--primary">
               <Icon name="gauge" size={16} />

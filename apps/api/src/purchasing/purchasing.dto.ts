@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsIn,
   IsISO8601,
   IsOptional,
   IsString,
@@ -41,23 +42,29 @@ export class ListQueryDto {
   @IsOptional()
   @IsString()
   branchId?: string;
+
+  /** Restrict a list to one supplier, so a payment form can show that
+   *  supplier's open invoices without paging the whole register. */
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
 }
 
 export class CreateSupplierDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(40)
-  code!: string;
+  @IsOptional() @IsIn(['INDIVIDUAL', 'COMPANY']) kind?: 'INDIVIDUAL' | 'COMPANY';
+  @IsOptional() @IsString() @MaxLength(200) contactPerson?: string;
+  @IsOptional() @IsString() @MaxLength(80) idNumber?: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
@@ -107,6 +114,9 @@ export class CreateSupplierDto {
 }
 
 export class UpdateSupplierDto {
+  @IsOptional() @IsIn(['INDIVIDUAL', 'COMPANY']) kind?: 'INDIVIDUAL' | 'COMPANY';
+  @IsOptional() @IsString() @MaxLength(200) contactPerson?: string;
+  @IsOptional() @IsString() @MaxLength(80) idNumber?: string;
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -319,10 +329,16 @@ export class CreateSupplierInvoiceDto {
   @IsString()
   supplierId!: string;
 
+  /** External vendor reference; ORYX assigns the internal invoice number. */
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(60)
-  supplierInvoiceNumber!: string;
+  supplierInvoiceNumber?: string;
+
+  /** Warehouse for direct-invoice receipt (no purchase order). */
+  @IsOptional()
+  @IsString()
+  warehouseId?: string;
 
   @IsOptional()
   @IsString()

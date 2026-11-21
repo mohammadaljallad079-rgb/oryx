@@ -1,0 +1,337 @@
+import { existsSync } from 'node:fs';
+import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { PDFDocument } from 'pdf-lib';
+import type { Browser, BrowserType } from 'playwright';
+import { DocumentFontService, DOCUMENT_FONT_STACK, DOCUMENT_LATIN_STACK } from './document-fonts.service';
+
+/**
+ * Renders HTML to a print-ready PDF with a real layout engine.
+ *
+ * Chromium is used rather than a PDF-drawing library because the documents are
+ * laid out with the same CSS a browser uses — Arabic shaping, bidi runs, table
+ * pagination, `@page` margins and repeated table headers all come for free and
+ * correctly. A hand-drawn PDF builder would have to reimplement Arabic joining
+ * and RTL bidi itself, and would get it subtly wrong.
+ *
+ * One browser instance is reused across renders; launching Chromium takes longer
+ * than rendering a document, so a per-request launch would dominate the response
+ * time and leak a process if a request was cancelled.
+ */
+@Injectable()
+export class PdfRendererService implements OnModuleDestroy {
+  private readonly logger = new Logger(PdfRendererService.name);
+  private browserPromise: Promise<Browser> | null = null;
+
+  constructor(private readonly fonts: DocumentFontService) {}
+
+  private async browser(): Promise<Browser> {
+    if (this.browserPromise) {
+      // A browser that has crashed or been closed still resolves the cached
+      // promise, so every later render would fail with "browser has been
+      // closed". Re-check liveness and relaunch rather than reuse a corpse.
+      const existing = await this.browserPromise.catch(() => null);
+      if (existing && existing.isConnected()) return existing;
+      this.browserPromise = null;
+    }
+    this.browserPromise = (async () => {
+      // Imported lazily so the API can boot (and unit tests can run) without
+      // the browser binary present; only a PDF request needs it.
+      const { chromium } = await import('playwright');
+      const browser = await launchChromium(chromium);
+      // A launch that later dies must not leave a stale promise behind.
+      browser.on('disconnected', () => {
+        this.browserPromise = null;
+      });
+      this.logger.log('PDF renderer browser started');
+      return browser;
+    })().catch((error) => {
+      // Reset so a later request retries instead of reusing a rejected promise.
+      this.browserPromise = null;
+      throw error;
+    });
+    return this.browserPromise;
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (!this.browserPromise) return;
+    try {
+      const browser = await this.browserPromise;
+      await browser.close();
+    } catch {
+      // A browser that never started has nothing to close.
+    }
+    this.browserPromise = null;
+  }
+
+  /**
+   * Renders a full HTML document to PDF bytes.
+   *
+   * `background: true` is required — the report uses filled header bars and
+   * shaded tables, and Chromium drops background colours when printing by
+   * default.
+   */
+  async render(
+    html: string,
+    options: { footerHtml?: string; coverFooterHtml?: string; margins?: PdfMargins } = {},
+  ): Promise<{ pdf: Buffer; pageCount: number }> {
+    const pdf = await this.renderOnce(html, options.footerHtml, options.margins);
+    // The approved inspection report prints a different footer on its cover than
+    // on its section pages, and Chromium paints one footer template on *every*
+    // page. A second pass with the cover footer supplies page one, and the
+    // cover's page is spliced onto the section pass so both variants appear in
+    // one document. The footer is painted inside the bottom margin, so it never
+    // changes pagination — the two passes break at exactly the same places.
+    if (options.coverFooterHtml && options.coverFooterHtml !== options.footerHtml) {
+      const cover = await this.renderOnce(html, options.coverFooterHtml, options.margins);
+      if (cover.pageCount === pdf.pageCount && cover.pageCount > 1) {
+        return { pdf: await spliceFirstPage(cover.pdf, pdf.pdf), pageCount: pdf.pageCount };
+      }
+    }
+    return pdf;
+  }
+
+  private async renderOnce(
+    html: string,
+    footerHtml: string | undefined,
+    margins: PdfMargins | undefined,
+  ): Promise<{ pdf: Buffer; pageCount: number }> {
+    const browser = await this.browser();
+    const context = await browser.newContext({ viewport: { width: 1240, height: 1754 } });
+    const page = await context.newPage();
+    try {
+      await page.setContent(html, { waitUntil: 'load', timeout: 30_000 });
+
+      // `font-display:block` keeps text invisible until the face is ready; wait
+      // for it explicitly so the first page is not rendered in a fallback font.
+      await page.evaluate(() => document.fonts.ready);
+      await page.emulateMedia({ media: 'print' });
+
+      // The footer is a Chromium *footer template*, not in-flow markup. A footer
+      // in the flow sits after the content and pushes a short document onto a
+      // second page; the template is painted in the page margin instead, so it
+      // never consumes content height and the real page counter is available.
+      // Chromium only substitutes `.pageNumber`/`.totalPages` when the template
+      // sets a font size, and margins must be non-zero for the band to show.
+      //
+      // The margins are a parameter because the official financial layout was
+      // measured against a printed reference with tighter edges than the report;
+      // a single fixed margin would make one of the two documents drift.
+      const pdf = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        preferCSSPageSize: false,
+        displayHeaderFooter: Boolean(footerHtml),
+        headerTemplate: '<span></span>',
+        footerTemplate: footerHtml ?? '<span></span>',
+        margin: margins ?? DEFAULT_PDF_MARGINS,
+      });
+
+      const buffer = Buffer.from(pdf);
+      return { pdf: buffer, pageCount: countPdfPages(buffer) };
+    } finally {
+      await context.close();
+    }
+  }
+
+  /** The `@font-face` rules plus the base print stylesheet every document shares. */
+  async baseStyles(): Promise<string> {
+    return `${await this.fonts.fontFaceCss()}\n${BASE_PRINT_CSS}`;
+  }
+}
+
+/**
+ * Launches Chromium for document rendering.
+ *
+ * Playwright's bundled build is preferred, but the binary is not installed by
+ * `pnpm install` — it needs `playwright install chromium`. A deployment that
+ * skipped that step (or a sandbox that wiped the browser cache) would otherwise
+ * fail *every* issue, preview and print request with an opaque
+ * "Executable doesn't exist" 500. Falling back to a system Chromium keeps the
+ * documents working, and the explicit message below tells an operator how to
+ * restore the bundled build.
+ *
+ * `PLAYWRIGHT_CHROMIUM` names a build explicitly, matching the audit scripts.
+ */
+export async function launchChromium(chromium: BrowserType): Promise<Browser> {
+  const args = ['--no-sandbox', '--disable-dev-shm-usage', '--font-render-hinting=none'];
+  const explicit = process.env.PLAYWRIGHT_CHROMIUM;
+  if (explicit) return chromium.launch({ args, executablePath: explicit });
+  try {
+    return await chromium.launch({ args });
+  } catch (error) {
+    const system = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].find(
+      (path) => existsSync(path),
+    );
+    if (!system) {
+      throw new Error(
+        `Document rendering needs Chromium. Run "pnpm --filter @oryx/admin exec playwright install chromium", ` +
+          `or set PLAYWRIGHT_CHROMIUM. Cause: ${(error as Error).message}`,
+      );
+    }
+    return chromium.launch({ args, executablePath: system });
+  }
+}
+
+/**
+ * Page margins for a generated PDF, in Chromium's CSS length units.
+ */
+export interface PdfMargins {
+  top: string;
+  right: string;
+  bottom: string;
+  left: string;
+}
+
+/**
+ * The default margins: a comfortable frame for a multi-page report.
+ *
+ * The footer is painted inside the bottom margin, so it is deeper than the other
+ * three sides.
+ */
+export const DEFAULT_PDF_MARGINS: PdfMargins = {
+  top: '12mm',
+  right: '12mm',
+  bottom: '20mm',
+  left: '12mm',
+};
+
+/**
+ * Margins for the official financial layout.
+ *
+ * Measured from the approved printed invoice: the margin is measured to the
+ * identity band, not the priced table. The reference prints the logotype at
+ * x16.5 and the quality badge at x579.5, so the page inset is 5.8mm / 5.6mm and
+ * the table columns are recovered by the `.of-body` inset in the layout. The
+ * footer sits in the bottom margin. A compact footer band reserves its
+ * contact and address rows inside 28mm without stealing body space from
+ * one-page invoices and POS receipts.
+ */
+export const OFFICIAL_PDF_MARGINS: PdfMargins = {
+  top: '5.7mm',
+  right: '5.6mm',
+  bottom: '28mm',
+  left: '5.8mm',
+};
+
+/**
+ * Measured from the approved inspection report.
+ *
+ * Only the top edge differs from the default: the reference prints the brand
+ * lockup about 5.6mm from the paper edge, which is higher than the default
+ * 12mm. The side margins stay at the default 12mm because the cover photograph
+ * is drawn as a full-bleed band that reaches the paper edge by cancelling
+ * exactly that inset; narrowing the sides would push the band past the page and
+ * make Chromium shrink the whole sheet to fit.
+ */
+export const REPORT_PDF_MARGINS: PdfMargins = {
+  top: '5.6mm',
+  right: '5.6mm',
+  bottom: '34mm',
+  left: '5.6mm',
+};
+
+/**
+ * Counts pages by reading the PDF page tree.
+ *
+ * Chromium does not report a page count, and a caller needs one for the stored
+ * document row. The count is read from the raw bytes rather than by pulling in a
+ * PDF parser: `/Type /Page` appears once per page and the `/Count` entry of the
+ * page tree gives the total, which is enough for a document we just generated
+ * ourselves.
+ */
+export function countPdfPages(pdf: Buffer): number {
+  const text = pdf.toString('latin1');
+  const counts = [...text.matchAll(/\/Count\s+(\d+)/g)].map((m) => Number(m[1]));
+  if (counts.length > 0) return Math.max(...counts);
+  const pages = text.match(/\/Type\s*\/Page[^s]/g);
+  return pages ? pages.length : 1;
+}
+
+/**
+ * Replaces the first page of `body` with the first page of `cover`.
+ *
+ * The approved inspection report prints the signature-box band on its cover and
+ * a compact lockup on its section pages. Chromium paints a single footer
+ * template on every page, so the report is rendered twice — once with each
+ * footer — and the cover's first page is lifted onto the section render. The two
+ * passes break at identical points (the footer lives in the page margin and
+ * consumes no content height), so page one is the only page that differs.
+ */
+export async function spliceFirstPage(cover: Buffer, body: Buffer): Promise<Buffer> {
+  const coverDoc = await PDFDocument.load(cover);
+  const bodyDoc = await PDFDocument.load(body);
+  const out = await PDFDocument.create();
+  const [first] = await out.copyPages(coverDoc, [0]);
+  out.addPage(first);
+  const rest = bodyDoc.getPageIndices().filter((index) => index > 0);
+  for (const page of await out.copyPages(bodyDoc, rest)) out.addPage(page);
+  // `useObjectStreams: false` keeps the page tree and `/MediaBox` in plain text.
+  // `countPdfPages` and the document tests read the raw bytes rather than
+  // pulling in a full PDF parser, and pdf-lib's default object streams would
+  // hide both behind a compressed xref.
+  return Buffer.from(await out.save({ useObjectStreams: false }));
+}
+
+/**
+ * Appends every page of `extra` after every page of `base`.
+ *
+ * Used to attach an external diagnostic PDF (a vendor's computer-unit scan) to
+ * an issued inspection report so the two travel as one document. The pages are
+ * copied verbatim — the report's own bytes are untouched — so the merged file
+ * still verifies against the token printed on the report.
+ */
+export async function appendPdf(base: Buffer, extra: Buffer): Promise<Buffer> {
+  const baseDoc = await PDFDocument.load(base);
+  const extraDoc = await PDFDocument.load(extra, { ignoreEncryption: true });
+  const out = await PDFDocument.create();
+  for (const page of await out.copyPages(baseDoc, baseDoc.getPageIndices())) out.addPage(page);
+  for (const page of await out.copyPages(extraDoc, extraDoc.getPageIndices())) out.addPage(page);
+  return Buffer.from(await out.save({ useObjectStreams: false }));
+}
+
+/**
+ * Shared print CSS.
+ *
+ * The palette is the approved ORYX identity: navy #0F2B48 and gold. `@page`
+ * carries the A4 size and the running margin box; each template supplies its own
+ * header and footer because the footer differs per document.
+ */
+export const BASE_PRINT_CSS = `
+  :root{
+    --navy:#0F2B48;
+    --navy-soft:#1c3f66;
+    --gold:#c98a2c;
+    --gold-soft:#e6cf7a;
+    --ink:#111827;
+    --muted:#5b6472;
+    --line:#d7dce3;
+    --line-strong:#9aa4b2;
+    --ok:#1f9d55;
+    --warn:#e08a1e;
+    --bad:#d92d20;
+  }
+  /* The page *margins* are set by the renderer, not here: the footer is a
+     Chromium footer template that is painted inside the bottom margin, and a
+     margin declared in CSS would silently win over the renderer's value and
+     clip it. Only the paper size is declared. */
+  @page{ size:A4; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:${DOCUMENT_FONT_STACK};
+    color:var(--ink);
+    font-size:10.5pt;
+    line-height:1.45;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .ltr{ direction:ltr; unicode-bidi:isolate; font-family:${DOCUMENT_LATIN_STACK}; }
+  .num{ font-family:${DOCUMENT_LATIN_STACK}; font-variant-numeric:tabular-nums; direction:ltr; unicode-bidi:isolate; }
+  .doc-page{ page-break-after:always; position:relative; }
+  .doc-page:last-child{ page-break-after:auto; }
+  h1,h2,h3,h4{ margin:0; font-weight:700; }
+  table{ width:100%; border-collapse:collapse; }
+  thead{ display:table-header-group; }
+  tr{ page-break-inside:avoid; }
+  .avoid-break{ page-break-inside:avoid; }
+`;

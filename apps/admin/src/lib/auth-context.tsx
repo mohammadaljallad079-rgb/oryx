@@ -10,12 +10,14 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  isLocale,
   resolveEffectivePermissions,
   type LoginResponse,
   type MembershipSummary,
   type SessionUser,
 } from '@oryx/shared';
 import { api, ApiError, restoreSession, tokenStore } from './api';
+import { useUi } from './ui-context';
 
 interface AuthState {
   user: SessionUser | null;
@@ -44,12 +46,21 @@ interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
   setCompanyContext: (companyId: string | null, branchId?: string | null) => void;
   refreshSession: () => Promise<void>;
-  updatePreferences: (patch: { preferredLocale?: 'ar' | 'en'; preferredTheme?: 'dark' | 'light' }) => Promise<void>;
+  updatePreferences: (patch: {
+    preferredLocale?: 'ar' | 'en';
+    preferredTheme?: 'dark' | 'light';
+    preferredFontScale?: 'SM' | 'MD' | 'LG';
+  }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // The account's saved language/theme live on the user record, so a signed-in
+  // operator keeps their preference across devices and reloads. The UI provider
+  // owns the live value; this effect pushes the account preference into it once
+  // the session is known (and after a preference change on the settings page).
+  const { setLocale, setTheme, setFontScale } = useUi();
   const [state, setState] = useState<AuthState>({
     user: null,
     memberships: [],
@@ -68,17 +79,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * case we attempt one cookie-based restore before concluding there is no
    * session. `api.me()` itself also retries through the refresh cookie on a 401,
    * so a stale in-memory token is recovered transparently.
+   *
+   * A transient failure (`unavailable`) is NOT a lost session. Only an explicit
+   * `expired` outcome, or a 401/403 from `me`, ends the session; anything else
+   * leaves the user signed in and retries on the next request. Treating an
+   * outage as a sign-out is what logged the iPad out.
    */
   const loadSession = useCallback(async () => {
     try {
       if (!tokenStore.access) {
-        const restored = await restoreSession();
-        if (!restored) {
+        const outcome = await restoreSession();
+        if (outcome === 'expired') {
           setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
           return;
         }
+        if (outcome === 'unavailable') {
+          // Keep whatever session state we already had; do not sign out.
+          setState((p) => ({ ...p, ready: true }));
+          return;
+        }
       }
-      const me = await api.me();
+      let me = await api.me();
+
+      // Platform super admin: no Membership is required.
+      // Resolve a tenant context from the platform company list.
+      if (me.user.isSuperAdmin && !me.context.companyId) {
+        const platformContext = await api.context();
+        const firstCompany = platformContext.companies.find(
+          (company) => company.status !== 'ARCHIVED',
+        );
+
+        if (firstCompany) {
+          tokenStore.setContext(firstCompany.id, null);
+          me = await api.me();
+        }
+      }
+
       setState((p) => ({
         ...p,
         ready: true,
@@ -91,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           kind: me.user.isSuperAdmin ? 'PLATFORM' : 'COMPANY',
           preferredLocale: me.user.preferredLocale,
           preferredTheme: me.user.preferredTheme,
+          preferredFontScale: me.user.preferredFontScale,
           isSuperAdmin: me.user.isSuperAdmin,
         },
         memberships: me.memberships as MembershipSummary[],
@@ -100,7 +137,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         branchId: me.context.branchId ?? p.branchId,
         supportSessionCompanyId: me.context.supportSessionCompanyId,
       }));
-    } catch {
+    } catch (error) {
+      // A transient API failure must not end the session. Only an explicit
+      // authentication rejection does.
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        tokenStore.clear();
+        setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
+        return;
+      }
+      if (error instanceof ApiError && error.code === 'network.unavailable') {
+        setState((p) => ({ ...p, ready: true }));
+        return;
+      }
       tokenStore.clear();
       setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
     }
@@ -109,6 +157,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void loadSession();
   }, [loadSession]);
+
+  /**
+   * Apply the active company's General → Default language on a fresh browser.
+   * An explicit device choice remains authoritative; otherwise the company
+   * default wins, with the user's saved preference as a fallback.
+   */
+  useEffect(() => {
+    const user = state.user;
+    if (!user) return;
+    let cancelled = false;
+    const hasStoredLocale = window.localStorage.getItem('oryx.locale');
+    const hasStoredTheme = window.localStorage.getItem('oryx.theme');
+    const hasStoredFontScale = window.localStorage.getItem('oryx.fontScale');
+
+    if (!hasStoredLocale && state.companyId) {
+      void api.companySettings(state.companyId).then((settings) => {
+        if (cancelled || window.localStorage.getItem('oryx.locale')) return;
+        const companyLocale = settings.sections?.general?.defaultLocale;
+        if (isLocale(companyLocale)) setLocale(companyLocale);
+        else if (isLocale(user.preferredLocale)) setLocale(user.preferredLocale);
+      }).catch(() => {
+        if (!cancelled && !window.localStorage.getItem('oryx.locale') && isLocale(user.preferredLocale)) {
+          setLocale(user.preferredLocale);
+        }
+      });
+    } else if (!hasStoredLocale && isLocale(user.preferredLocale)) {
+      setLocale(user.preferredLocale);
+    }
+
+    if (!hasStoredTheme && (user.preferredTheme === 'dark' || user.preferredTheme === 'light')) {
+      setTheme(user.preferredTheme);
+    }
+    if (
+      !hasStoredFontScale &&
+      (user.preferredFontScale === 'SM' ||
+        user.preferredFontScale === 'MD' ||
+        user.preferredFontScale === 'LG')
+    ) {
+      setFontScale(user.preferredFontScale);
+    }
+    return () => { cancelled = true; };
+  }, [state.user, state.companyId, setLocale, setTheme, setFontScale]);
 
   // When a request proves the session is gone (refresh failed), drop local state
   // so the shell redirects to sign-in rather than showing a broken screen.
@@ -163,6 +253,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
+      // Drop any leftover session first. A stale in-memory token or a stale
+      // `oryx_csrf` cookie from a previous session must not be presented to the
+      // login endpoint; the API clears its own cookies on a successful login.
+      tokenStore.clear();
       const res = await api.login(email, password);
       if ('mfaRequired' in res && res.mfaRequired) {
         // Password accepted but a second factor is required: no session yet.
@@ -221,7 +315,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const updatePreferences = useCallback(
-    async (patch: { preferredLocale?: 'ar' | 'en'; preferredTheme?: 'dark' | 'light' }) => {
+    async (patch: {
+      preferredLocale?: 'ar' | 'en';
+      preferredTheme?: 'dark' | 'light';
+      preferredFontScale?: 'SM' | 'MD' | 'LG';
+    }) => {
       await api.updateProfile(patch);
       setState((p) =>
         p.user
@@ -231,6 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 ...p.user,
                 preferredLocale: patch.preferredLocale ?? p.user.preferredLocale,
                 preferredTheme: patch.preferredTheme ?? p.user.preferredTheme,
+                preferredFontScale: patch.preferredFontScale ?? p.user.preferredFontScale,
               },
             }
           : p,
@@ -250,7 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [state.permissions],
   );
   const hasModule = useCallback(
-    (moduleKey: string) => isPlatform && !state.companyId ? true : state.licensedModules.includes(moduleKey),
+    (moduleKey: string) => (isPlatform && !state.companyId ? true : state.licensedModules.includes(moduleKey)),
     [isPlatform, state.companyId, state.licensedModules],
   );
 

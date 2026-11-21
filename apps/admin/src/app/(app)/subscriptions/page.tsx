@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { CompanyDto, PlanDto, SubscriptionDto } from '@oryx/shared';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
@@ -14,6 +14,7 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -30,15 +31,29 @@ export default function SubscriptionsPage() {
 
   const [assignTo, setAssignTo] = useState<CompanyDto | null>(null);
   const [historyOf, setHistoryOf] = useState<SubscriptionRow | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeSubscription = async (s: SubscriptionRow) => {
+    if (!window.confirm(t('subscriptions.confirmDelete'))) return;
+    setBusyId(s.id);
+    try {
+      await api.deleteSubscription(s.id);
+      await subs.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('subscriptions.deleteBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
-    <div className="flex flex-col gap-5" data-testid="subscriptions-page">
+    <div className="flex flex-col gap-4" data-testid="subscriptions-page">
       <SectionHeader
         title={t('subscriptions.title')}
         subtitle={t('subscriptions.subtitle')}
         actions={
           <Button size="sm" onClick={() => void subs.reload()}>
-            <Icon name="search" size={15} />
+            <Icon name="refresh" size={15} />
             {t('common.refresh')}
           </Button>
         }
@@ -98,6 +113,18 @@ export default function SubscriptionsPage() {
                       >
                         {s.status === 'ACTIVE' ? t('companies.suspend') : t('companies.activate')}
                       </Button>
+                      {s.status === 'CANCELLED' || s.status === 'EXPIRED' ? (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={busyId === s.id}
+                          onClick={() => void removeSubscription(s)}
+                          data-testid={`delete-subscription-${s.companyId}`}
+                        >
+                          <Icon name="trash" size={14} />
+                          {t('common.delete')}
+                        </Button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -107,7 +134,7 @@ export default function SubscriptionsPage() {
         )}
       </Card>
 
-      <Card className="p-5">
+      <Card className="p-4">
         <p className="oryx-panel-title m-0 mb-3">{t('subscriptions.assign')}</p>
         <div className="flex flex-wrap gap-2">
           {(companies.data?.items ?? [])
@@ -198,18 +225,16 @@ function AssignModal({
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('companies.selectPlan')} required>
-          <select
-            className="oryx-select"
-            value={planId}
-            onChange={(e) => setPlanId(e.target.value)}
-            data-testid="assign-plan"
-          >
-            {plans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {locale === 'ar' ? p.nameAr : p.nameEn} — {p.modules.length} modules
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={planId || null}
+            options={plans.map((p) => ({
+              value: p.id,
+              label: `${locale === 'ar' ? p.nameAr : p.nameEn} — ${p.modules.length} modules`,
+            }))}
+            onChange={(v) => setPlanId(v ?? '')}
+            placeholder={t('companies.selectPlan')}
+            testId="assign-plan"
+          />
         </Field>
         <Field label={t('subscriptions.period')} required>
           <select

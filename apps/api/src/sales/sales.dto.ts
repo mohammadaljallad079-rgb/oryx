@@ -8,11 +8,61 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
+
+/**
+ * The date every sales document carries, under one canonical key.
+ *
+ * The API historically named the same concept differently per document —
+ * `issueDate` on a quotation or credit note, `orderDate` on an order,
+ * `invoiceDate` on an invoice. Each DTO declared only its own name while the
+ * API runs with `forbidNonWhitelisted`, so a shared create form that sent all
+ * three was rejected with "property issueDate should not exist".
+ *
+ * `documentDate` is the contract. The three historical names remain declared
+ * and accepted, so no client is forced to know which document it is posting to.
+ *
+ * The aliases cannot be folded onto `documentDate` with a `@Transform`:
+ * class-transformer only runs a property's transform when that property is
+ * present on the source object, so `{ issueDate }` never reaches a
+ * `documentDate` transform. Instead `documentDate` is required only when no
+ * alias is supplied, and every name is validated on its own. `resolveDocumentDate`
+ * then reads them in precedence order.
+ */
+export class SalesDocumentDateDto {
+  @ValidateIf((o: SalesDocumentDateDto) => !o.issueDate && !o.orderDate && !o.invoiceDate)
+  @IsISO8601()
+  documentDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  issueDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  orderDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  invoiceDate?: string;
+}
+
+/**
+ * The effective date of a sales document, preferring the canonical key.
+ *
+ * Callers pass a validated DTO, so at least one name is guaranteed present;
+ * `undefined` is still returned as a type-level guard rather than a fallback
+ * "now", which would silently backdate a document.
+ */
+export function resolveDocumentDate(dto: SalesDocumentDateDto): string | undefined {
+  return dto.documentDate ?? dto.issueDate ?? dto.orderDate ?? dto.invoiceDate;
+}
 
 export class ListQueryDto {
   @IsOptional()
@@ -30,6 +80,30 @@ export class ListQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  dateTo?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minAmountMinor?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxAmountMinor?: number;
+
+  @IsOptional()
+  @IsIn(['due', 'settled'])
+  paymentState?: 'due' | 'settled';
+
 
   @IsOptional()
   @IsString()
@@ -42,23 +116,59 @@ export class ListQueryDto {
   @IsOptional()
   @IsString()
   branchId?: string;
+
+  /** Restrict a list to one customer, so a payment form can show that
+   *  customer's open invoices without paging the whole register. */
+  @IsOptional()
+  @IsString()
+  customerId?: string;
+}
+
+/** Customer-master filters are validated independently from document register filters. */
+export class CustomerListQueryDto extends ListQueryDto {
+  @IsOptional()
+  @IsIn(['COMPANY', 'INDIVIDUAL'])
+  kind?: 'COMPANY' | 'INDIVIDUAL';
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  active?: 'true' | 'false';
+
+  @IsOptional()
+  @IsString()
+  sourceId?: string;
+
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
 }
 
 export class CreateCustomerDto {
+  /** Optional when the server assigns the next company-scoped CO/CU identifier. */
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(40)
-  code!: string;
+  code?: string;
 
+  /**
+   * The two name fields are optional independently: an administrator may know
+   * the customer by one language only, and forcing both would make them invent
+   * a name. At least one must be supplied — enforced in the service, because a
+   * class-validator rule cannot express "one of these two".
+   *
+   * A missing name is stored as an empty string rather than null, so the many
+   * existing reads of `nameEn`/`nameAr` across sales, accounting and reports do
+   * not have to handle a null. The interface falls back to whichever name exists.
+   */
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
@@ -90,6 +200,16 @@ export class CreateCustomerDto {
   @MaxLength(3)
   countryCode?: string;
 
+  /** The lead-source catalogue entry the customer came from. */
+  @IsOptional()
+  @IsString()
+  sourceId?: string;
+
+  /** The sales department that owns the customer. */
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -111,6 +231,46 @@ export class CreateCustomerDto {
   @IsString()
   @MaxLength(400)
   notes?: string;
+
+  /** Individual or company. Absent defaults to INDIVIDUAL on the server. */
+  @IsOptional()
+  @IsIn(['INDIVIDUAL', 'COMPANY'])
+  kind?: 'INDIVIDUAL' | 'COMPANY';
+
+  /** Individual: national id / personal number. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  nationalId?: string;
+
+  /** Company: commercial registration number and expiry. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  crExpiryDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactPersonName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  contactPersonPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  parentCustomerId?: string;
 }
 
 export class UpdateCustomerDto {
@@ -150,6 +310,19 @@ export class UpdateCustomerDto {
   city?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  countryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  sourceId?: string;
+
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
@@ -160,6 +333,177 @@ export class UpdateCustomerDto {
   @IsInt()
   @Min(0)
   paymentTermsDays?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  notes?: string;
+
+  /** Individual or company. Absent defaults to INDIVIDUAL on the server. */
+  @IsOptional()
+  @IsIn(['INDIVIDUAL', 'COMPANY'])
+  kind?: 'INDIVIDUAL' | 'COMPANY';
+
+  /** Individual: national id / personal number. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  nationalId?: string;
+
+  /** Company: commercial registration number and expiry. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  crExpiryDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactPersonName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  contactPersonPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  parentCustomerId?: string;
+}
+
+export class CustomerAttachmentDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(260)
+  fileName!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  mimeType?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sizeBytes?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  storageRef?: string;
+}
+
+/**
+ * A secondary branch of a company customer. Its own code namespace inside the
+ * tenant, so two company customers can each name a branch "MAIN" without a
+ * collision.
+ */
+export class CustomerBranchDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  code!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  nameEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  nameAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  addressLine?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  countryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  notes?: string;
+}
+
+export class UpdateCustomerBranchDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  nameEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  nameAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  addressLine?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  countryCode?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -198,6 +542,13 @@ export class SalesLineDto {
   @Min(0)
   discountPercentBp?: number;
 
+  /** Optional fixed line discount in minor units (takes priority over a percentage). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  discountAmountMinor?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -205,7 +556,7 @@ export class SalesLineDto {
   taxPercentBp?: number;
 }
 
-export class CreateQuotationDto {
+export class CreateQuotationDto extends SalesDocumentDateDto {
   @IsString()
   customerId!: string;
 
@@ -213,8 +564,10 @@ export class CreateQuotationDto {
   @IsString()
   branchId?: string;
 
-  @IsISO8601()
-  issueDate!: string;
+  /** Accepted for generic document-form compatibility. */
+  @IsOptional()
+  @IsString()
+  warehouseId?: string;
 
   @IsOptional()
   @IsISO8601()
@@ -225,10 +578,40 @@ export class CreateQuotationDto {
   @MaxLength(3)
   currency?: string;
 
+  /** The settlement method and salesperson printed on the quotation document. */
+  @IsOptional()
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  paymentMethod?: string;
+
+  /** Stable company-configured method code (validated server-side). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  paymentMethodCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  salespersonName?: string;
+
+  /** The bank/reference printed beneath "Payment at Account" on the quotation. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  paymentReference?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(400)
   notes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  post?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  issueStock?: boolean;
 
   @IsArray()
   @ArrayMinSize(1)
@@ -243,7 +626,7 @@ export class ConvertQuotationDto {
   warehouseId?: string;
 }
 
-export class CreateSalesOrderDto {
+export class CreateSalesOrderDto extends SalesDocumentDateDto {
   @IsString()
   customerId!: string;
 
@@ -259,13 +642,20 @@ export class CreateSalesOrderDto {
   @IsBoolean()
   confirm?: boolean;
 
-  @IsISO8601()
-  orderDate!: string;
-
   @IsOptional()
   @IsString()
   @MaxLength(3)
   currency?: string;
+
+  /** The settlement method and salesperson printed on the order document. */
+  @IsOptional()
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  salespersonName?: string;
 
   @IsOptional()
   @IsString()
@@ -279,7 +669,7 @@ export class CreateSalesOrderDto {
   lines!: SalesLineDto[];
 }
 
-export class CreateInvoiceDto {
+export class CreateInvoiceDto extends SalesDocumentDateDto {
   @IsOptional()
   @IsString()
   customerId?: string;
@@ -296,9 +686,6 @@ export class CreateInvoiceDto {
   @IsString()
   warehouseId?: string;
 
-  @IsISO8601()
-  invoiceDate!: string;
-
   @IsOptional()
   @IsISO8601()
   dueDate?: string;
@@ -307,6 +694,32 @@ export class CreateInvoiceDto {
   @IsString()
   @MaxLength(3)
   currency?: string;
+
+  /**
+   * How the invoice is settled. The official template prints a "Payment" line,
+   * so the method is captured with the document.
+   */
+  @IsOptional()
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER', 'CREDIT'])
+  paymentMethod?: string;
+
+  /** Stable company-configured method code (validated server-side). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  paymentMethodCode?: string;
+
+  /** The salesperson credited on the printed invoice ("Staf Name"). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  salespersonName?: string;
+
+  /** The bank/reference printed beneath "Payment at Account" on the invoice. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  paymentReference?: string;
 
   @IsOptional()
   @IsString()
@@ -328,7 +741,59 @@ export class CreateInvoiceDto {
   lines?: SalesLineDto[];
 }
 
-export class CreateCreditNoteDto {
+export class UpdateInvoiceDto extends SalesDocumentDateDto {
+  @IsString()
+  customerId!: string;
+
+  @IsOptional()
+  @IsString()
+  warehouseId?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  dueDate?: string;
+
+  @IsOptional()
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER', 'CREDIT'])
+  paymentMethod?: string;
+
+  /** Stable company-configured method code (validated server-side). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  paymentMethodCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  salespersonName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  paymentReference?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  notes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  post?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  issueStock?: boolean;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => SalesLineDto)
+  lines!: SalesLineDto[];
+}
+
+export class CreateCreditNoteDto extends SalesDocumentDateDto {
   @IsString()
   customerId!: string;
 
@@ -344,13 +809,18 @@ export class CreateCreditNoteDto {
   @IsString()
   warehouseId?: string;
 
-  @IsISO8601()
-  issueDate!: string;
-
   @IsOptional()
   @IsString()
   @MaxLength(300)
   reason?: string;
+
+  /**
+   * How the credited amount is given back. Defaults to `CREDIT_ACCOUNT`, which
+   * keeps the value on the customer's account (the historical behaviour).
+   */
+  @IsOptional()
+  @IsIn(['CREDIT_ACCOUNT', 'CASH', 'BANK_TRANSFER', 'CARD'])
+  refundMethod?: 'CREDIT_ACCOUNT' | 'CASH' | 'BANK_TRANSFER' | 'CARD';
 
   @IsOptional()
   @IsString()
@@ -415,6 +885,25 @@ export class PosSaleLineDto {
   @Min(0)
   unitPriceMinor!: number;
 
+  /**
+   * A cashier discount on this line, in basis points (500 = 5%).
+   *
+   * Bounded to 100% by the same clamp the document path uses; the server
+   * computes the discount minor amount, never the client.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  discountPercentBp?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  discountAmountMinor?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -440,6 +929,12 @@ export class CreatePosSaleDto {
   @IsOptional()
   @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
   paymentMethod?: 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'CHEQUE' | 'WALLET' | 'OTHER';
+
+  /** Stable company-configured method code (validated server-side). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  paymentMethodCode?: string;
 
   @IsOptional()
   @Type(() => Number)

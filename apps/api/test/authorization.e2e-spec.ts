@@ -760,6 +760,263 @@ describe('ORYX API authorization (e2e)', () => {
       expect(res.body.effective).toContain('erp.dashboard.read');
       expect(res.body.effective).not.toContain('company.user.invite');
     });
+
+    it('changes a membership role, branch scope and active state', async () => {
+      const roles = await companyCall<Array<{ id: string; code: string }>>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/roles`,
+        { token: companyToken },
+      );
+      const staffRole = roles.body.find((r) => r.code === 'staff_viewer')!;
+      const managerRole = roles.body.find((r) => r.code === 'branch_manager')!;
+
+      const email = `${FIXTURE_PREFIX.toLowerCase()}-membership@oryx.test`;
+      const invite = await companyCall<{ inviteToken: string }>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/users/invitations`,
+        {
+          method: 'POST',
+          token: companyToken,
+          body: { email, fullNameEn: 'Membership Target', fullNameAr: 'هدف العضوية', roleId: staffRole.id },
+        },
+      );
+      const accepted = await call<{ accessToken: string }>(ctx.base, '/auth/accept-invitation', {
+        method: 'POST',
+        body: {
+          token: invite.body.inviteToken,
+          fullNameEn: 'Membership Target',
+          fullNameAr: 'هدف العضوية',
+          password: 'A-strong-password-2026',
+        },
+      });
+      expect(accepted.status).toBe(200);
+
+      const users = await companyCall<{ items: Array<{ id: string; email: string; memberships: Array<{ roleId: string; branchIds: string[]; isActive?: boolean }> }> }>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/users`,
+        { token: companyToken },
+      );
+      const target = users.body.items.find((u) => u.email === email)!;
+      expect(target).toBeDefined();
+      // A freshly accepted membership is active and lists its role.
+      expect(target.memberships[0].isActive).toBe(true);
+      expect(target.memberships[0].roleId).toBe(staffRole.id);
+
+      const branches = await call<{ items: Array<{ id: string }> }>(
+        ctx.base,
+        `/companies/${authzTenantId}/branches`,
+        { token: superToken },
+      );
+      const branchId = branches.body.items[0]?.id;
+      const branchIds = branchId ? [branchId] : [];
+
+      const updated = await companyCall(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/users/${target.id}/membership`,
+        { method: 'PATCH', token: companyToken, body: { roleId: managerRole.id, branchIds, isActive: false } },
+      );
+      expect(updated.status).toBe(200);
+
+      const after = await ctx.prisma.membership.findUniqueOrThrow({
+        where: { userId_companyId: { userId: target.id, companyId: authzTenantId } },
+        include: { branches: true },
+      });
+      expect(after.roleId).toBe(managerRole.id);
+      expect(after.isActive).toBe(false);
+      expect(after.branches.map((b) => b.branchId)).toEqual(branchIds);
+
+      // Deactivating the membership must invalidate the user's live sessions.
+      const revoked = await ctx.prisma.refreshToken.count({ where: { userId: target.id, revokedAt: null } });
+      expect(revoked).toBe(0);
+
+      // The listing reflects the new state, so the admin console can render it.
+      const relisted = await companyCall<{ items: Array<{ email: string; memberships: Array<{ isActive?: boolean }> }> }>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/users`,
+        { token: companyToken },
+      );
+      const reread = relisted.body.items.find((u) => u.email === email)!;
+      expect(reread.memberships[0].isActive).toBe(false);
+    });
+  });
+
+  // --------------------------------------------- direct user creation (no invite)
+
+  describe('direct user creation and profile editing', () => {
+    it('creates an active account with identity fields and a branch scope, then signs in', async () => {
+      const roles = await companyCall<Array<{ id: string; code: string }>>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/roles`,
+        { token: companyToken },
+      );
+      const staffRole = roles.body.find((r) => r.code === 'staff_viewer')!;
+
+      const branches = await call<{ items: Array<{ id: string }> }>(
+        ctx.base,
+        `/companies/${authzTenantId}/branches`,
+        { token: superToken },
+      );
+      const branchId = branches.body.items[0]?.id;
+      const branchIds = branchId ? [branchId] : [];
+
+      const email = `${FIXTURE_PREFIX.toLowerCase()}-direct@oryx.test`;
+      const created = await companyCall<{
+        id: string;
+        email: string;
+        status: string;
+        nationalId: string | null;
+        nationality: string | null;
+        address: string | null;
+      }>(ctx.base, authzTenantId, `/companies/${authzTenantId}/users`, {
+        method: 'POST',
+        token: companyToken,
+        body: {
+          email,
+          fullNameEn: 'Direct User',
+          fullNameAr: 'مستخدم مباشر',
+          password: 'A-strong-password-2026',
+          nationalId: '9900112233',
+          nationality: 'Bahraini',
+          address: 'Manama, Bahrain',
+          roleId: staffRole.id,
+          branchIds,
+        },
+      });
+      expect(created.status).toBe(201);
+      expect(created.body.status).toBe('ACTIVE');
+      expect(created.body.nationalId).toBe('9900112233');
+      expect(created.body.nationality).toBe('Bahraini');
+      expect(created.body.address).toBe('Manama, Bahrain');
+
+      // The password is hashed, never stored or returned in the clear.
+      const stored = await ctx.prisma.user.findUniqueOrThrow({ where: { email } });
+      expect(stored.passwordHash).not.toContain('A-strong-password-2026');
+
+      // The membership exists with the requested branch scope.
+      const membership = await ctx.prisma.membership.findUniqueOrThrow({
+        where: { userId_companyId: { userId: created.body.id, companyId: authzTenantId } },
+        include: { branches: true },
+      });
+      expect(membership.roleId).toBe(staffRole.id);
+      expect(membership.branches.map((b) => b.branchId)).toEqual(branchIds);
+
+      // The account is usable immediately, without an invitation round-trip.
+      const token = await login(ctx.base, email, 'A-strong-password-2026');
+      expect(token).toBeTruthy();
+    });
+
+    it('refuses to assign a role that does not belong to the company', async () => {
+      const otherRoles = await call<Array<{ id: string; code: string }>>(
+        ctx.base,
+        `/companies/${oryxAutoCompanyId}/roles`,
+        { token: superToken },
+      );
+      const foreignRole = otherRoles.body[0];
+
+      const res = await companyCall(ctx.base, authzTenantId, `/companies/${authzTenantId}/users`, {
+        method: 'POST',
+        token: companyToken,
+        body: {
+          email: `${FIXTURE_PREFIX.toLowerCase()}-foreign@oryx.test`,
+          fullNameEn: 'Foreign Role',
+          fullNameAr: 'دور خارجي',
+          password: 'A-strong-password-2026',
+          roleId: foreignRole.id,
+        },
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('edits a user profile through the API and persists the change', async () => {
+      const users = await companyCall<{ items: Array<{ id: string; email: string }> }>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/users`,
+        { token: companyToken },
+      );
+      const target = users.body.items.find((u) => u.email.endsWith('-direct@oryx.test'))!;
+      expect(target).toBeDefined();
+
+      const res = await companyCall<{
+        nationalId: string | null;
+        nationality: string | null;
+        address: string | null;
+      }>(ctx.base, authzTenantId, `/companies/${authzTenantId}/users/${target.id}`, {
+        method: 'PATCH',
+        token: companyToken,
+        body: { nationalId: '880099', nationality: 'Bahraini', address: 'Riffa, Bahrain' },
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.nationalId).toBe('880099');
+      expect(res.body.address).toBe('Riffa, Bahrain');
+
+      const stored = await ctx.prisma.user.findUniqueOrThrow({ where: { id: target.id } });
+      expect(stored.nationalId).toBe('880099');
+      expect(stored.address).toBe('Riffa, Bahrain');
+    });
+
+    it('refuses a cross-tenant profile edit', async () => {
+      const users = await companyCall<{ items: Array<{ id: string; email: string }> }>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/users`,
+        { token: companyToken },
+      );
+      const target = users.body.items.find((u) => u.email.endsWith('-direct@oryx.test'))!;
+
+      const res = await companyCall(
+        ctx.base,
+        oryxAutoCompanyId,
+        `/companies/${oryxAutoCompanyId}/users/${target.id}`,
+        { method: 'PATCH', token: companyToken, body: { address: 'hijack' } },
+      );
+      expect(res.status).toBe(403);
+    });
+
+    it('refuses to create a user whose email already belongs to another company, without touching that account', async () => {
+      const roles = await companyCall<Array<{ id: string; code: string }>>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/roles`,
+        { token: companyToken },
+      );
+      const staffRole = roles.body.find((r) => r.code === 'staff_viewer')!;
+
+      // A user of a different tenant (ORYX-AUTO), not a member of the caller's company.
+      const victimEmail = SEED_ORYX_AUTO_ADMIN.email;
+      const before = await ctx.prisma.user.findUniqueOrThrow({ where: { email: victimEmail } });
+
+      const res = await companyCall(ctx.base, authzTenantId, `/companies/${authzTenantId}/users`, {
+        method: 'POST',
+        token: companyToken,
+        body: {
+          email: victimEmail,
+          fullNameEn: 'Takeover Attempt',
+          fullNameAr: 'محاولة استيلاء',
+          password: 'Attacker-password-2026',
+          nationalId: '0000000000',
+          roleId: staffRole.id,
+        },
+      });
+      // The request is refused with a conflict rather than silently taking over
+      // the sign-in or editing a profile owned by another tenant.
+      expect(res.status).toBe(409);
+
+      const after = await ctx.prisma.user.findUniqueOrThrow({ where: { email: victimEmail } });
+      expect(after.id).toBe(before.id);
+      expect(after.passwordHash).toBe(before.passwordHash);
+      expect(after.fullNameEn).toBe(before.fullNameEn);
+      expect(after.nationalId).toBe(before.nationalId);
+
+      // The attacker-chosen password must not now sign in to the victim account.
+      await expect(login(ctx.base, victimEmail, 'Attacker-password-2026')).rejects.toBeTruthy();
+    });
   });
 
   // ------------------------------------------------------- cross-tenant access
@@ -884,6 +1141,52 @@ describe('ORYX API authorization (e2e)', () => {
         { token: superToken },
       );
       expect(audit.body.items.length).toBeGreaterThan(0);
+
+      // The new filters narrow the same trail: by target type, by free-text
+      // summary, and by a date window that excludes a past century. A wrong
+      // filter must return nothing, not everything.
+      const byTarget = await call<{ items: Array<{ targetType: string }>; total: number }>(
+        ctx.base,
+        '/audit-logs?targetType=COMPANY',
+        { token: superToken },
+      );
+      expect(byTarget.status).toBe(200);
+      expect(byTarget.body.items.every((i) => i.targetType === 'COMPANY')).toBe(true);
+
+      const bySearch = await call<{ items: Array<{ summary: string; action: string; targetId: string | null }> }>(
+        ctx.base,
+        '/audit-logs?search=support',
+        { token: superToken },
+      );
+      expect(bySearch.status).toBe(200);
+      expect(bySearch.body.items.length).toBeGreaterThan(0);
+      expect(
+        bySearch.body.items.every(
+          (i) =>
+            i.summary.toLowerCase().includes('support') ||
+            i.action.toLowerCase().includes('support') ||
+            (i.targetId ?? '').toLowerCase().includes('support'),
+        ),
+      ).toBe(true);
+
+      const windowed = await call<{ total: number }>(
+        ctx.base,
+        '/audit-logs?from=2020-01-01T00:00:00.000Z&to=2030-01-01T00:00:00.000Z',
+        { token: superToken },
+      );
+      expect(windowed.status).toBe(200);
+      expect(windowed.body.total).toBeGreaterThan(0);
+
+      const empty = await call<{ total: number }>(
+        ctx.base,
+        '/audit-logs?from=1999-01-01T00:00:00.000Z&to=1999-12-31T00:00:00.000Z',
+        { token: superToken },
+      );
+      expect(empty.body.total).toBe(0);
+
+      // A malformed date is the caller's mistake, not a 500.
+      const badDate = await call(ctx.base, '/audit-logs?from=not-a-date', { token: superToken });
+      expect(badDate.status).toBe(400);
 
       const ended = await call(ctx.base, `/support-sessions/${opened.body.id}/end`, {
         method: 'POST',

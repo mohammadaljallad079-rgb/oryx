@@ -23,12 +23,16 @@ import type { ActorContext } from '../organizations/organizations.service';
 import {
   AssignPermissionsDto,
   CreateRoleDto,
+  CreateUserDto,
   InviteUserDto,
   UpdateMembershipDto,
   UpdateRoleDto,
+  UpdateUserDto,
   UpdateUserStatusDto,
 } from './rbac.dto';
 import { PrismaService } from '../common/prisma.service';
+import { badRequest, ERROR_CODES, forbidden } from '../common/errors';
+import { DEFAULT_COMPANY_ROLE_TEMPLATES } from '../common/role-templates';
 
 interface RequestLike {
   ip?: string;
@@ -52,13 +56,17 @@ function resolveCompanyId(principal: RequestPrincipal, routeCompanyId?: string):
   const own = principal.company?.companyId;
   if (principal.kind === 'COMPANY') {
     if (routeCompanyId && routeCompanyId !== own) {
-      // PermissionsGuard/guard already rejects, but keep a defence in depth.
-      throw new Error('cross-tenant route resolution');
+      // PermissionsGuard already rejects, but keep a defence in depth. This must
+      // be an HTTP exception: a plain Error surfaced as a 500 for what is a
+      // caller-scoping mistake.
+      throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
     }
-    if (!own) throw new Error('no company scope');
+    if (!own) throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'No company scope is selected.');
     return own;
   }
-  if (!routeCompanyId) throw new Error('platform requests must specify a company');
+  if (!routeCompanyId) {
+    throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A companyId is required for a platform request.');
+  }
   return routeCompanyId;
 }
 
@@ -95,6 +103,43 @@ export class PermissionsController {
     const scope = resolveCompanyId(p, companyId);
     const codes = await this.rbac.delegablePermissions(scope, actorFrom(p, req));
     return { companyId: scope, permissions: codes };
+  }
+
+  /**
+   * Named role templates.
+   *
+   * These are the same templates seeded into every new company. Exposing them
+   * lets the admin UI offer "start from a role" instead of an empty permission
+   * grid, and each template is returned with the permission codes it grants so
+   * the screen can preview them. A caller with a company scope receives only
+   * the codes it may actually delegate, so a template can never be used to
+   * escalate.
+   */
+  @Get('role-templates')
+  @RequireAnyPermission('platform.company.read', 'company.role.read', 'platform.role.manage')
+  @ApiOperation({ summary: 'Named role templates with their permission sets' })
+  async roleTemplates(
+    @Query('companyId') companyId: string | undefined,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    const scope = resolveCompanyId(p, companyId);
+    const delegable = new Set(await this.rbac.delegablePermissions(scope, actorFrom(p, req)));
+    return {
+      companyId: scope,
+      templates: DEFAULT_COMPANY_ROLE_TEMPLATES.map((t) => {
+        const allowed = t.permissions.filter((code) => delegable.has(code));
+        return {
+          code: t.code,
+          nameEn: t.nameEn,
+          nameAr: t.nameAr,
+          descriptionEn: t.descriptionEn,
+          permissions: allowed,
+          totalPermissions: t.permissions.length,
+          withheldPermissions: t.permissions.length - allowed.length,
+        };
+      }),
+    };
   }
 
   constructor(private readonly rbac: RbacService) {}
@@ -202,6 +247,18 @@ export class CompanyUsersController {
     return this.rbac.inviteUser(companyId, dto, actorFrom(p, req));
   }
 
+  @Post()
+  @RequireAnyPermission('platform.user.manage', 'company.user.invite')
+  @ApiOperation({ summary: 'Create a user directly with an active account, role and branch scope' })
+  create(
+    @Param('companyId') companyId: string,
+    @Body() dto: CreateUserDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.rbac.createUser(companyId, dto, actorFrom(p, req));
+  }
+
   @Get('invitations')
   @RequireAnyPermission('platform.user.read', 'company.user.read')
   @ApiOperation({ summary: 'List invitations for a company' })
@@ -232,6 +289,19 @@ export class CompanyUsersController {
     @Req() req: RequestLike,
   ) {
     return this.rbac.updateMembership(companyId, userId, dto, actorFrom(p, req));
+  }
+
+  @Patch(':userId')
+  @RequireAnyPermission('platform.user.manage', 'company.user.update')
+  @ApiOperation({ summary: 'Edit a user\'s identity and contact details' })
+  updateProfile(
+    @Param('companyId') companyId: string,
+    @Param('userId') userId: string,
+    @Body() dto: UpdateUserDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.rbac.updateUser(companyId, userId, dto, actorFrom(p, req));
   }
 }
 

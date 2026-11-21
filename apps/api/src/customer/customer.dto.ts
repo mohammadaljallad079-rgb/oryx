@@ -14,10 +14,14 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+import { IsBahrainPhone, NormaliseBahrainPhone } from '../common/bahrain-phone.validator';
+import { TrimString } from '../common/transformers';
+
 const LOCALES = ['ar', 'en'] as const;
 const THEMES = ['dark', 'light'] as const;
 
 export class CustomerRegisterDto {
+  @TrimString()
   @IsEmail()
   @MaxLength(200)
   email!: string;
@@ -38,8 +42,8 @@ export class CustomerRegisterDto {
   fullName!: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
+  @NormaliseBahrainPhone()
+  @IsBahrainPhone()
   phone?: string;
 
   @IsOptional()
@@ -52,6 +56,7 @@ export class CustomerRegisterDto {
 }
 
 export class CustomerLoginDto {
+  @TrimString()
   @IsEmail()
   @MaxLength(200)
   email!: string;
@@ -71,6 +76,7 @@ export class CustomerRefreshDto {
 }
 
 export class CustomerForgotPasswordDto {
+  @TrimString()
   @IsEmail()
   @MaxLength(200)
   email!: string;
@@ -125,8 +131,8 @@ export class UpdateCustomerProfileDto {
   fullName?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
+  @NormaliseBahrainPhone()
+  @IsBahrainPhone()
   phone?: string;
 
   @IsOptional()

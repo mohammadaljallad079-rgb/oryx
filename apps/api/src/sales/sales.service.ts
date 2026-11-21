@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { fromQuantity, sumMinor } from '@oryx/shared';
+import { fromQuantity, lineAmountMinor, sumMinor, withDefaults, type RoundingMode } from '@oryx/shared';
+import type { PaymentMethod } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService, SYSTEM_ROLES } from '../common/accounting-posting.service';
@@ -10,11 +11,13 @@ import { computeDocumentTotals, type PricedLineInput } from '../common/document-
 import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
+import { resolveDocumentDate } from './sales.dto';
 import type {
   ConvertQuotationDto,
   CreateCashierSessionDto,
   CreateCreditNoteDto,
   CreateCustomerDto,
+  CustomerListQueryDto,
   CreateInvoiceDto,
   CreatePosSaleDto,
   CreateQuotationDto,
@@ -23,6 +26,9 @@ import type {
   PosSaleLineDto,
   SalesLineDto,
   UpdateCustomerDto,
+  CustomerBranchDto,
+  UpdateCustomerBranchDto,
+  UpdateInvoiceDto,
 } from './sales.dto';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -41,6 +47,9 @@ interface InvoiceSource {
   actorUserId: string;
   /** When false, stock is not issued (services / untracked items). */
   issueStock: boolean;
+  /** Company whole-amount cash rounding applied to the document total. */
+  roundingMode?: RoundingMode;
+  roundingScale?: number;
 }
 
 /**
@@ -75,14 +84,148 @@ export class SalesService {
     private readonly inventory: InventoryService,
   ) {}
 
+  /**
+   * Resolve the company's selected payment code to a recognised accounting
+   * method. Store both the stable code and a label snapshot on the document so
+   * deleting or renaming configuration never rewrites historical receipts.
+   */
+  private async resolveCompanyPayment(
+    tx: Tx,
+    companyId: string,
+    code: string | undefined,
+    fallback: PaymentMethod,
+    channel: 'invoices' | 'pos',
+  ) {
+    // Preserve compatibility for existing clients and internal posting flows.
+    // New UI requests always send a configured payment-method code.
+    if (!code) return {
+      paymentMethod: fallback,
+      paymentMethodCode: null,
+      paymentMethodLabelEn: null,
+      paymentMethodLabelAr: null,
+    };
+    const row = await tx.companySetting.findUnique({
+      where: { companyId_section: { companyId, section: 'sales' } },
+    });
+    const settings = withDefaults('sales', row?.value);
+    const selectedCode = (code?.trim().toUpperCase() || fallback);
+    const method = settings.paymentMethods.find(item => item.code === selectedCode);
+    if (!method || !method.isActive
+      || (channel === 'invoices' && !method.useInInvoices)
+      || (channel === 'pos' && (!method.useInPos || method.accountingMethod === 'CREDIT'))) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Selected payment method is unavailable for this company.');
+    }
+    return {
+      paymentMethod: method.accountingMethod as PaymentMethod,
+      paymentMethodCode: method.code,
+      paymentMethodLabelEn: method.nameEn,
+      paymentMethodLabelAr: method.nameAr,
+    };
+  }
+
+  /**
+   * An invoice paid by cash, card, Benefit or bank transfer must settle in the
+   * same transaction as the posted invoice. Changing status alone would leave
+   * accounts receivable open and omit the cash/bank journal.
+   */
+  private async settleImmediateInvoice(
+    tx: Tx,
+    input: {
+      companyId: string;
+      branchId: string | null;
+      customerId: string;
+      invoiceId: string;
+      totalMinor: number;
+      currency: string;
+      method: PaymentMethod;
+      paidAt: Date;
+      actorUserId: string;
+      reference?: string | null;
+    },
+  ): Promise<void> {
+    if (input.method === 'CREDIT') return;
+
+    if (input.totalMinor <= 0) {
+      await tx.salesInvoice.update({
+        where: { id: input.invoiceId },
+        data: { status: 'PAID', amountPaidMinor: input.totalMinor },
+      });
+      return;
+    }
+
+    const idempotencyKey = `auto-sales-invoice:${input.invoiceId}`;
+    const existing = await tx.payment.findFirst({
+      where: { companyId: input.companyId, idempotencyKey },
+    });
+    if (existing) return;
+
+    const paymentNumber = await this.sequences.next(tx, input.companyId, 'payment');
+    const payment = await tx.payment.create({
+      data: {
+        companyId: input.companyId,
+        branchId: input.branchId,
+        direction: 'RECEIPT',
+        partyType: 'CUSTOMER',
+        customerId: input.customerId,
+        paymentNumber,
+        method: input.method,
+        amountMinor: input.totalMinor,
+        currency: input.currency,
+        reference: input.reference ?? null,
+        notes: 'Automatic full settlement of sales invoice',
+        paidAt: input.paidAt,
+        idempotencyKey,
+        createdById: input.actorUserId,
+      },
+    });
+
+    await tx.paymentAllocation.create({
+      data: {
+        companyId: input.companyId,
+        paymentId: payment.id,
+        target: 'SALES_INVOICE',
+        salesInvoiceId: input.invoiceId,
+        amountMinor: input.totalMinor,
+      },
+    });
+    const settlementAccount = await this.posting.systemAccount(
+      tx,
+      input.companyId,
+      input.method === 'CASH' ? SYSTEM_ROLES.CASH : SYSTEM_ROLES.BANK,
+    );
+    const arAccount = await this.posting.systemAccount(tx, input.companyId, SYSTEM_ROLES.AR_CONTROL);
+    const journal = await this.posting.postJournal(tx, {
+      companyId: input.companyId,
+      branchId: input.branchId,
+      entryDate: input.paidAt,
+      memo: `Automatic receipt ${paymentNumber}`,
+      sourceType: 'CUSTOMER_RECEIPT',
+      sourceId: payment.id,
+      actorUserId: input.actorUserId,
+      lines: [
+        { accountId: settlementAccount, debit: input.totalMinor },
+        { accountId: arAccount, credit: input.totalMinor },
+      ],
+    });
+    await tx.payment.update({ where: { id: payment.id }, data: { journalEntryId: journal.id } });
+    await tx.salesInvoice.update({
+      where: { id: input.invoiceId },
+      data: { status: 'PAID', amountPaidMinor: input.totalMinor },
+    });
+  }
+
   // --------------------------------------------------------------- customers
 
-  async listCustomers(query: ListQueryDto, principal: RequestPrincipal) {
+  async listCustomers(query: CustomerListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 200, 500);
     const where = {
       companyId,
+      ...(query.kind ? { kind: query.kind } : {}),
+      ...(query.active !== undefined ? { isActive: query.active === 'true' } : {}),
+      ...(query.sourceId ? { sourceId: query.sourceId } : {}),
+      ...(query.departmentId ? { departmentId: query.departmentId } : {}),
       ...(query.search
         ? {
             OR: [
@@ -96,41 +239,134 @@ export class SalesService {
         : {}),
     };
     const [rows, total] = await Promise.all([
-      this.prisma.customer.findMany({ where, orderBy: { code: 'asc' }, skip: (page - 1) * pageSize, take: pageSize }),
+      this.prisma.customer.findMany({
+        where,
+        orderBy: { code: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: { source: true, department: true },
+      }),
       this.prisma.customer.count({ where }),
     ]);
     return { items: rows.map(toCustomerDto), total, page, pageSize };
   }
 
+  /**
+   * Resolve the optional attribution catalogues, refusing an id that belongs to
+   * another tenant. A foreign id would otherwise let a caller attach its
+   * customer to a catalogue row it cannot read, and the relation would leak the
+   * other tenant's source name through `include`.
+   */
+  private async resolveAttribution(companyId: string, sourceId?: string, departmentId?: string) {
+    const [source, department] = await Promise.all([
+      sourceId ? this.prisma.leadSource.findFirst({ where: { id: sourceId, companyId } }) : null,
+      departmentId ? this.prisma.department.findFirst({ where: { id: departmentId, companyId } }) : null,
+    ]);
+    if (sourceId && !source) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer source not found in this company.');
+    if (departmentId && !department) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Department not found in this company.');
+    return { source, department };
+  }
+
+  /**
+   * The "Staf Name" printed on a document: the salesperson the caller named, or
+   * failing that the signed-in operator. Resolving the operator's own name keeps
+   * the field truthful and never blank without asking the form for a value the
+   * session already knows.
+   */
+  private async resolveSalespersonName(
+    explicit: string | undefined,
+    actorUserId: string,
+  ): Promise<string | null> {
+    const trimmed = explicit?.trim();
+    if (trimmed) return trimmed;
+    const user = await this.prisma.user.findUnique({
+      where: { id: actorUserId },
+      select: { fullNameEn: true, fullNameAr: true, email: true },
+    });
+    return user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? null;
+  }
+
   async createCustomer(dto: CreateCustomerDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.customer.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Customer code ${dto.code} already exists.`);
-    const customer = await this.prisma.customer.create({
+    // A new customer inherits the tenant's own market, not a hard-coded one.
+    const [defaultCurrency, defaultCountry] = await Promise.all([
+      this.context.companyCurrency(companyId),
+      this.context.companyCountryCode(companyId),
+    ]);
+    const explicitCode = dto.code?.trim();
+    if (explicitCode) {
+      const dup = await this.prisma.customer.findUnique({ where: { companyId_code: { companyId, code: explicitCode } } });
+      if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Customer code ${explicitCode} already exists.`);
+    }
+    const settings = explicitCode ? null : await this.prisma.companySetting.findUnique({
+      where: { companyId_section: { companyId, section: 'sales' } },
+    });
+    const customerPrefixes = withDefaults('sales', settings?.value);
+    const prefix = (dto.kind === 'COMPANY' ? customerPrefixes.customerCompanyPrefix : customerPrefixes.customerIndividualPrefix).toUpperCase();
+    // The two names are independent, but a customer with no name at all would be
+    // unidentifiable in a list, so at least one is required.
+    const nameEn = (dto.nameEn ?? '').trim();
+    const nameAr = (dto.nameAr ?? '').trim();
+    if (!nameEn && !nameAr) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide the customer name in English, Arabic, or both.');
+    }
+    await this.resolveAttribution(companyId, dto.sourceId, dto.departmentId);
+    const createRecord = (code: string) => this.prisma.customer.create({
       data: {
         companyId,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code,
+        nameEn,
+        nameAr,
         email: dto.email ?? null,
         phone: dto.phone ?? null,
         taxNumber: dto.taxNumber ?? null,
         addressLine: dto.addressLine ?? null,
         city: dto.city ?? null,
-        countryCode: dto.countryCode ?? 'SA',
+        countryCode: dto.countryCode ?? defaultCountry,
+        sourceId: dto.sourceId ?? null,
+        departmentId: dto.departmentId ?? null,
         creditLimitMinor: dto.creditLimitMinor ?? 0,
         paymentTermsDays: dto.paymentTermsDays ?? 0,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? defaultCurrency,
         notes: dto.notes ?? null,
+        kind: dto.kind ?? 'INDIVIDUAL',
+        nationalId: dto.nationalId ?? null,
+        crNumber: dto.crNumber ?? null,
+        crExpiryDate: dto.crExpiryDate ? new Date(dto.crExpiryDate) : null,
+        website: dto.website ?? null,
+        contactPersonName: dto.contactPersonName ?? null,
+        contactPersonPhone: dto.contactPersonPhone ?? null,
+        parentCustomerId: dto.parentCustomerId ?? null,
       },
+      include: { source: true, department: true },
     });
+    let customer: Awaited<ReturnType<typeof createRecord>> | undefined;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      // Existing manual codes are left untouched. Only numeric suffixes count.
+      const recent = explicitCode ? [] : await this.prisma.customer.findMany({
+        where: { companyId, code: { startsWith: prefix } },
+        orderBy: { code: 'desc' }, take: 100, select: { code: true },
+      });
+      const last = recent.map(row => row.code.slice(prefix.length))
+        .filter(suffix => /^\\d+$/.test(suffix))
+        .reduce((max, suffix) => Math.max(max, Number(suffix)), 0);
+      const code = explicitCode || `${prefix}${String(last + 1 + attempt).padStart(6, '0')}`;
+      try {
+        customer = await createRecord(code);
+        break;
+      } catch (error) {
+        if (!explicitCode && (error as { code?: string }).code === 'P2002') continue;
+        throw error;
+      }
+    }
+    if (!customer) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Unable to allocate a unique customer code.');
     await this.audit.record({
       actorUserId: actor.userId,
       companyId,
       action: 'sales.customer_created',
       targetType: 'CUSTOMER',
       targetId: customer.id,
-      summary: `Created customer ${customer.code} ${customer.nameEn}`,
+      summary: `Created customer ${customer.code} ${customer.nameEn || customer.nameAr}`,
     });
     return toCustomerDto(customer);
   }
@@ -139,6 +375,7 @@ export class SalesService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const customer = await this.prisma.customer.findFirst({ where: { id, companyId } });
     if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    await this.resolveAttribution(companyId, dto.sourceId, dto.departmentId);
     const updated = await this.prisma.customer.update({
       where: { id },
       data: {
@@ -149,11 +386,25 @@ export class SalesService {
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
         ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
         ...(dto.city !== undefined ? { city: dto.city } : {}),
+        ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode } : {}),
+        ...(dto.sourceId !== undefined ? { sourceId: dto.sourceId || null } : {}),
+        ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId || null } : {}),
         ...(dto.creditLimitMinor !== undefined ? { creditLimitMinor: dto.creditLimitMinor } : {}),
         ...(dto.paymentTermsDays !== undefined ? { paymentTermsDays: dto.paymentTermsDays } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
+        ...(dto.nationalId !== undefined ? { nationalId: dto.nationalId || null } : {}),
+        ...(dto.crNumber !== undefined ? { crNumber: dto.crNumber || null } : {}),
+        ...(dto.crExpiryDate !== undefined
+          ? { crExpiryDate: dto.crExpiryDate ? new Date(dto.crExpiryDate) : null }
+          : {}),
+        ...(dto.website !== undefined ? { website: dto.website || null } : {}),
+        ...(dto.contactPersonName !== undefined ? { contactPersonName: dto.contactPersonName || null } : {}),
+        ...(dto.contactPersonPhone !== undefined ? { contactPersonPhone: dto.contactPersonPhone || null } : {}),
+        ...(dto.parentCustomerId !== undefined ? { parentCustomerId: dto.parentCustomerId || null } : {}),
       },
+      include: { source: true, department: true },
     });
     await this.audit.record({
       actorUserId: actor.userId,
@@ -166,13 +417,329 @@ export class SalesService {
     return toCustomerDto(updated);
   }
 
+  /**
+   * A customer's full profile for the customer screen: the record plus the
+   * history counts, recent invoices and registered vehicles, all scoped to the
+   * customer's own company. The vehicle relation is the Execution 03 registry,
+   * not the consumer garage.
+   */
+  async getCustomer(id: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, companyId },
+      include: { source: true, department: true },
+    });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+
+    const [quotations, orders, invoices, payments, creditNotes, vehicles, recentInvoices, vehicleRows] = await Promise.all([
+      this.prisma.quotation.count({ where: { companyId, customerId: id } }),
+      this.prisma.salesOrder.count({ where: { companyId, customerId: id } }),
+      this.prisma.salesInvoice.count({ where: { companyId, customerId: id } }),
+      this.prisma.payment.count({ where: { companyId, customerId: id } }),
+      this.prisma.creditNote.count({ where: { companyId, customerId: id } }),
+      this.prisma.vehicle.count({ where: { companyId, customerId: id } }),
+      this.prisma.salesInvoice.findMany({
+        where: { companyId, customerId: id },
+        orderBy: { invoiceDate: 'desc' },
+        take: 10,
+      }),
+      this.prisma.vehicle.findMany({
+        where: { companyId, customerId: id },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+    ]);
+
+    return {
+      ...toCustomerDto(customer),
+      history: { quotations, orders, invoices, payments, creditNotes, vehicles },
+      recentInvoices: recentInvoices.map((inv) => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        invoiceDate: inv.invoiceDate.toISOString(),
+        status: inv.status,
+        totalMinor: inv.totalMinor,
+        balanceMinor: inv.totalMinor - inv.amountPaidMinor,
+        currency: inv.currency,
+      })),
+      vehicles: vehicleRows.map((v) => ({
+        id: v.id,
+        vin: v.vin,
+        plateNumber: v.plateNumber,
+        make: v.make,
+        model: v.model,
+        modelYear: v.modelYear,
+      })),
+    };
+  }
+
+  // ------------------------------------------------------ customer attachments
+
+  async listCustomerAttachments(customerId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id: customerId, companyId }, select: { id: true } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    const rows = await this.prisma.entityAttachment.findMany({
+      where: { companyId, entityType: 'CUSTOMER', entityId: customerId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
+  }
+
+  async addCustomerAttachment(customerId: string, body: { fileName: string; mimeType?: string; sizeBytes?: number; storageRef?: string }, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id: customerId, companyId }, select: { id: true } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    const attachment = await this.prisma.entityAttachment.create({
+      data: {
+        companyId,
+        entityType: 'CUSTOMER',
+        entityId: customerId,
+        fileName: body.fileName,
+        mimeType: body.mimeType ?? null,
+        sizeBytes: body.sizeBytes ?? 0,
+        storageRef: body.storageRef ?? null,
+        uploadedById: actor.userId,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'sales.customer_attachment_added', targetType: 'CUSTOMER', targetId: customerId, summary: `Attached ${body.fileName}` });
+    return attachment;
+  }
+
+  async removeCustomerAttachment(customerId: string, attachmentId: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const attachment = await this.prisma.entityAttachment.findFirst({
+      where: { id: attachmentId, companyId, entityType: 'CUSTOMER', entityId: customerId },
+    });
+    if (!attachment) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Attachment not found.');
+    await this.prisma.entityAttachment.delete({ where: { id: attachmentId } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'sales.customer_attachment_removed', targetType: 'CUSTOMER', targetId: customerId, summary: `Removed ${attachment.fileName}` });
+    return { removed: true };
+  }
+
+  // ------------------------------------------------- secondary customer branches
+
+  /**
+   * The branches of a company customer.
+   *
+   * Scoped to the owning company in the query, so a branch id from another
+   * tenant cannot be read even if it is guessed.
+   */
+  async listCustomerBranches(customerId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, companyId },
+      select: { id: true },
+    });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    return this.prisma.customerBranch.findMany({
+      where: { companyId, customerId },
+      orderBy: { code: 'asc' },
+    });
+  }
+
+  async createCustomerBranch(
+    customerId: string,
+    dto: CustomerBranchDto,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id: customerId, companyId } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    const nameEn = (dto.nameEn ?? '').trim();
+    const nameAr = (dto.nameAr ?? '').trim();
+    if (!nameEn && !nameAr) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide the branch name in English, Arabic, or both.');
+    }
+    const dup = await this.prisma.customerBranch.findUnique({
+      where: { companyId_code: { companyId, code: dto.code } },
+    });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Branch code ${dto.code} already exists.`);
+    const branch = await this.prisma.customerBranch.create({
+      data: {
+        companyId,
+        customerId,
+        code: dto.code,
+        nameEn,
+        nameAr,
+        contactName: dto.contactName ?? null,
+        phone: dto.phone ?? null,
+        email: dto.email ?? null,
+        addressLine: dto.addressLine ?? null,
+        city: dto.city ?? null,
+        countryCode: dto.countryCode ?? null,
+        notes: dto.notes ?? null,
+      },
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.customer_branch_created',
+      targetType: 'CUSTOMER',
+      targetId: customerId,
+      summary: `Added branch ${branch.code} to customer ${customer.code}`,
+    });
+    return branch;
+  }
+
+  async updateCustomerBranch(
+    customerId: string,
+    branchId: string,
+    dto: UpdateCustomerBranchDto,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const branch = await this.prisma.customerBranch.findFirst({
+      where: { id: branchId, companyId, customerId },
+    });
+    if (!branch) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Branch not found.');
+    const updated = await this.prisma.customerBranch.update({
+      where: { id: branchId },
+      data: {
+        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.contactName !== undefined ? { contactName: dto.contactName || null } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone || null } : {}),
+        ...(dto.email !== undefined ? { email: dto.email || null } : {}),
+        ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine || null } : {}),
+        ...(dto.city !== undefined ? { city: dto.city || null } : {}),
+        ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode || null } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes || null } : {}),
+      },
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.customer_branch_updated',
+      targetType: 'CUSTOMER',
+      targetId: customerId,
+      summary: `Updated branch ${updated.code}`,
+    });
+    return updated;
+  }
+
+  async deleteCustomerBranch(
+    customerId: string,
+    branchId: string,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const branch = await this.prisma.customerBranch.findFirst({
+      where: { id: branchId, companyId, customerId },
+    });
+    if (!branch) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Branch not found.');
+    await this.prisma.customerBranch.delete({ where: { id: branchId } });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.customer_branch_removed',
+      targetType: 'CUSTOMER',
+      targetId: customerId,
+      summary: `Removed branch ${branch.code}`,
+    });
+    return { deleted: true as const };
+  }
+
+  /**
+   * Permanently delete a customer.
+   *
+   * A customer with any commercial history — a quotation, order, invoice, credit
+   * note, payment, vehicle or inspection — is refused, because deleting it would
+   * either violate the ledger's referential integrity or silently drop the
+   * counterparty from issued documents. The generated "Walk-in customer" row is
+   * also protected: the POS recreates it on demand and the seeded invoices point
+   * at it. Only a customer whose own detail rows are the sole references is
+   * removed, and those detail rows go with it.
+   */
+  async deleteCustomer(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id, companyId } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    if (customer.code === 'WALK-IN') {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The walk-in customer cannot be deleted.');
+    }
+
+    const [
+      quotations,
+      orders,
+      invoices,
+      creditNotes,
+      posSales,
+      payments,
+      vehicles,
+      inspections,
+      bookingSlots,
+      paymentIntents,
+      contactCount,
+      segmentCount,
+    ] = await Promise.all([
+      this.prisma.quotation.count({ where: { customerId: id } }),
+      this.prisma.salesOrder.count({ where: { customerId: id } }),
+      this.prisma.salesInvoice.count({ where: { customerId: id } }),
+      this.prisma.creditNote.count({ where: { customerId: id } }),
+      this.prisma.posSale.count({ where: { customerId: id } }),
+      this.prisma.payment.count({ where: { customerId: id } }),
+      this.prisma.vehicle.count({ where: { customerId: id } }),
+      this.prisma.inspectionSession.count({ where: { customerId: id } }),
+      this.prisma.bookingSlot.count({ where: { customerId: id } }),
+      this.prisma.paymentIntent.count({ where: { customerId: id } }),
+      this.prisma.customerContact.count({ where: { customerId: id } }),
+      this.prisma.customerSegmentMember.count({ where: { customerId: id } }),
+    ]);
+
+    if (
+      quotations + orders + invoices + creditNotes + posSales + payments + vehicles + inspections + bookingSlots + paymentIntents >
+      0
+    ) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This customer has documents, payments or vehicles on file and cannot be deleted. Deactivate it instead to keep its history.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.entityAttachment.deleteMany({ where: { companyId, entityType: 'CUSTOMER', entityId: id } });
+      await tx.customerContact.deleteMany({ where: { customerId: id } });
+      await tx.customerSegmentMember.deleteMany({ where: { customerId: id } });
+      await tx.customer.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.customer_deleted',
+      targetType: 'CUSTOMER',
+      targetId: id,
+      summary: `Permanently deleted customer ${customer.code} (${contactCount} contacts, ${segmentCount} segment memberships removed)`,
+    });
+    return { id, deleted: true };
+  }
+
   // -------------------------------------------------------------- quotations
 
   async listQuotations(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.status ? { status: query.status as never } : {}) };
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.dateFrom || query.dateTo ? { issueDate: { ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}), ...(query.dateTo ? { lte: new Date(`${query.dateTo}T23:59:59.999Z`) } : {}) } } : {}),
+      ...(query.minAmountMinor !== undefined || query.maxAmountMinor !== undefined ? { totalMinor: { ...(query.minAmountMinor !== undefined ? { gte: query.minAmountMinor } : {}), ...(query.maxAmountMinor !== undefined ? { lte: query.maxAmountMinor } : {}) } } : {}),
+      ...(query.search?.trim() ? { OR: [
+        { quoteNumber: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        { customer: { is: { OR: [
+          { nameEn: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { code: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        ] } } },
+      ] } : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.quotation.findMany({
         where,
@@ -183,7 +750,27 @@ export class SalesService {
       }),
       this.prisma.quotation.count({ where }),
     ]);
-    return { items: rows.map(toQuotationDto), total, page, pageSize };
+    // Expose the resulting invoice number on converted quotations, without
+    // rewriting the old sales-order conversion workflow or adding columns.
+    const convertedOrders = rows
+      .map((quote) => quote.convertedOrderId)
+      .filter((id): id is string => Boolean(id));
+    const relatedInvoices = convertedOrders.length
+      ? await this.prisma.salesInvoice.findMany({
+          where: { companyId, orderId: { in: convertedOrders } },
+          select: { id: true, orderId: true, invoiceNumber: true, status: true },
+        })
+      : [];
+    const byOrder = new Map(relatedInvoices.map((invoice) => [invoice.orderId, invoice]));
+    return {
+      items: rows.map((quote) => ({
+        ...toQuotationDto(quote),
+        convertedInvoiceId: byOrder.get(quote.convertedOrderId)?.id ?? null,
+        convertedInvoiceNumber: byOrder.get(quote.convertedOrderId)?.invoiceNumber ?? null,
+        convertedInvoiceStatus: byOrder.get(quote.convertedOrderId)?.status ?? null,
+      })),
+      total, page, pageSize,
+    };
   }
 
   async createQuotation(dto: CreateQuotationDto, principal: RequestPrincipal, actor: ActorContext) {
@@ -191,9 +778,14 @@ export class SalesService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     await this.assertCustomer(companyId, dto.customerId);
 
-    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
+    const currency = dto.currency ?? (await this.context.companyCurrency(companyId));
+    const rounding = await this.context.companyRoundingMode(companyId);
+    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
     const quotation = await this.posting.withTransaction(async (tx) => {
       const quoteNumber = await this.sequences.next(tx, companyId, 'quotation');
+      const selectedPayment = await this.resolveCompanyPayment(tx, companyId, dto.paymentMethodCode,
+        (dto.paymentMethod ?? 'CASH') as PaymentMethod, 'invoices');
       return tx.quotation.create({
         data: {
           companyId,
@@ -201,13 +793,17 @@ export class SalesService {
           quoteNumber,
           customerId: dto.customerId,
           status: 'DRAFT',
-          issueDate: new Date(dto.issueDate),
+          issueDate: new Date(resolveDocumentDate(dto)!),
           validUntil: dto.validUntil ? new Date(dto.validUntil) : null,
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency,
+          ...selectedPayment,
+          salespersonName,
+          paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
@@ -249,6 +845,7 @@ export class SalesService {
           subtotalMinor: quote.subtotalMinor,
           discountMinor: quote.discountMinor,
           taxMinor: quote.taxMinor,
+          roundingMinor: quote.roundingMinor,
           totalMinor: quote.totalMinor,
           currency: quote.currency,
           createdById: actor.userId,
@@ -259,6 +856,7 @@ export class SalesService {
               quantity: l.quantity,
               unitPriceMinor: l.unitPriceMinor,
               discountPercentBp: l.discountPercentBp,
+              discountMinor: l.discountMinor,
               taxPercentBp: l.taxPercentBp,
               lineTotalMinor: l.lineTotalMinor,
               sortOrder: l.sortOrder,
@@ -279,6 +877,134 @@ export class SalesService {
       summary: `Converted quotation to order ${result.orderNumber}`,
     });
     return toSalesOrderDto(result);
+  }
+
+  /**
+   * Convert a quotation directly into an unposted invoice for admin approval.
+   *
+   * An internal order preserves the existing quotation -> order -> invoice
+   * relationship without a schema migration. All three records are created in
+   * one transaction; no invoice journal, stock issue, or payment is produced
+   * until the normal draft approval/posting path executes.
+   */
+  async convertQuotationToDraftInvoice(
+    id: string, dto: ConvertQuotationDto, principal: RequestPrincipal, actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const invoice = await this.posting.withTransaction(async (tx) => {
+      const quote = await tx.quotation.findFirst({
+        where: { id, companyId }, include: { lines: true },
+      });
+      if (!quote) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Quotation not found.');
+      if (quote.convertedOrderId || quote.status === 'CONVERTED') {
+        throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'Quotation was already converted.');
+      }
+      const orderNumber = await this.sequences.next(tx, companyId, 'salesOrder');
+      const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
+      const order = await tx.salesOrder.create({
+        data: {
+          companyId,
+          branchId: quote.branchId,
+          orderNumber,
+          customerId: quote.customerId,
+          quotationId: quote.id,
+          warehouseId: dto.warehouseId ?? null,
+          status: 'CONFIRMED',
+          orderDate: new Date(),
+          subtotalMinor: quote.subtotalMinor,
+          discountMinor: quote.discountMinor,
+          taxMinor: quote.taxMinor,
+          roundingMinor: quote.roundingMinor,
+          totalMinor: quote.totalMinor,
+          currency: quote.currency,
+          paymentMethod: quote.paymentMethod,
+          salespersonName: quote.salespersonName,
+          notes: quote.notes,
+          createdById: actor.userId,
+          lines: {
+            create: quote.lines.map((line) => ({
+              productId: line.productId,
+              description: line.description,
+              quantity: line.quantity,
+              unitPriceMinor: line.unitPriceMinor,
+              discountPercentBp: line.discountPercentBp,
+              discountMinor: line.discountMinor,
+              taxPercentBp: line.taxPercentBp,
+              lineTotalMinor: line.lineTotalMinor,
+              sortOrder: line.sortOrder,
+            })),
+          },
+        },
+      });
+      // The invoice is intentionally DRAFT even when the quote was CASH.
+      // Posting it later uses the standard stock/AR/payment processing, once.
+      const created = await tx.salesInvoice.create({
+        data: {
+          companyId,
+          branchId: quote.branchId,
+          invoiceNumber,
+          customerId: quote.customerId,
+          orderId: order.id,
+          warehouseId: dto.warehouseId ?? null,
+          status: 'DRAFT',
+          invoiceDate: new Date(),
+          dueDate: null,
+          subtotalMinor: quote.subtotalMinor,
+          discountMinor: quote.discountMinor,
+          taxMinor: quote.taxMinor,
+          roundingMinor: quote.roundingMinor,
+          totalMinor: quote.totalMinor,
+          currency: quote.currency,
+          paymentMethod: quote.paymentMethod,
+          paymentMethodCode: quote.paymentMethodCode,
+          paymentMethodLabelEn: quote.paymentMethodLabelEn,
+          paymentMethodLabelAr: quote.paymentMethodLabelAr,
+          salespersonName: quote.salespersonName,
+          paymentReference: quote.paymentReference,
+          notes: quote.notes,
+          createdById: actor.userId,
+          lines: {
+            create: quote.lines.map((line) => {
+              const subtotal = lineAmountMinor(line.quantity, line.unitPriceMinor);
+              const net = subtotal - line.discountMinor;
+              return {
+                productId: line.productId,
+                description: line.description,
+                quantity: line.quantity,
+                unitPriceMinor: line.unitPriceMinor,
+                discountPercentBp: line.discountPercentBp,
+                taxPercentBp: line.taxPercentBp,
+                lineSubtotalMinor: subtotal,
+                discountMinor: line.discountMinor,
+                taxMinor: line.lineTotalMinor - net,
+                lineTotalMinor: line.lineTotalMinor,
+                sortOrder: line.sortOrder,
+              };
+            }),
+          },
+        },
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      });
+      // Compare-and-set prevents concurrent conversion requests from both
+      // succeeding even when they read the original quote simultaneously.
+      const claimed = await tx.quotation.updateMany({
+        where: { id, companyId, convertedOrderId: null, status: { not: 'CONVERTED' } },
+        data: { status: 'CONVERTED', convertedOrderId: order.id },
+      });
+      if (claimed.count !== 1) {
+        throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'Quotation was already converted.');
+      }
+      return created;
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.quotation_converted_to_draft_invoice',
+      targetType: 'SALES_INVOICE',
+      targetId: invoice.id,
+      summary: `Converted quotation into draft sales invoice ${invoice.invoiceNumber}`,
+    });
+    return toInvoiceDto(invoice);
   }
 
   // ------------------------------------------------------------ sales orders
@@ -307,7 +1033,10 @@ export class SalesService {
     await this.assertCustomer(companyId, dto.customerId);
     if (dto.warehouseId) await this.assertWarehouse(companyId, dto.warehouseId);
 
-    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
+    const currency = dto.currency ?? (await this.context.companyCurrency(companyId));
+    const rounding = await this.context.companyRoundingMode(companyId);
+    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
     const order = await this.posting.withTransaction(async (tx) => {
       const orderNumber = await this.sequences.next(tx, companyId, 'salesOrder');
       return tx.salesOrder.create({
@@ -318,12 +1047,15 @@ export class SalesService {
           customerId: dto.customerId,
           warehouseId: dto.warehouseId ?? null,
           status: dto.confirm ? 'CONFIRMED' : 'DRAFT',
-          orderDate: new Date(dto.orderDate),
+          orderDate: new Date(resolveDocumentDate(dto)!),
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency,
+          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
+          salespersonName,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
@@ -352,6 +1084,22 @@ export class SalesService {
       companyId,
       ...(query.status ? { status: query.status as never } : {}),
       ...(query.branchId ? { branchId: query.branchId } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.dateFrom || query.dateTo ? { invoiceDate: { ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}), ...(query.dateTo ? { lte: new Date(`${query.dateTo}T23:59:59.999Z`) } : {}) } } : {}),
+      ...(query.minAmountMinor !== undefined || query.maxAmountMinor !== undefined ? { totalMinor: { ...(query.minAmountMinor !== undefined ? { gte: query.minAmountMinor } : {}), ...(query.maxAmountMinor !== undefined ? { lte: query.maxAmountMinor } : {}) } } : {}),
+      ...(query.search?.trim() ? { OR: [
+        { invoiceNumber: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        { customer: { is: { OR: [
+          { nameEn: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { code: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        ] } } },
+      ] } : {}),
+      ...(query.paymentState === 'due' ? {
+        amountPaidMinor: { lt: this.prisma.salesInvoice.fields.totalMinor },
+      } : query.paymentState === 'settled' ? {
+        amountPaidMinor: { gte: this.prisma.salesInvoice.fields.totalMinor },
+      } : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.salesInvoice.findMany({
@@ -363,7 +1111,31 @@ export class SalesService {
       }),
       this.prisma.salesInvoice.count({ where }),
     ]);
-    return { items: rows.map(toInvoiceDto), total, page, pageSize };
+    const orderIds = rows.map((invoice) => invoice.orderId).filter((id): id is string => Boolean(id));
+    const orders = orderIds.length
+      ? await this.prisma.salesOrder.findMany({
+          where: { companyId, id: { in: orderIds } },
+          select: { id: true, quotationId: true },
+        })
+      : [];
+    const quoteIds = orders.map((order) => order.quotationId).filter((id): id is string => Boolean(id));
+    const sources = quoteIds.length
+      ? await this.prisma.quotation.findMany({
+          where: { companyId, id: { in: quoteIds } },
+          select: { id: true, quoteNumber: true },
+        })
+      : [];
+    const orderQuote = new Map(orders.map((order) => [order.id, order.quotationId]));
+    const quoteNumber = new Map(sources.map((quote) => [quote.id, quote.quoteNumber]));
+    return {
+      items: rows.map((invoice) => ({
+        ...toInvoiceDto(invoice),
+        sourceQuotationNumber: invoice.orderId
+          ? quoteNumber.get(orderQuote.get(invoice.orderId) ?? '') ?? null
+          : null,
+      })),
+      total, page, pageSize,
+    };
   }
 
   async getInvoice(id: string, principal: RequestPrincipal) {
@@ -381,6 +1153,196 @@ export class SalesService {
   }
 
   /**
+   * Update a draft invoice only. Posted invoices are immutable: changing them
+   * would invalidate the posted journal, stock issue and any allocations.
+   */
+  async updateInvoice(id: string, dto: UpdateInvoiceDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
+    const result = await this.posting.withTransaction(async (tx) => {
+      const current = await tx.salesInvoice.findFirst({
+        where: { id, companyId },
+        include: { lines: true, allocations: true },
+      });
+      if (!current) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
+      if (
+        current.status !== 'DRAFT' ||
+        current.journalEntryId ||
+        current.amountPaidMinor > 0 ||
+        current.allocations.length > 0
+      ) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'Only an unposted draft invoice without payments can be edited. Use a credit note to correct a posted invoice.',
+        );
+      }
+      const [officialDocument, attachment] = await Promise.all([
+        tx.officialDocument.findFirst({
+          where: { companyId, sourceType: 'SalesInvoice', sourceId: id, status: { notIn: ['CANCELLED', 'REVOKED'] } },
+          select: { id: true },
+        }),
+        tx.entityAttachment.findFirst({
+          where: { companyId, entityType: 'SALES_INVOICE', entityId: id },
+          select: { id: true },
+        }),
+      ]);
+      if (officialDocument || attachment) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'This draft has an issued document or attachments. Revoke/remove them before editing.',
+        );
+      }
+      await this.assertCustomerTx(tx, companyId, dto.customerId);
+      const lineInputs = dto.lines.map((line) => ({
+        productId: line.productId ?? null,
+        description: line.description,
+        quantity: line.quantity,
+        unitPriceMinor: line.unitPriceMinor,
+        discountPercentBp: line.discountPercentBp,
+        discountAmountMinor: line.discountAmountMinor,
+        taxPercentBp: line.taxPercentBp,
+      }));
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
+      const invoiceDate = new Date(resolveDocumentDate(dto)!);
+      const selectedPayment = await this.resolveCompanyPayment(tx, companyId,
+        dto.paymentMethodCode ?? current.paymentMethodCode ?? undefined,
+        (dto.paymentMethod as PaymentMethod | undefined) ?? current.paymentMethod, 'invoices');
+      const dueDate = selectedPayment.paymentMethod === 'CREDIT'
+        ? (dto.dueDate ? new Date(dto.dueDate) : current.dueDate)
+        : null;
+      if (selectedPayment.paymentMethod === 'CREDIT' && !dueDate) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A due date is required for credit invoices.');
+      }
+      const willPost = dto.post === true;
+      // Credit limits guard receivables, not a sale settled in the same
+      // transaction by cash/card/bank payment.
+      if (willPost && selectedPayment.paymentMethod === 'CREDIT') {
+        await this.assertCreditLimit(tx, companyId, dto.customerId, totals.totalMinor);
+      }
+      const updated = await tx.salesInvoice.update({
+        where: { id },
+        data: {
+          customerId: dto.customerId,
+          warehouseId: dto.warehouseId ?? current.warehouseId,
+          invoiceDate,
+          dueDate,
+          subtotalMinor: totals.subtotalMinor,
+          discountMinor: totals.discountMinor,
+          taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
+          totalMinor: totals.totalMinor,
+          ...selectedPayment,
+          salespersonName,
+          paymentReference: dto.paymentReference ?? null,
+          notes: dto.notes ?? null,
+          lines: { deleteMany: {}, create: buildLineRows(totals, lineInputs) },
+        },
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      });
+      if (!willPost) return toInvoiceDto(updated);
+      const posted = await this.postSalesInvoice(tx, {
+        companyId,
+        branchId: current.branchId,
+        customerId: dto.customerId,
+        warehouseId: dto.warehouseId ?? current.warehouseId,
+        currency: current.currency,
+        lines: lineInputs,
+        entryDate: invoiceDate,
+        sourceType: 'SALES_INVOICE',
+        sourceId: id,
+        actorUserId: actor.userId,
+        issueStock: dto.issueStock ?? true,
+        roundingMode: rounding.mode,
+        roundingScale: rounding.scale,
+      });
+      await this.settleImmediateInvoice(tx, {
+        companyId,
+        branchId: current.branchId,
+        customerId: dto.customerId,
+        invoiceId: id,
+        totalMinor: totals.totalMinor,
+        currency: current.currency,
+        method: selectedPayment.paymentMethod,
+        paidAt: invoiceDate,
+        actorUserId: actor.userId,
+        reference: dto.paymentReference,
+      });
+      if (current.orderId) {
+        const orderLines = await tx.salesOrderLine.findMany({ where: { orderId: current.orderId } });
+        for (const line of orderLines) {
+          await tx.salesOrderLine.update({
+            where: { id: line.id },
+            data: { quantityInvoiced: line.quantity },
+          });
+        }
+        await tx.salesOrder.update({ where: { id: current.orderId }, data: { status: 'INVOICED' } });
+      }
+      if (selectedPayment.paymentMethod === 'CREDIT') return posted;
+      const settled = await tx.salesInvoice.findUniqueOrThrow({
+        where: { id },
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      });
+      return toInvoiceDto(settled);
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.invoice_updated',
+      targetType: 'SALES_INVOICE',
+      targetId: id,
+      summary: `Updated draft sales invoice ${result.invoiceNumber}`,
+    });
+    return result;
+  }
+
+  /** Permanently remove a draft invoice only when nothing has been issued against it. */
+  async deleteInvoice(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const deleted = await this.posting.withTransaction(async (tx) => {
+      const invoice = await tx.salesInvoice.findFirst({
+        where: { id, companyId },
+        include: { allocations: true },
+      });
+      if (!invoice) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
+      if (
+        invoice.status !== 'DRAFT' ||
+        invoice.journalEntryId ||
+        invoice.amountPaidMinor > 0 ||
+        invoice.allocations.length > 0
+      ) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'Only an unposted draft invoice without payments can be permanently deleted. Posted invoices must be reversed with a credit note.',
+        );
+      }
+      const [officialDocument, attachment, comment, approval] = await Promise.all([
+        tx.officialDocument.findFirst({ where: { companyId, sourceType: 'SalesInvoice', sourceId: id }, select: { id: true } }),
+        tx.entityAttachment.findFirst({ where: { companyId, entityType: 'SALES_INVOICE', entityId: id }, select: { id: true } }),
+        tx.entityComment.findFirst({ where: { companyId, entityType: 'SALES_INVOICE', entityId: id }, select: { id: true } }),
+        tx.approvalRequest.findFirst({ where: { companyId, entityType: 'SALES_INVOICE', entityId: id }, select: { id: true } }),
+      ]);
+      if (officialDocument || attachment || comment || approval) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'This invoice has related official documents, attachments, comments or approvals and cannot be deleted.',
+        );
+      }
+      await tx.salesInvoice.delete({ where: { id } });
+      return invoice.invoiceNumber;
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.invoice_deleted',
+      targetType: 'SALES_INVOICE',
+      targetId: id,
+      summary: `Permanently deleted draft sales invoice ${deleted}`,
+    });
+    return { id, deleted: true };
+  }
+
+  /**
    * Create a sales invoice, optionally from a sales order.
    *
    * Posting is atomic: the invoice header/lines, the ledger entry, the stock
@@ -391,11 +1353,13 @@ export class SalesService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
     const result = await this.posting.withTransaction(async (tx) => {
       let customerId = dto.customerId ?? null;
       let orderId: string | null = null;
       let warehouseId = dto.warehouseId ?? null;
-      let currency = dto.currency ?? 'SAR';
+      let currency = dto.currency ?? companyCurrency;
       let lineInputs: Array<PricedLineInput & { productId: string | null; description: string }>;
 
       if (dto.orderId) {
@@ -421,6 +1385,7 @@ export class SalesService {
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
+          discountAmountMinor: l.discountMinor > 0 ? l.discountMinor : undefined,
           taxPercentBp: l.taxPercentBp,
         }));
       } else {
@@ -434,24 +1399,30 @@ export class SalesService {
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
+          discountAmountMinor: l.discountAmountMinor,
           taxPercentBp: l.taxPercentBp,
         }));
       }
 
       await this.assertCustomerTx(tx, companyId, customerId!);
-      const totals = computeDocumentTotals(lineInputs);
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
 
-      // Credit limit check for a posted (non-draft) invoice.
       const willPost = dto.post !== false;
-      if (willPost) {
+      const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
+      const selectedPayment = await this.resolveCompanyPayment(tx, companyId, dto.paymentMethodCode,
+        (dto.paymentMethod ?? 'CASH') as PaymentMethod, 'invoices');
+      // Only unpaid credit sales consume the customer's credit limit.
+      if (willPost && selectedPayment.paymentMethod === 'CREDIT') {
         await this.assertCreditLimit(tx, companyId, customerId!, totals.totalMinor);
       }
-
-      const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
-      const invoiceDate = new Date(dto.invoiceDate);
-      const dueDate = dto.dueDate
-        ? new Date(dto.dueDate)
-        : await computeDueDate(tx, companyId, customerId!, invoiceDate);
+      const invoiceDate = new Date(resolveDocumentDate(dto)!);
+      if (selectedPayment.paymentMethod === 'CREDIT' && !dto.dueDate) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select the due date for a credit invoice.');
+      }
+      const dueDate = selectedPayment.paymentMethod === 'CREDIT'
+        ? new Date(dto.dueDate!)
+        : null;
 
       const invoice = await tx.salesInvoice.create({
         data: {
@@ -467,8 +1438,12 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency,
+          ...selectedPayment,
+          salespersonName,
+          paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },
@@ -489,6 +1464,8 @@ export class SalesService {
           sourceId: invoice.id,
           actorUserId: actor.userId,
           issueStock: dto.issueStock ?? true,
+          roundingMode: rounding.mode,
+          roundingScale: rounding.scale,
         });
 
         // Mark the source order invoiced and update its lines.
@@ -502,7 +1479,24 @@ export class SalesService {
           }
           await tx.salesOrder.update({ where: { id: orderId }, data: { status: 'INVOICED' } });
         }
-        return posted;
+        await this.settleImmediateInvoice(tx, {
+          companyId,
+          branchId: invoice.branchId,
+          customerId: customerId!,
+          invoiceId: invoice.id,
+          totalMinor: totals.totalMinor,
+          currency,
+          method: selectedPayment.paymentMethod,
+          paidAt: invoiceDate,
+          actorUserId: actor.userId,
+          reference: dto.paymentReference,
+        });
+        if (selectedPayment.paymentMethod === 'CREDIT') return posted;
+        const settled = await tx.salesInvoice.findUniqueOrThrow({
+          where: { id: invoice.id },
+          include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+        });
+        return toInvoiceDto(settled);
       }
       return toInvoiceDto(invoice);
     });
@@ -530,10 +1524,17 @@ export class SalesService {
    * moving-average cost captured by the stock ledger.
    */
   private async postSalesInvoice(tx: Tx, src: InvoiceSource) {
-    const totals = computeDocumentTotals(src.lines);
+    const totals = computeDocumentTotals(src.lines, src.roundingMode ?? 'NONE', src.roundingScale ?? 2);
     const arAccount = await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.AR_CONTROL);
     const revenueAccount = await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.SALES_REVENUE);
 
+    // A cash-rounding difference is a small gain (credit) when the total rounds
+    // up and a loss (debit) when it rounds down, so AR always settles the exact
+    // rounded total while revenue and VAT keep their exact figures.
+    const roundingAccount =
+      totals.roundingMinor !== 0
+        ? await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.ROUNDING_GAIN_LOSS)
+        : null;
     const lines = [
       { accountId: arAccount, debit: totals.totalMinor },
       ...(totals.discountMinor > 0
@@ -542,6 +1543,12 @@ export class SalesService {
       { accountId: revenueAccount, credit: totals.subtotalMinor },
       ...(totals.taxMinor > 0
         ? [{ accountId: await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.VAT_OUTPUT), credit: totals.taxMinor }]
+        : []),
+      ...(roundingAccount && totals.roundingMinor > 0
+        ? [{ accountId: roundingAccount, credit: totals.roundingMinor }]
+        : []),
+      ...(roundingAccount && totals.roundingMinor < 0
+        ? [{ accountId: roundingAccount, debit: -totals.roundingMinor }]
         : []),
     ];
 
@@ -615,8 +1622,11 @@ export class SalesService {
    * commit or roll back together. Posting is idempotent per source document.
    */
   async issueInvoice(tx: Tx, input: IssueInvoiceInput) {
-    const totals = computeDocumentTotals(input.lines);
+    const rounding = await this.context.companyRoundingMode(input.companyId, tx);
+    const totals = computeDocumentTotals(input.lines, rounding.mode, rounding.scale);
     const invoiceNumber = await this.sequences.next(tx, input.companyId, 'salesInvoice');
+    // A module-issued invoice follows the tenant's currency unless told otherwise.
+    const currency = input.currency ?? (await this.context.companyCurrency(input.companyId, tx));
     const invoice = await tx.salesInvoice.create({
       data: {
         companyId: input.companyId,
@@ -629,8 +1639,9 @@ export class SalesService {
         subtotalMinor: totals.subtotalMinor,
         discountMinor: totals.discountMinor,
         taxMinor: totals.taxMinor,
+        roundingMinor: totals.roundingMinor,
         totalMinor: totals.totalMinor,
-        currency: input.currency ?? 'SAR',
+        currency,
         notes: input.notes ?? null,
         createdById: input.actorUserId,
         lines: { create: buildLineRows(totals, input.lines) },
@@ -642,13 +1653,15 @@ export class SalesService {
       branchId: input.branchId ?? null,
       customerId: input.customerId,
       warehouseId: input.warehouseId ?? null,
-      currency: input.currency ?? 'SAR',
+      currency,
       lines: input.lines,
       entryDate: input.entryDate,
       sourceType: input.sourceType,
       sourceId: invoice.id,
       actorUserId: input.actorUserId,
       issueStock: input.issueStock,
+      roundingMode: rounding.mode,
+      roundingScale: rounding.scale,
     });
     return posted;
   }
@@ -657,13 +1670,34 @@ export class SalesService {
 
   async listCreditNotes(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
-    const rows = await this.prisma.creditNote.findMany({
-      where: { companyId },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-      include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
-    });
-    return { items: rows.map(toCreditNoteDto), total: rows.length, page: 1, pageSize: rows.length };
+    const page = query.page ?? 1;
+    const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.dateFrom || query.dateTo ? { issueDate: { ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}), ...(query.dateTo ? { lte: new Date(`${query.dateTo}T23:59:59.999Z`) } : {}) } } : {}),
+      ...(query.minAmountMinor !== undefined || query.maxAmountMinor !== undefined ? { totalMinor: { ...(query.minAmountMinor !== undefined ? { gte: query.minAmountMinor } : {}), ...(query.maxAmountMinor !== undefined ? { lte: query.maxAmountMinor } : {}) } } : {}),
+      ...(query.search?.trim() ? { OR: [
+        { creditNoteNumber: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        { customer: { is: { OR: [
+          { nameEn: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { code: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        ] } } },
+      ] } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.creditNote.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      }),
+      this.prisma.creditNote.count({ where }),
+    ]);
+    return { items: rows.map(toCreditNoteDto), total, page, pageSize };
   }
 
   /**
@@ -677,19 +1711,92 @@ export class SalesService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       await this.assertCustomerTx(tx, companyId, dto.customerId);
       let invoiceId: string | null = dto.invoiceId ?? null;
       let warehouseId = dto.warehouseId ?? null;
+      // Invoice-linked returns must inherit the original monetary discount.
+      // The client is not trusted to choose a smaller discount and over-refund.
+      const originalPricing = new Map<string, { quantity: number; discountMinor: number; taxMinor: number }>();
+      let invoiceCurrency: string | null = null;
       if (invoiceId) {
-        const invoice = await tx.salesInvoice.findFirst({ where: { id: invoiceId, companyId } });
+        const invoice = await tx.salesInvoice.findFirst({
+          where: { id: invoiceId, companyId }, include: { lines: true },
+        });
         if (!invoice) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
-        warehouseId = warehouseId ?? invoice.warehouseId;
+        if (invoice.customerId !== dto.customerId || invoice.status === 'DRAFT') {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select a posted invoice belonging to the selected customer.');
+        }
+        if (dto.currency && dto.currency !== invoice.currency) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Return currency must match the original invoice.');
+        }
+        // Acquire a row lock by updating the parent invoice within the same
+        // transaction. Concurrent returns for one invoice then serialize before
+        // checking historical quantities, preventing double refunds.
+        await tx.salesInvoice.update({ where: { id: invoice.id }, data: { updatedAt: new Date() } });
+        const priorReturns = await tx.creditNote.findMany({
+          where: { companyId, invoiceId, status: 'POSTED' },
+          include: { lines: true },
+        });
+        const key = (line: { productId: string | null; description: string; unitPriceMinor: number; taxPercentBp?: number | null }) =>
+          JSON.stringify([line.productId, line.description, line.unitPriceMinor, line.taxPercentBp ?? 0]);
+        const available = new Map<string, number>();
+        for (const line of invoice.lines) {
+          const k = key(line);
+          available.set(k, (available.get(k) ?? 0) + line.quantity);
+        }
+        for (const previous of priorReturns) {
+          for (const line of previous.lines) {
+            const k = key(line);
+            available.set(k, (available.get(k) ?? 0) - line.quantity);
+          }
+        }
+        for (const line of dto.lines) {
+          const k = key({ ...line, productId: line.productId ?? null });
+          const remaining = available.get(k) ?? 0;
+          if (remaining < line.quantity || line.quantity <= 0) {
+            throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Return exceeds the remaining quantity or differs from the original invoice price/tax.');
+          }
+          available.set(k, remaining - line.quantity);
+        }
+        for (const original of invoice.lines) {
+          const k = key(original);
+          const current = originalPricing.get(k) ?? { quantity: 0, discountMinor: 0, taxMinor: 0 };
+          originalPricing.set(k, {
+            quantity: current.quantity + original.quantity,
+            discountMinor: current.discountMinor + original.discountMinor,
+            taxMinor: current.taxMinor + original.taxMinor,
+          });
+        }
+        invoiceCurrency = invoice.currency;
+        warehouseId = invoice.warehouseId;
       }
 
-      const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const returnInputs = dto.lines.map((line) => {
+        if (!invoiceId) return { ...line };
+        const k = JSON.stringify([
+          line.productId ?? null, line.description, line.unitPriceMinor, line.taxPercentBp ?? 0,
+        ]);
+        const original = originalPricing.get(k);
+        if (!original || original.quantity <= 0) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Return line is not part of the original invoice.');
+        }
+        // Preserve discounts as currency, prorated to returned quantity.
+        // Ignore caller-supplied discount values for linked invoices.
+        return {
+          ...line,
+          discountPercentBp: 0,
+          discountAmountMinor: Math.round(original.discountMinor * line.quantity / original.quantity),
+          // Linked returns must reverse the invoice's actual posted VAT, even if
+          // that invoice predates the tax-before-discount policy.
+          taxAmountMinor: Math.round(original.taxMinor * line.quantity / original.quantity),
+        };
+      });
+      const totals = computeDocumentTotals(returnInputs, rounding.mode, rounding.scale);
       const creditNoteNumber = await this.sequences.next(tx, companyId, 'creditNote');
-      const issueDate = new Date(dto.issueDate);
+      const issueDate = new Date(resolveDocumentDate(dto)!);
 
       const note = await tx.creditNote.create({
         data: {
@@ -703,9 +1810,11 @@ export class SalesService {
           issueDate,
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
-          currency: dto.currency ?? 'SAR',
+          refundMethod: dto.refundMethod ?? 'CREDIT_ACCOUNT',
+          currency: invoiceCurrency ?? dto.currency ?? companyCurrency,
           restockInventory: dto.restockInventory ?? false,
           createdById: actor.userId,
           postedAt: new Date(),
@@ -726,12 +1835,33 @@ export class SalesService {
 
       const revenueAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.SALES_REVENUE);
       const arAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AR_CONTROL);
+      // The credit side depends on how the money is actually returned. The
+      // default keeps it on the customer's account (AR); a real refund settles
+      // to cash or bank in the same posting, so the ledger reflects the payout.
+      const refundMethod = dto.refundMethod ?? 'CREDIT_ACCOUNT';
+      const creditAccount =
+        refundMethod === 'CASH'
+          ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.CASH)
+          : refundMethod === 'BANK_TRANSFER' || refundMethod === 'CARD'
+            ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.BANK)
+            : arAccount;
+      const roundingAccount =
+        totals.roundingMinor !== 0
+          ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.ROUNDING_GAIN_LOSS)
+          : null;
       const journalLines = [
-        { accountId: revenueAccount, debit: totals.subtotalMinor },
+        // A fixed discount reduces the revenue being reversed, not VAT or AR.
+        { accountId: revenueAccount, debit: totals.subtotalMinor - totals.discountMinor },
         ...(totals.taxMinor > 0
           ? [{ accountId: await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.VAT_OUTPUT), debit: totals.taxMinor }]
           : []),
-        { accountId: arAccount, credit: totals.totalMinor },
+        ...(roundingAccount && totals.roundingMinor > 0
+          ? [{ accountId: roundingAccount, debit: totals.roundingMinor }]
+          : []),
+        ...(roundingAccount && totals.roundingMinor < 0
+          ? [{ accountId: roundingAccount, credit: -totals.roundingMinor }]
+          : []),
+        { accountId: creditAccount, credit: totals.totalMinor },
       ];
       const journal = await this.posting.postJournal(tx, {
         companyId,
@@ -928,7 +2058,22 @@ export class SalesService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.branchId ? { branchId: query.branchId } : {}) };
+    const where = {
+      companyId,
+      ...(query.branchId ? { branchId: query.branchId } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.dateFrom || query.dateTo ? { createdAt: { ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}), ...(query.dateTo ? { lte: new Date(`${query.dateTo}T23:59:59.999Z`) } : {}) } } : {}),
+      ...(query.minAmountMinor !== undefined || query.maxAmountMinor !== undefined ? { totalMinor: { ...(query.minAmountMinor !== undefined ? { gte: query.minAmountMinor } : {}), ...(query.maxAmountMinor !== undefined ? { lte: query.maxAmountMinor } : {}) } } : {}),
+      ...(query.search?.trim() ? { OR: [
+        { receiptNumber: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        { customer: { is: { OR: [
+          { nameEn: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { code: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        ] } } },
+      ] } : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.posSale.findMany({
         where,
@@ -953,6 +2098,7 @@ export class SalesService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       const session = await tx.cashierSession.findFirst({
         where: { id: dto.cashierSessionId, companyId },
@@ -962,16 +2108,20 @@ export class SalesService {
         throw badRequest(ERROR_CODES.CASHIER_SESSION_CLOSED, 'The cashier session is closed.');
       }
       const warehouseId = dto.warehouseId ?? session.warehouseId ?? null;
+      const selectedPayment = await this.resolveCompanyPayment(tx, companyId, dto.paymentMethodCode,
+        (dto.paymentMethod ?? 'CASH') as PaymentMethod, 'pos');
 
       const lineInputs = dto.lines.map((l: PosSaleLineDto) => ({
         productId: l.productId ?? null,
         description: l.description,
         quantity: l.quantity,
         unitPriceMinor: l.unitPriceMinor,
-        discountPercentBp: 0,
+        discountPercentBp: l.discountPercentBp ?? 0,
+        discountAmountMinor: l.discountAmountMinor,
         taxPercentBp: l.taxPercentBp ?? 0,
       }));
-      const totals = computeDocumentTotals(lineInputs);
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
       const paidMinor = dto.paidMinor ?? totals.totalMinor;
       if (paidMinor < totals.totalMinor) {
         throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Paid amount is less than the sale total.');
@@ -994,8 +2144,10 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
-          currency: 'SAR',
+          currency: companyCurrency,
+          ...selectedPayment,
           notes: `POS sale in session ${session.sessionNumber}`,
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },
@@ -1008,13 +2160,15 @@ export class SalesService {
         branchId: dto.branchId,
         customerId,
         warehouseId,
-        currency: 'SAR',
+        currency: companyCurrency,
         lines: lineInputs,
         entryDate: invoiceDate,
         sourceType: 'POS_SALE',
         sourceId: invoice.id,
         actorUserId: actor.userId,
         issueStock: true,
+        roundingMode: rounding.mode,
+        roundingScale: rounding.scale,
       });
 
       // Settle the invoice immediately with a receipt.
@@ -1036,11 +2190,12 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           paidMinor,
           changeMinor,
-          paymentMethod: dto.paymentMethod,
-          currency: 'SAR',
+          ...selectedPayment,
+          currency: companyCurrency,
           salesInvoiceId: invoice.id,
           journalEntryId: posted.journalEntryId ?? null,
           createdById: actor.userId,
@@ -1063,7 +2218,7 @@ export class SalesService {
       const cashAccount = await this.posting.systemAccount(
         tx,
         companyId,
-        dto.paymentMethod === 'CASH' ? SYSTEM_ROLES.CASH : SYSTEM_ROLES.BANK,
+        selectedPayment.paymentMethod === 'CASH' ? SYSTEM_ROLES.CASH : SYSTEM_ROLES.BANK,
       );
       const arAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AR_CONTROL);
       await this.posting.postJournal(tx, {
@@ -1141,14 +2296,6 @@ export class SalesService {
 
 // ---------------------------------------------------------------- helpers
 
-async function computeDueDate(tx: Tx, companyId: string, customerId: string, invoiceDate: Date): Promise<Date> {
-  const customer = await tx.customer.findFirst({ where: { id: customerId, companyId } });
-  const days = customer?.paymentTermsDays ?? 0;
-  const due = new Date(invoiceDate);
-  due.setDate(due.getDate() + days);
-  return due;
-}
-
 /** Line rows for documents that store only totals (quotation, order, credit note). */
 function buildSimpleLineRows(
   totals: ReturnType<typeof computeDocumentTotals>,
@@ -1160,6 +2307,7 @@ function buildSimpleLineRows(
     quantity: l.quantity,
     unitPriceMinor: l.unitPriceMinor,
     discountPercentBp: l.discountPercentBp,
+    discountMinor: l.discountMinor,
     taxPercentBp: l.taxPercentBp,
     lineTotalMinor: l.lineTotalMinor,
     sortOrder: i,
@@ -1197,13 +2345,33 @@ function toCustomerDto(c: {
   addressLine: string | null;
   city: string | null;
   countryCode: string | null;
+  kind: string;
+  nationalId: string | null;
+  crNumber: string | null;
+  crExpiryDate: Date | null;
+  website: string | null;
+  contactPersonName: string | null;
+  contactPersonPhone: string | null;
+  parentCustomerId: string | null;
+  sourceId?: string | null;
+  departmentId?: string | null;
   creditLimitMinor: number;
   paymentTermsDays: number;
   currency: string;
   isActive: boolean;
   notes: string | null;
+  source?: { id: string; code: string; nameEn: string; nameAr: string } | null;
+  department?: { id: string; code: string; nameEn: string; nameAr: string } | null;
 }) {
-  return { ...c };
+  const { source, department, ...rest } = c;
+  return {
+    ...rest,
+    crExpiryDate: c.crExpiryDate ? c.crExpiryDate.toISOString() : null,
+    sourceNameEn: source?.nameEn ?? null,
+    sourceNameAr: source?.nameAr ?? null,
+    departmentNameEn: department?.nameEn ?? null,
+    departmentNameAr: department?.nameAr ?? null,
+  };
 }
 
 function toQuotationDto(q: {
@@ -1216,8 +2384,15 @@ function toQuotationDto(q: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   currency: string;
+  paymentMethod: string;
+  paymentMethodCode?: string | null;
+  paymentMethodLabelEn?: string | null;
+  paymentMethodLabelAr?: string | null;
+  salespersonName: string | null;
+  paymentReference: string | null;
   notes: string | null;
   convertedOrderId: string | null;
   customer: { nameEn: string; nameAr: string; code: string };
@@ -1235,8 +2410,15 @@ function toQuotationDto(q: {
     subtotalMinor: q.subtotalMinor,
     discountMinor: q.discountMinor,
     taxMinor: q.taxMinor,
+    roundingMinor: q.roundingMinor,
     totalMinor: q.totalMinor,
     currency: q.currency,
+    paymentMethod: q.paymentMethod,
+    paymentMethodCode: q.paymentMethodCode ?? null,
+    paymentMethodLabelEn: q.paymentMethodLabelEn ?? null,
+    paymentMethodLabelAr: q.paymentMethodLabelAr ?? null,
+    salespersonName: q.salespersonName,
+    paymentReference: q.paymentReference,
     notes: q.notes,
     convertedOrderId: q.convertedOrderId,
     lines: q.lines,
@@ -1252,8 +2434,11 @@ function toSalesOrderDto(o: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   currency: string;
+  paymentMethod: string;
+  salespersonName: string | null;
   notes: string | null;
   customer: { nameEn: string; nameAr: string; code: string };
   lines: Array<Record<string, unknown>>;
@@ -1269,8 +2454,11 @@ function toSalesOrderDto(o: {
     subtotalMinor: o.subtotalMinor,
     discountMinor: o.discountMinor,
     taxMinor: o.taxMinor,
+    roundingMinor: o.roundingMinor,
     totalMinor: o.totalMinor,
     currency: o.currency,
+    paymentMethod: o.paymentMethod,
+    salespersonName: o.salespersonName,
     notes: o.notes,
     lines: o.lines,
   };
@@ -1279,6 +2467,7 @@ function toSalesOrderDto(o: {
 function toInvoiceDto(inv: {
   id: string;
   invoiceNumber: string;
+  branchId: string | null;
   customerId: string;
   orderId: string | null;
   status: string;
@@ -1287,9 +2476,16 @@ function toInvoiceDto(inv: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   amountPaidMinor: number;
   currency: string;
+  paymentMethod: string;
+  paymentMethodCode?: string | null;
+  paymentMethodLabelEn?: string | null;
+  paymentMethodLabelAr?: string | null;
+  salespersonName: string | null;
+  paymentReference: string | null;
   notes: string | null;
   journalEntryId: string | null;
   customer: { nameEn: string; nameAr: string; code: string };
@@ -1298,6 +2494,7 @@ function toInvoiceDto(inv: {
   return {
     id: inv.id,
     invoiceNumber: inv.invoiceNumber,
+    branchId: inv.branchId,
     customerId: inv.customerId,
     customerNameEn: inv.customer.nameEn,
     customerNameAr: inv.customer.nameAr,
@@ -1308,10 +2505,17 @@ function toInvoiceDto(inv: {
     subtotalMinor: inv.subtotalMinor,
     discountMinor: inv.discountMinor,
     taxMinor: inv.taxMinor,
+    roundingMinor: inv.roundingMinor,
     totalMinor: inv.totalMinor,
     amountPaidMinor: inv.amountPaidMinor,
     outstandingMinor: inv.totalMinor - inv.amountPaidMinor,
     currency: inv.currency,
+    paymentMethod: inv.paymentMethod,
+    paymentMethodCode: inv.paymentMethodCode ?? null,
+    paymentMethodLabelEn: inv.paymentMethodLabelEn ?? null,
+    paymentMethodLabelAr: inv.paymentMethodLabelAr ?? null,
+    salespersonName: inv.salespersonName,
+    paymentReference: inv.paymentReference,
     notes: inv.notes,
     journalEntryId: inv.journalEntryId,
     lines: inv.lines,
@@ -1327,8 +2531,10 @@ function toCreditNoteDto(n: {
   issueDate: Date;
   subtotalMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   reason: string | null;
+  refundMethod: string;
   currency: string;
   restockInventory: boolean;
   customer: { nameEn: string; nameAr: string; code: string };
@@ -1345,8 +2551,10 @@ function toCreditNoteDto(n: {
     issueDate: n.issueDate.toISOString(),
     subtotalMinor: n.subtotalMinor,
     taxMinor: n.taxMinor,
+    roundingMinor: n.roundingMinor,
     totalMinor: n.totalMinor,
     reason: n.reason,
+    refundMethod: n.refundMethod,
     currency: n.currency,
     restockInventory: n.restockInventory,
     lines: n.lines,
@@ -1395,10 +2603,14 @@ function toPosSaleDto(s: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   paidMinor: number;
   changeMinor: number;
   paymentMethod: string;
+  paymentMethodCode?: string | null;
+  paymentMethodLabelEn?: string | null;
+  paymentMethodLabelAr?: string | null;
   currency: string;
   createdAt: Date;
   lines: Array<Record<string, unknown>>;
@@ -1410,10 +2622,14 @@ function toPosSaleDto(s: {
     subtotalMinor: s.subtotalMinor,
     discountMinor: s.discountMinor,
     taxMinor: s.taxMinor,
+    roundingMinor: s.roundingMinor,
     totalMinor: s.totalMinor,
     paidMinor: s.paidMinor,
     changeMinor: s.changeMinor,
     paymentMethod: s.paymentMethod,
+    paymentMethodCode: s.paymentMethodCode ?? null,
+    paymentMethodLabelEn: s.paymentMethodLabelEn ?? null,
+    paymentMethodLabelAr: s.paymentMethodLabelAr ?? null,
     currency: s.currency,
     createdAt: s.createdAt.toISOString(),
     lines: s.lines,

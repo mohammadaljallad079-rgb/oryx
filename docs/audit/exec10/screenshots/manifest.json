@@ -1,0 +1,106 @@
+{
+  "app": "http://127.0.0.1:8091",
+  "viewport": {
+    "width": 411,
+    "height": 914
+  },
+  "captured": [
+    {
+      "name": "01-splash",
+      "note": "launch screen, Arabic RTL",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/01-splash.png"
+    },
+    {
+      "name": "02-homepage-ar",
+      "note": "homepage, Arabic RTL",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/02-homepage-ar.png"
+    },
+    {
+      "name": "02-homepage-en",
+      "note": "homepage, English LTR",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/02-homepage-en.png"
+    },
+    {
+      "name": "03-catalog",
+      "note": "parts catalogue, Arabic RTL",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/03-catalog.png"
+    },
+    {
+      "name": "04-services",
+      "note": "service directory, English LTR",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/04-services.png"
+    },
+    {
+      "name": "05-login",
+      "note": "customer sign-in",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/05-login.png"
+    },
+    {
+      "name": "06-after-login",
+      "note": "homepage after a live sign-in",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/06-after-login.png"
+    },
+    {
+      "name": "07-booking-new",
+      "note": "booking wizard",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/07-booking-new.png"
+    },
+    {
+      "name": "08-bookings",
+      "note": "booking history",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/08-bookings.png"
+    },
+    {
+      "name": "08b-booking-detail",
+      "note": "booking detail",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/08b-booking-detail.png"
+    },
+    {
+      "name": "09-merchant-login",
+      "note": "merchant sign-in",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/09-merchant-login.png"
+    },
+    {
+      "name": "10-merchant-dashboard",
+      "note": "provider dashboard",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/10-merchant-dashboard.png"
+    },
+    {
+      "name": "11-merchant-services",
+      "note": "provider services",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/11-merchant-services.png"
+    },
+    {
+      "name": "12-merchant-products",
+      "note": "provider products",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/12-merchant-products.png"
+    },
+    {
+      "name": "13-merchant-orders",
+      "note": "provider bookings/orders",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/13-merchant-orders.png"
+    },
+    {
+      "name": "14-merchant-profile",
+      "note": "provider profile",
+      "title": "ORYX Marketplace",
+      "file": "docs/audit/exec10/screenshots/14-merchant-profile.png"
+    }
+  ],
+  "problems": []
+}

@@ -1,0 +1,5 @@
+-- Preserve legacy diagnostic metadata already stored in production.
+-- The application no longer exposes or writes the module and faultCode fields,
+-- but existing InspectionDiagnosticEntry rows contain values in both columns.
+-- Keep the physical columns in place so historical data is not destroyed.
+-- Prisma's current model intentionally omits these legacy columns.

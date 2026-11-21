@@ -1,5 +1,6 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
-import { isKnownModule } from '@oryx/shared';
+import { DEFAULT_CURRENCY, isKnownModule } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../common/errors';
@@ -49,21 +50,23 @@ export class PlansService {
   }
 
   async createPlan(dto: CreatePlanDto, actor: ActorContext) {
+    const code = (dto.code?.trim() || await nextMasterCode(this.prisma, 'PLN')).toLowerCase();
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     this.assertPlatform(actor);
-    const existing = await this.prisma.plan.findUnique({ where: { code: dto.code } });
-    if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Plan code "${dto.code}" already exists.`);
+    const existing = await this.prisma.plan.findUnique({ where: { code: code } });
+    if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Plan code "${code}" already exists.`);
     this.assertModulesExist(dto.modules);
 
     const plan = await this.prisma.plan.create({
       data: {
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...names,
         descriptionEn: dto.descriptionEn ?? '',
         descriptionAr: dto.descriptionAr ?? '',
         monthlyPrice: dto.monthlyPrice.toFixed(2),
         annualPrice: dto.annualPrice.toFixed(2),
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? DEFAULT_CURRENCY,
         isPublic: dto.isPublic ?? true,
         isActive: dto.isActive ?? true,
         trialDays: dto.trialDays ?? 14,
@@ -334,6 +337,71 @@ export class PlansService {
     });
 
     return { id: updated.id, status: updated.status, licensedModules: updated.licensedModules };
+  }
+
+  /**
+   * Delete a subscription and its event history.
+   *
+   * A live subscription is the tenant's entitlement source, so it must be
+   * cancelled before it can be removed; deleting a cancelled subscription drops
+   * the tenant to zero capacity, which is the intended effect of an
+   * offboarding. The company itself is never touched.
+   */
+  async deleteSubscription(subscriptionId: string, actor: ActorContext) {
+    this.assertPlatform(actor);
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+    });
+    if (!subscription) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Subscription not found.');
+    if (subscription.status !== 'CANCELLED' && subscription.status !== 'EXPIRED') {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'Cancel or expire this subscription before deleting it.',
+      );
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.subscriptionEvent.deleteMany({ where: { subscriptionId } });
+      await tx.subscription.delete({ where: { id: subscriptionId } });
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId: subscription.companyId,
+      action: 'subscription.deleted',
+      targetType: 'SUBSCRIPTION',
+      targetId: subscriptionId,
+      summary: `Deleted subscription for company ${subscription.companyId}`,
+    });
+    return { id: subscriptionId, deleted: true as const };
+  }
+
+  /**
+   * Delete a plan that no tenant has ever subscribed to. The plan's module
+   * mappings cascade away; a plan with subscriptions is retained so history
+   * stays resolvable.
+   */
+  async deletePlan(planId: string, actor: ActorContext) {
+    this.assertPlatform(actor);
+    const plan = await this.prisma.plan.findUnique({
+      where: { id: planId },
+      include: { _count: { select: { subscriptions: true } } },
+    });
+    if (!plan) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Plan not found.');
+    if (plan._count.subscriptions > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This plan has subscriptions and cannot be deleted. Deactivate it instead.',
+      );
+    }
+    await this.prisma.plan.delete({ where: { id: planId } });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId: null,
+      action: 'plan.deleted',
+      targetType: 'PLAN',
+      targetId: planId,
+      summary: `Deleted plan ${plan.code}`,
+    });
+    return { id: planId, deleted: true as const };
   }
 
   private toPlanDto(p: {

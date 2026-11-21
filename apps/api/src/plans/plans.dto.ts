@@ -14,19 +14,20 @@ import {
 } from 'class-validator';
 
 export class CreatePlanDto {
+  @IsOptional()
   @IsString()
   @Matches(/^[a-z0-9][a-z0-9_-]{1,40}$/, { message: 'code must be lowercase letters, digits, dash or underscore' })
-  code!: string;
+  code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(120)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(120)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()

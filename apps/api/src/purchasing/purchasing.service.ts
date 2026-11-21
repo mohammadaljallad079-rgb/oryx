@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { basisPointsOfMinor, lineAmountMinor, sumMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
@@ -49,6 +50,11 @@ export class PurchasingService {
               { code: { contains: query.search, mode: 'insensitive' as const } },
               { nameEn: { contains: query.search, mode: 'insensitive' as const } },
               { nameAr: { contains: query.search } },
+              { phone: { contains: query.search } },
+              { email: { contains: query.search, mode: 'insensitive' as const } },
+              { taxNumber: { contains: query.search } },
+              { contactPerson: { contains: query.search, mode: 'insensitive' as const } },
+              { idNumber: { contains: query.search } },
             ],
           }
         : {}),
@@ -61,23 +67,37 @@ export class PurchasingService {
   }
 
   async createSupplier(dto: CreateSupplierDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'SUP');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.supplier.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Supplier code ${dto.code} already exists.`);
+    // A new supplier inherits the tenant's own market, not a hard-coded one.
+    const [defaultCurrency, defaultCountry] = await Promise.all([
+      this.context.companyCurrency(companyId),
+      this.context.companyCountryCode(companyId),
+    ]);
+    // One name in either language is enough; persist a fallback for existing
+    // consumers whose schema expects both name columns to be populated.
+    const name = dto.nameEn?.trim() || dto.nameAr?.trim();
+    if (!name) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Supplier name is required in Arabic or English.');
+    const dup = await this.prisma.supplier.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Supplier code ${code} already exists.`);
     const supplier = await this.prisma.supplier.create({
       data: {
         companyId,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        kind: dto.kind ?? 'COMPANY',
+        contactPerson: dto.contactPerson?.trim() || null,
+        idNumber: dto.idNumber?.trim() || null,
+        nameEn: dto.nameEn?.trim() || name,
+        nameAr: dto.nameAr?.trim() || name,
         email: dto.email ?? null,
         phone: dto.phone ?? null,
         taxNumber: dto.taxNumber ?? null,
         addressLine: dto.addressLine ?? null,
         city: dto.city ?? null,
-        countryCode: dto.countryCode ?? 'SA',
+        countryCode: dto.countryCode ?? defaultCountry,
         paymentTermsDays: dto.paymentTermsDays ?? 0,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? defaultCurrency,
         notes: dto.notes ?? null,
       },
     });
@@ -96,11 +116,17 @@ export class PurchasingService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const supplier = await this.prisma.supplier.findFirst({ where: { id, companyId } });
     if (!supplier) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Supplier not found.');
+    const nextNameEn = dto.nameEn?.trim() || supplier.nameEn;
+    const nextNameAr = dto.nameAr?.trim() || supplier.nameAr;
+    if (!nextNameEn && !nextNameAr) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Supplier name is required.');
     const updated = await this.prisma.supplier.update({
       where: { id },
       data: {
-        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
-        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
+        ...(dto.contactPerson !== undefined ? { contactPerson: dto.contactPerson.trim() || null } : {}),
+        ...(dto.idNumber !== undefined ? { idNumber: dto.idNumber.trim() || null } : {}),
+        ...(dto.nameEn !== undefined ? { nameEn: nextNameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: nextNameAr } : {}),
         ...(dto.email !== undefined ? { email: dto.email } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
@@ -122,12 +148,69 @@ export class PurchasingService {
     return toSupplierDto(updated);
   }
 
+  /**
+   * Permanently delete a supplier.
+   *
+   * A supplier that appears on a purchase order, receipt, invoice or return is
+   * part of the procurement ledger and must not be erased; the caller is told to
+   * deactivate instead. A supplier with only a set-null link (a payment or an
+   * unconverted requisition) can be removed — those rows survive with a null
+   * supplier.
+   */
+  async deleteSupplier(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const supplier = await this.prisma.supplier.findFirst({ where: { id, companyId } });
+    if (!supplier) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Supplier not found.');
+
+    const [orders, receipts, invoices, returns] = await Promise.all([
+      this.prisma.purchaseOrder.count({ where: { supplierId: id } }),
+      this.prisma.goodsReceipt.count({ where: { supplierId: id } }),
+      this.prisma.supplierInvoice.count({ where: { supplierId: id } }),
+      this.prisma.purchaseReturn.count({ where: { supplierId: id } }),
+    ]);
+    if (orders + receipts + invoices + returns > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This supplier appears on purchase documents and cannot be deleted. Deactivate it instead to keep its history.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.purchaseRequisition.updateMany({ where: { supplierId: id }, data: { supplierId: null } });
+      await tx.payment.updateMany({ where: { supplierId: id }, data: { supplierId: null } });
+      await tx.supplier.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'purchasing.supplier_deleted',
+      targetType: 'SUPPLIER',
+      targetId: id,
+      summary: `Permanently deleted supplier ${supplier.code}`,
+    });
+    return { id, deleted: true };
+  }
+
   // ------------------------------------------------------------ requisitions
 
   async listRequisitions(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.purchaseRequisition.findMany({
-      where: { companyId, ...(query.status ? { status: query.status as never } : {}) },
+      where: {
+        companyId,
+        ...(query.status ? { status: query.status as never } : {}),
+        ...(query.search ? { OR: [
+          { requisitionNumber: { contains: query.search, mode: 'insensitive' as const } },
+          { notes: { contains: query.search, mode: 'insensitive' as const } },
+          { supplier: { is: { OR: [
+            { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+            { nameAr: { contains: query.search } },
+            { code: { contains: query.search, mode: 'insensitive' as const } },
+          ] } } },
+          { lines: { some: { description: { contains: query.search, mode: 'insensitive' as const } } } },
+        ] } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: { lines: true, supplier: { select: { nameEn: true, nameAr: true } } },
@@ -200,6 +283,7 @@ export class PurchasingService {
   /** Convert an approved requisition into a purchase order. */
   async convertRequisition(id: string, supplierId: string, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       const req = await tx.purchaseRequisition.findFirst({ where: { id, companyId }, include: { lines: true } });
       if (!req) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Requisition not found.');
@@ -217,6 +301,13 @@ export class PurchasingService {
         unitCostMinor: l.estimatedUnitCostMinor,
         taxPercentBp: 0,
       }));
+      // Conversion writes purchase-order lines without going through createOrder.
+      // Apply the same product uniqueness rule so later receipt allocations
+      // cannot silently update the first matching line twice.
+      const lineProducts = lineInputs.flatMap((line) => line.productId ? [line.productId] : []);
+      if (new Set(lineProducts).size !== lineProducts.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Combine repeated products before converting the requisition.');
+      }
       const totals = computePurchaseTotals(lineInputs);
       const orderNumber = await this.sequences.next(tx, companyId, 'purchaseOrder');
       const order = await tx.purchaseOrder.create({
@@ -231,7 +322,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: 'SAR',
+          currency: companyCurrency,
           createdById: actor.userId,
           lines: {
             create: lineInputs.map((l, i) => ({
@@ -270,7 +361,20 @@ export class PurchasingService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.status ? { status: query.status as never } : {}) };
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.search ? { OR: [
+        { orderNumber: { contains: query.search, mode: 'insensitive' as const } },
+        { notes: { contains: query.search, mode: 'insensitive' as const } },
+        { supplier: { is: { OR: [
+          { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search } },
+          { code: { contains: query.search, mode: 'insensitive' as const } },
+        ] } } },
+        { lines: { some: { description: { contains: query.search, mode: 'insensitive' as const } } } },
+      ] } : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.purchaseOrder.findMany({
         where,
@@ -290,6 +394,14 @@ export class PurchasingService {
     await this.assertSupplier(companyId, dto.supplierId);
     if (dto.warehouseId) await this.assertWarehouse(companyId, dto.warehouseId);
 
+    // Receipt allocation is keyed by productId. Duplicate product lines on
+    // one PO would make quantityReceived ambiguous and permit over-receipt.
+    const orderProducts = dto.lines.flatMap((line) => line.productId ? [line.productId] : []);
+    if (new Set(orderProducts).size !== orderProducts.length) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Combine repeated products into one purchase-order line.');
+    }
+
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const totals = computePurchaseTotals(dto.lines);
     const order = await this.posting.withTransaction(async (tx) => {
       const orderNumber = await this.sequences.next(tx, companyId, 'purchaseOrder');
@@ -306,7 +418,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           notes: dto.notes ?? null,
           approvedById: dto.approve ? actor.userId : null,
           approvedAt: dto.approve ? new Date() : null,
@@ -363,7 +475,20 @@ export class PurchasingService {
   async listReceipts(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.goodsReceipt.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        ...(query.status ? { status: query.status as never } : {}),
+        ...(query.search ? { OR: [
+          { receiptNumber: { contains: query.search, mode: 'insensitive' as const } },
+          { notes: { contains: query.search, mode: 'insensitive' as const } },
+          { supplier: { is: { OR: [
+            { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+            { nameAr: { contains: query.search } },
+            { code: { contains: query.search, mode: 'insensitive' as const } },
+          ] } } },
+          { lines: { some: { description: { contains: query.search, mode: 'insensitive' as const } } } },
+        ] } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: { lines: true, supplier: { select: { nameEn: true, nameAr: true } } },
@@ -384,6 +509,13 @@ export class PurchasingService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
     const result = await this.posting.withTransaction(async (tx) => {
+      // Serialise receipt allocation per order. Without this lock, concurrent
+      // transactions may both read the same remaining quantity and over-receive.
+      await tx.$queryRawUnsafe(
+        'SELECT id FROM "PurchaseOrder" WHERE id = $1 AND "companyId" = $2 FOR UPDATE',
+        dto.purchaseOrderId,
+        companyId,
+      );
       const order = await tx.purchaseOrder.findFirst({
         where: { id: dto.purchaseOrderId, companyId },
         include: { lines: true },
@@ -400,10 +532,27 @@ export class PurchasingService {
       const receivedAt = new Date(dto.receivedAt);
 
       // Determine received quantities: explicit lines, or the outstanding order.
+      // An explicit line is capped at what the order still owes, so a retried or
+      // duplicated receipt cannot move stock (and accrue AP) twice for the same
+      // ordered quantity.
+      if (dto.lines) {
+        const ids = dto.lines.map((line) => line.productId);
+        if (new Set(ids).size !== ids.length) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A goods receipt cannot repeat the same product in separate lines.');
+        }
+      }
       const receiptLines = dto.lines
         ? dto.lines.map((l) => {
             const orderLine = order.lines.find((ol) => ol.productId === l.productId);
             if (!orderLine) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Received product is not on the order.');
+            const outstanding = orderLine.quantity - orderLine.quantityReceived;
+            if (l.quantity > outstanding) {
+              throw badRequest(
+                ERROR_CODES.OVER_RECEIPT,
+                `Cannot receive ${l.quantity} of ${orderLine.description}: only ${outstanding} remains outstanding on this order.`,
+                { ordered: orderLine.quantity, received: orderLine.quantityReceived, outstanding },
+              );
+            }
             return {
               productId: l.productId,
               description: orderLine.description,
@@ -529,7 +678,22 @@ export class PurchasingService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.status ? { status: query.status as never } : {}) };
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+      ...(query.search ? { OR: [
+        { invoiceNumber: { contains: query.search, mode: 'insensitive' as const } },
+        { supplierInvoiceNumber: { contains: query.search, mode: 'insensitive' as const } },
+        { notes: { contains: query.search, mode: 'insensitive' as const } },
+        { supplier: { is: { OR: [
+          { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search } },
+          { code: { contains: query.search, mode: 'insensitive' as const } },
+        ] } } },
+        { lines: { some: { description: { contains: query.search, mode: 'insensitive' as const } } } },
+      ] } : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.supplierInvoice.findMany({
         where,
@@ -555,18 +719,106 @@ export class PurchasingService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     await this.assertSupplier(companyId, dto.supplierId);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
+      // Serialise invoices for this supplier before checking the external invoice
+      // number. A browser retry or simultaneous requests must not accrue AP
+      // and VAT twice for the same supplier document.
+      await tx.$queryRawUnsafe(
+        'SELECT id FROM "Supplier" WHERE id = $1 AND "companyId" = $2 FOR UPDATE',
+        dto.supplierId,
+        companyId,
+      );
+      const externalNumber = dto.supplierInvoiceNumber?.trim();
+      if (externalNumber) {
+        const existing = await tx.supplierInvoice.findFirst({
+          where: { companyId, supplierId: dto.supplierId, supplierInvoiceNumber: externalNumber },
+          select: { id: true },
+        });
+        if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This supplier invoice number was already recorded for this supplier.');
+      }
+      // A direct invoice may receive physical goods only into an explicitly
+      // selected warehouse. Linked invoices never receive goods a second time.
+      if (!dto.purchaseOrderId && dto.post !== false && dto.lines.some((line) => line.productId)) {
+        if (!dto.warehouseId) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Choose a warehouse to receive stock for a direct supplier invoice.');
+        }
+        await this.assertWarehouse(companyId, dto.warehouseId);
+      }
       const totals = computePurchaseTotals(dto.lines);
       const invoiceDate = new Date(dto.invoiceDate);
       const invoiceNumber = await this.sequences.next(tx, companyId, 'supplierInvoice');
 
-      // Already received against the PO? Then only VAT remains to accrue.
+      // Value already accrued at actual goods receipt costs; invoice/receipt
+      // price differences must go to purchase price variance, not inventory.
       let alreadyAccrued = 0;
       if (dto.purchaseOrderId) {
         const order = await tx.purchaseOrder.findFirst({ where: { id: dto.purchaseOrderId, companyId } });
         if (!order) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase order not found.');
-        const receipts = await tx.goodsReceipt.findMany({ where: { purchaseOrderId: order.id, status: 'POSTED' } });
-        if (receipts.length > 0) alreadyAccrued = totals.subtotalMinor;
+        if (order.supplierId !== dto.supplierId) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Supplier invoice supplier must match the purchase order.');
+        }
+        // Match invoice lines against quantities actually received, subtracting
+        // earlier posted invoices. A partial receipt cannot justify an invoice
+        // for the entire order, and successive invoices cannot bill one receipt
+        // allocation twice. Standalone invoices remain available without a PO.
+        const receipts = await tx.goodsReceipt.findMany({
+          where: { purchaseOrderId: order.id, status: 'POSTED' },
+          include: { lines: true },
+        });
+        const priorInvoices = await tx.supplierInvoice.findMany({
+          where: { purchaseOrderId: order.id, companyId, status: 'POSTED' },
+          include: { lines: true },
+        });
+        const receivedByProduct = new Map<string, number>();
+        for (const receipt of receipts) {
+          for (const line of receipt.lines) {
+            receivedByProduct.set(line.productId, (receivedByProduct.get(line.productId) ?? 0) + line.quantity);
+          }
+        }
+        const billedByProduct = new Map<string, number>();
+        for (const previous of priorInvoices) {
+          for (const line of previous.lines) {
+            if (!line.productId) continue;
+            billedByProduct.set(line.productId, (billedByProduct.get(line.productId) ?? 0) + line.quantity);
+          }
+        }
+        const requestedByProduct = new Map<string, number>();
+        for (const line of dto.lines) {
+          if (!line.productId) continue;
+          requestedByProduct.set(line.productId, (requestedByProduct.get(line.productId) ?? 0) + line.quantity);
+        }
+        for (const [productId, requested] of requestedByProduct) {
+          const available = (receivedByProduct.get(productId) ?? 0) - (billedByProduct.get(productId) ?? 0);
+          if (requested > available) {
+            throw badRequest(
+              ERROR_CODES.OVER_RECEIPT,
+              'Supplier invoice quantity exceeds received and not-yet-invoiced stock.',
+              { productId, requested, available: Math.max(0, available) },
+            );
+          }
+        }
+        // Assign each invoice quantity to the oldest unbilled receipt lines.
+        // The goods receipt accrued AP at its own unit cost, which may differ
+        // from the supplier's later invoice price. Do not revalue physical stock.
+        for (const [productId, quantity] of requestedByProduct) {
+          let skipPrior = billedByProduct.get(productId) ?? 0;
+          let unbilled = quantity;
+          const receiptLines = receipts
+            .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime())
+            .flatMap((receipt) => receipt.lines.filter((line) => line.productId === productId));
+          for (const line of receiptLines) {
+            const skipped = Math.min(skipPrior, line.quantity);
+            skipPrior -= skipped;
+            const available = line.quantity - skipped;
+            const matched = Math.min(unbilled, available);
+            if (matched > 0) {
+              alreadyAccrued += lineAmountMinor(matched, line.unitCostMinor);
+              unbilled -= matched;
+            }
+            if (unbilled === 0) break;
+          }
+        }
       }
 
       const supplier = await tx.supplier.findFirst({ where: { id: dto.supplierId, companyId } });
@@ -579,7 +831,7 @@ export class PurchasingService {
           companyId,
           branchId: dto.branchId ?? null,
           invoiceNumber,
-          supplierInvoiceNumber: dto.supplierInvoiceNumber,
+          supplierInvoiceNumber: externalNumber || `AUTO-${invoiceNumber}`,
           supplierId: dto.supplierId,
           purchaseOrderId: dto.purchaseOrderId ?? null,
           status: 'DRAFT',
@@ -588,7 +840,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: {
@@ -608,37 +860,76 @@ export class PurchasingService {
         include: { supplier: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
       });
 
+      if (dto.post !== false && !dto.purchaseOrderId && dto.warehouseId) {
+        // An unlinked direct invoice is both the receiving document and the AP
+        // invoice. Record stock movements exactly once inside the same transaction.
+        for (const line of dto.lines) {
+          if (!line.productId) continue;
+          await this.inventory.recordMovement(tx, {
+            companyId,
+            branchId: invoice.branchId,
+            warehouseId: dto.warehouseId,
+            productId: line.productId,
+            movementType: 'RECEIPT',
+            source: 'SUPPLIER_INVOICE',
+            sourceId: invoice.id,
+            quantity: line.quantity,
+            unitCostMinor: line.unitCostMinor,
+            occurredAt: invoiceDate,
+            actorUserId: actor.userId,
+          });
+        }
+      }
+
       if (dto.post !== false) {
         const apAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AP_CONTROL);
         const inventoryAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.INVENTORY);
         const vatInput = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.VAT_INPUT);
-        const expenseAccount = inventoryAccount;
-        // Only the part not already accrued by a goods receipt increases the
-        // payable; the VAT is always accrued by the invoice.
-        const netToAccrue = totals.subtotalMinor - alreadyAccrued;
+        // Non-stock invoice lines follow the existing expense/inventory
+        // accrual policy. For received products, separate the price difference
+        // from inventory so the stock ledger continues to match its valuation.
+        const serviceAccrual = sumMinor(dto.lines
+          .filter((line) => !line.productId)
+          .map((line) => lineAmountMinor(line.quantity, line.unitCostMinor)));
+        const receivedProductInvoiced = totals.subtotalMinor - serviceAccrual;
+        const priceVariance = dto.purchaseOrderId ? receivedProductInvoiced - alreadyAccrued : 0;
+        const netToAccrue = dto.purchaseOrderId ? serviceAccrual + priceVariance : totals.subtotalMinor;
         const apIncrease = netToAccrue + totals.taxMinor;
-
-        const journalLines: PostingLine[] = [{ accountId: apAccount, credit: apIncrease }];
-        if (netToAccrue !== 0) {
-          journalLines.push({ accountId: expenseAccount, debit: netToAccrue });
+        const journalLines: PostingLine[] = [];
+        if (apIncrease > 0) journalLines.push({ accountId: apAccount, credit: apIncrease });
+        if (apIncrease < 0) journalLines.push({ accountId: apAccount, debit: -apIncrease });
+        const inventoryAccrual = dto.purchaseOrderId ? serviceAccrual : totals.subtotalMinor;
+        if (inventoryAccrual > 0) journalLines.push({ accountId: inventoryAccount, debit: inventoryAccrual });
+        if (priceVariance !== 0) {
+          const varianceAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.PURCHASE_PRICE_VARIANCE);
+          journalLines.push(priceVariance > 0
+            ? { accountId: varianceAccount, debit: priceVariance }
+            : { accountId: varianceAccount, credit: -priceVariance });
         }
-        if (totals.taxMinor > 0) {
-          journalLines.push({ accountId: vatInput, debit: totals.taxMinor });
+        if (totals.taxMinor > 0) journalLines.push({ accountId: vatInput, debit: totals.taxMinor });
+        // A fully accrued receipt with no VAT needs no second journal. Mark
+        // the invoice posted rather than trying to create a zero-value entry.
+        if (apIncrease === 0 && netToAccrue === 0 && totals.taxMinor === 0) {
+          await tx.supplierInvoice.update({
+            where: { id: invoice.id },
+            data: { status: 'POSTED', postedAt: new Date() },
+          });
+        } else {
+          const journal = await this.posting.postJournal(tx, {
+            companyId,
+            branchId: invoice.branchId,
+            entryDate: invoiceDate,
+            memo: `Supplier invoice ${invoiceNumber}`,
+            sourceType: 'SUPPLIER_INVOICE',
+            sourceId: invoice.id,
+            actorUserId: actor.userId,
+            lines: journalLines,
+          });
+          await tx.supplierInvoice.update({
+            where: { id: invoice.id },
+            data: { status: 'POSTED', journalEntryId: journal.id, postedAt: new Date() },
+          });
         }
-        const journal = await this.posting.postJournal(tx, {
-          companyId,
-          branchId: invoice.branchId,
-          entryDate: invoiceDate,
-          memo: `Supplier invoice ${invoiceNumber}`,
-          sourceType: 'SUPPLIER_INVOICE',
-          sourceId: invoice.id,
-          actorUserId: actor.userId,
-          lines: journalLines,
-        });
-        await tx.supplierInvoice.update({
-          where: { id: invoice.id },
-          data: { status: 'POSTED', journalEntryId: journal.id, postedAt: new Date() },
-        });
       }
 
       const fresh = await tx.supplierInvoice.findUniqueOrThrow({
@@ -664,7 +955,20 @@ export class PurchasingService {
   async listReturns(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.purchaseReturn.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        ...(query.status ? { status: query.status as never } : {}),
+        ...(query.search ? { OR: [
+          { returnNumber: { contains: query.search, mode: 'insensitive' as const } },
+          { reason: { contains: query.search, mode: 'insensitive' as const } },
+          { supplier: { is: { OR: [
+            { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+            { nameAr: { contains: query.search } },
+            { code: { contains: query.search, mode: 'insensitive' as const } },
+          ] } } },
+          { lines: { some: { description: { contains: query.search, mode: 'insensitive' as const } } } },
+        ] } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: { lines: true, supplier: { select: { nameEn: true, nameAr: true } } },
@@ -678,8 +982,19 @@ export class PurchasingService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     await this.assertSupplier(companyId, dto.supplierId);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       await this.assertWarehouseTx(tx, companyId, dto.warehouseId);
+      if (dto.purchaseOrderId) {
+        const order = await tx.purchaseOrder.findFirst({
+          where: { id: dto.purchaseOrderId, companyId },
+          select: { supplierId: true },
+        });
+        if (!order) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase order not found.');
+        if (order.supplierId !== dto.supplierId) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Purchase return supplier must match the purchase order.');
+        }
+      }
       const totals = computePurchaseTotals(dto.lines);
       const returnDate = new Date(dto.returnDate);
       const returnNumber = await this.sequences.next(tx, companyId, 'purchaseReturn');
@@ -698,7 +1013,7 @@ export class PurchasingService {
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           createdById: actor.userId,
           postedAt: new Date(),
           lines: {
@@ -749,10 +1064,15 @@ export class PurchasingService {
       const variance = totals.totalMinor - returnedValue - totals.taxMinor;
       if (variance !== 0) {
         const varianceAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.PURCHASE_PRICE_VARIANCE);
+        // The debit is the payable at the invoiced value; the credits are the
+        // stock at moving-average cost and the input VAT. When the invoice
+        // exceeds the carrying value the credit side is short, so the variance
+        // must be credited to balance; the opposite holds when the stock is
+        // worth more than it was invoiced for.
         journalLines.push(
           variance > 0
-            ? { accountId: varianceAccount, debit: variance }
-            : { accountId: varianceAccount, credit: -variance },
+            ? { accountId: varianceAccount, credit: variance }
+            : { accountId: varianceAccount, debit: -variance },
         );
       }
       const journal = await this.posting.postJournal(tx, {
@@ -850,6 +1170,9 @@ function addDays(date: Date, days: number): Date {
 }
 
 function toSupplierDto(s: {
+  kind: string;
+  contactPerson: string | null;
+  idNumber: string | null;
   id: string;
   code: string;
   nameEn: string;
@@ -865,7 +1188,7 @@ function toSupplierDto(s: {
   isActive: boolean;
   notes: string | null;
 }) {
-  return { ...s };
+  return { ...s, kind: s.kind === 'INDIVIDUAL' ? 'INDIVIDUAL' as const : 'COMPANY' as const };
 }
 
 function toRequisitionDto(r: {

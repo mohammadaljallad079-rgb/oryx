@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { MODULE_KEYS } from '@oryx/shared';
 import { PrismaService } from './prisma.service';
 
 export interface CompanyEntitlements {
@@ -17,8 +18,15 @@ export interface CompanyEntitlements {
   };
   /** True when the subscription currently grants access (ACTIVE or TRIAL). */
   isActive: boolean;
+  /**
+   * True for an ORYX internal company (company type `INTERNAL`), which is
+   * governed by the group rather than sold as a subscription. Such a company is
+   * never plan-gated or limit-gated.
+   */
+  isInternal: boolean;
 }
 
+/** A company with no active subscription has zero capacity. */
 const NO_LIMITS = {
   maxCompanies: 0,
   maxBranches: 0,
@@ -27,17 +35,60 @@ const NO_LIMITS = {
   apiRequestsPerMonth: 0,
 };
 
+/** `-1` is the platform's explicit "unlimited" for every plan limit. */
+const UNLIMITED_LIMITS = {
+  maxCompanies: -1,
+  maxBranches: -1,
+  maxUsers: -1,
+  storageMb: -1,
+  apiRequestsPerMonth: -1,
+};
+
 /**
- * Resolves the effective entitlement set for a company from its subscription.
+ * Resolves the effective entitlement set for a company.
  *
  * This is the single authority for "which modules is this company allowed to
  * use". Guards, navigation and CRUD all read from here so they cannot diverge.
+ *
+ * ORYX runs two distinct company models and they must never be conflated:
+ *
+ *  - **TYPE 1 — ORYX internal company** (`Company.type = INTERNAL`): owned by
+ *    the ORYX group and governed by the Platform Super Admin. It is not a
+ *    customer, so it is never subscription-limited: every catalogued module is
+ *    available and no plan limit applies. Seeding a plan against an internal
+ *    company (as the seed once did) must not narrow it.
+ *  - **TYPE 2 — SaaS tenant** (`Company.type = SAAS_TENANT`): a paying customer
+ *    whose entitlements are exactly its subscription snapshot.
+ *
+ * Deciding this in one place is what keeps the guards, the module catalogue and
+ * the admin navigation in agreement; a per-call-site exception would drift.
  */
 @Injectable()
 export class EntitlementService {
   constructor(private readonly prisma: PrismaService) {}
 
   async forCompany(companyId: string): Promise<CompanyEntitlements> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { type: true, status: true },
+    });
+
+    if (company?.type === 'INTERNAL') {
+      return {
+        companyId,
+        planId: null,
+        planCode: null,
+        subscriptionId: null,
+        status: 'INTERNAL',
+        licensedModules: [...MODULE_KEYS],
+        limits: { ...UNLIMITED_LIMITS },
+        // Suspension and archival remain real governance actions even for an
+        // internal company; only subscription gating is bypassed.
+        isActive: company.status === 'ACTIVE',
+        isInternal: true,
+      };
+    }
+
     const subscription = await this.prisma.subscription.findFirst({
       where: { companyId },
       orderBy: { createdAt: 'desc' },
@@ -54,6 +105,7 @@ export class EntitlementService {
         licensedModules: [],
         limits: { ...NO_LIMITS },
         isActive: false,
+        isInternal: false,
       };
     }
 
@@ -77,6 +129,7 @@ export class EntitlementService {
         apiRequestsPerMonth: subscription.plan.apiRequestsPerMonth,
       },
       isActive,
+      isInternal: false,
     };
   }
 

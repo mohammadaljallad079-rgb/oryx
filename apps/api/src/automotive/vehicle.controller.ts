@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
   RequireAnyPermission,
@@ -13,14 +14,17 @@ import {
   CreateChecklistItemDto,
   CreateInspectionBookingDto,
   CreateInspectionServiceDto,
+  ReplaceInspectionServicesDto,
   CreateVehicleDto,
   DecideReportDto,
   InvoiceInspectionDto,
   ListQueryDto,
+  OcrExtractDto,
   RecordFindingsDto,
   RecordMileageDto,
   SubmitReportDto,
   UpdateInspectionBookingDto,
+  UpdateInspectionServiceDto,
   UpdateVehicleDto,
   VehicleDocumentDto,
 } from './automotive.dto';
@@ -77,6 +81,14 @@ export class VehicleController {
     return this.vehicles.recordMileage(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('vehicles/:id')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.vehicle.manage')
+  @ApiOperation({ summary: 'Delete a vehicle that carries no inspection, job card, warranty or booking' })
+  deleteVehicle(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.vehicles.deleteVehicle(id, p, actorFrom(p, req));
+  }
+
   @Get('vehicles/:id/documents')
   @RequireModule('automotive_inspections')
   @RequireAnyPermission('erp.vehicle.read', 'erp.vehicle.manage')
@@ -88,9 +100,52 @@ export class VehicleController {
   @Post('vehicles/:id/documents')
   @RequireModule('automotive_inspections')
   @RequirePermissions('erp.vehicle.manage')
-  @ApiOperation({ summary: 'Add a vehicle document' })
-  addDocument(@Param('id') id: string, @Body() dto: VehicleDocumentDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
-    return this.vehicles.addVehicleDocument(id, dto, p, actorFrom(p, req));
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Add a vehicle document, optionally with a scanned image' })
+  addDocument(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: VehicleDocumentDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.vehicles.addVehicleDocument(id, dto, p, actorFrom(p, req), file);
+  }
+
+  @Delete('vehicles/:id/documents/:documentId')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.vehicle.manage')
+  @ApiOperation({ summary: 'Remove a vehicle document' })
+  removeDocument(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.vehicles.removeVehicleDocument(id, documentId, p, actorFrom(p, req));
+  }
+
+  /**
+   * Read a registration card or insurance scan and return suggested fields.
+   *
+   * Stateless: nothing is persisted. The operator reviews the suggestion in the
+   * form and saves through the ordinary document endpoint, which is the only
+   * path that writes a document.
+   */
+  @Post('vehicles/:id/documents/ocr')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.vehicle.manage')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'OCR-assisted extraction from a registration-card scan (suggestions only)' })
+  extractDocument(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: OcrExtractDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+  ) {
+    return this.vehicles.extractVehicleDocument(id, dto, p, file);
   }
 
   // ------------------------------------------------------------- inspections
@@ -102,12 +157,61 @@ export class VehicleController {
     return this.vehicles.listInspectionServices(query, p);
   }
 
+  @Post('inspection-services/replace-approved')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.service.manage')
+  @ApiOperation({ summary: 'Replace old inspection services with seven approved priced inspection categories' })
+  replaceApprovedServices(
+    @Body() dto: ReplaceInspectionServicesDto,
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.vehicles.replaceInspectionServices(dto, principal, actorFrom(principal, req));
+  }
+
   @Post('inspection-services')
   @RequireModule('automotive_inspections')
   @RequirePermissions('erp.inspection.service.manage')
   @ApiOperation({ summary: 'Create an inspection service' })
   createService(@Body() dto: CreateInspectionServiceDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.vehicles.createInspectionService(dto, p, actorFrom(p, req));
+  }
+
+  @Delete('inspection-services/:id')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.service.manage')
+  @ApiOperation({ summary: 'Delete an inspection service that has no bookings' })
+  deleteService(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.vehicles.deleteInspectionService(id, p, actorFrom(p, req));
+  }
+
+  @Patch('inspection-services/:id')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.service.manage')
+  @ApiOperation({ summary: 'Edit an inspection service, its price, VAT or picture' })
+  updateService(@Param('id') id: string, @Body() dto: UpdateInspectionServiceDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.vehicles.updateInspectionService(id, dto, p, actorFrom(p, req));
+  }
+
+  /**
+   * Uploads the service picture. The image is re-encoded and stored in the
+   * shared media library; the returned asset id is written onto the service
+   * with a follow-up `PATCH`, so the same upload path serves a service picture
+   * and every other catalogue image.
+   */
+  @Post('inspection-services/:id/image')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.service.manage')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload a picture for an inspection service' })
+  uploadServiceImage(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.vehicles.uploadInspectionServiceImage(id, file, p, actorFrom(p, req));
   }
 
   @Post('inspection-checklist-items')
@@ -140,6 +244,14 @@ export class VehicleController {
   @ApiOperation({ summary: 'Update an inspection booking' })
   updateBooking(@Param('id') id: string, @Body() dto: UpdateInspectionBookingDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.vehicles.updateInspectionBooking(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('inspection-bookings/:id')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.booking.manage')
+  @ApiOperation({ summary: 'Delete an inspection booking that produced nothing' })
+  deleteBooking(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.vehicles.deleteInspectionBooking(id, p, actorFrom(p, req));
   }
 
   @Post('inspection-bookings/:id/findings')

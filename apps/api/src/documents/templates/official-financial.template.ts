@@ -1,0 +1,711 @@
+import { docStamp, esc, escMultiline, money, moneyPlain, quantity, countryName } from './html.util';
+import { lineAmountMinor } from '@oryx/shared';
+import { oryxLogoMark } from './oryx-logo.asset';
+import { CHROME_CSS, watermarkSizePt } from './chrome';
+import { DOCUMENT_LATIN_STACK } from '../pdf/document-fonts.service';
+import { amountInWords } from '../../print/print-format';
+import type {
+  DocumentIssuer,
+  DocumentVerification,
+  FinancialDocumentPayload,
+} from '../document-payload';
+
+/**
+ * The official ORYX invoice / quotation layout.
+ *
+ * Reproduces the approved printed document (`oryx 22.pdf`, page 1 invoice and
+ * page 2 quotation) rather than the generic ERP report shape: a white identity
+ * band carrying the official logo and the tagline, a centred bilingual title, a
+ * navy TRN strip, a two-column document/customer panel, a five-column priced
+ * table, a right-aligned totals block, a thank-you line, a signature strip and a
+ * contact footer.
+ *
+ * Geometry and colour were measured from the source PDF (595.5 x 842.25pt A4):
+ * logo band y 15-49, title y 79-94, TRN strip y 108-125, info panel y 113-226,
+ * table header y 233-263, totals y 377-436. The numbers in `OFFICIAL_FINANCIAL_CSS`
+ * are those measurements converted to points.
+ *
+ * Every value is data-driven: the tax rate, the totals rows, the payment method
+ * and the salesperson come from the payload built from the saved record, so no
+ * tenant's tax rate or currency is hard-coded here.
+ */
+
+export interface OfficialFinancialRenderInput {
+  issuer: DocumentIssuer;
+  payload: FinancialDocumentPayload;
+  documentNumber: string;
+  issuedAt: Date;
+  verification: DocumentVerification | null;
+  baseCss: string;
+}
+
+/**
+ * The name and the note a priced row prints.
+ *
+ * Newer payloads carry the note as its own `subDescription`. A document issued
+ * before that field existed stores the note after a newline in `description`, so
+ * it is split here as well — a reprinted old invoice then reads exactly as the
+ * approved form, with the name on the first line and the note beneath it.
+ */
+function lineParts(line: { description: string; subDescription?: string | null }): {
+  name: string;
+  note: string | null;
+} {
+  if (line.subDescription) return { name: line.description, note: line.subDescription };
+  const [name, ...rest] = (line.description ?? '').split('\n');
+  const note = rest.join(' ').trim();
+  return { name: (name ?? '').trim() || line.description, note: note || null };
+}
+
+/** Which label the document's own number line carries. */
+function numberLabel(titleEn: string): string {
+  const t = titleEn.toLowerCase();
+  if (t.includes('quotation')) return 'QUOTATION';
+  if (t.includes('order')) return 'ORDER';
+  if (t.includes('credit') || t.includes('return')) return 'CREDIT NOTE';
+  if (t.includes('receipt')) return 'RECEIPT';
+  if (t.includes('voucher')) return 'VOUCHER';
+  if (t.includes('statement')) return 'STATEMENT';
+  if (t.includes('journal')) return 'JOURNAL';
+  return 'INVOICE';
+}
+
+/**
+ * The settlement reference the printed quotation carries.
+ *
+ * The reference quotation shows "Payment at Account" above a bank reference
+ * ("NBB0155NH15454475") where the invoice shows a plain method. It is a stored
+ * value on the document, so a reprint shows the same reference.
+ */
+function paymentReference(payload: FinancialDocumentPayload): string | null {
+  return payload.paymentReference ?? null;
+}
+
+/** The settlement-method label, printed as the reference's "Payment" line. */
+function paymentLabel(payload: FinancialDocumentPayload): string | null {
+  // The reference quotation prints "Payment at Account" with the bank reference
+  // beneath it, rather than naming the method. Reproduce that wording whenever a
+  // reference is stored, so the document reads exactly as the approved one does.
+  if (paymentReference(payload)) return 'Payment at Account';
+  if (payload.paymentMethodDisplay) return payload.paymentMethodDisplay;
+  const raw = payload.paymentMethod ?? payload.payment?.method ?? null;
+  if (!raw) return null;
+  const map: Record<string, string> = {
+    CASH: 'Cash',
+    CARD: 'Card',
+    BANK_TRANSFER: 'Bank Transfer',
+    CHEQUE: 'Cheque',
+    WALLET: 'Benefit Pay',
+    OTHER: 'Other',
+    CREDIT: 'Credit / Pay later',
+  };
+  return map[raw] ?? raw;
+}
+
+/**
+ * The label printed above the settlement value.
+ *
+ * The reference invoice labels the row "Payment" and names the method; the
+ * reference quotation labels it "Payment at Account" and prints the bank
+ * reference beneath. Both read exactly as the approved documents do.
+ */
+function paymentFieldLabel(payload: FinancialDocumentPayload): string {
+  return paymentReference(payload) ? 'Payment at Account' : 'Payment';
+}
+
+/**
+ * The bilingual document title exactly as the approved reference prints it.
+ *
+ * The reference names the page "فاتورة / INVOICE" and "تسعيرة / QUOTATION" — the
+ * short words, not the ERP's longer catalogue labels ("Tax Invoice"). The
+ * printed document is the artifact the owner signed off, so its words win over
+ * the menu label; the catalogue label stays for the register and the pickers.
+ */
+function documentTitle(payload: FinancialDocumentPayload): { ar: string; en: string } {
+  const t = payload.titleEn.toLowerCase();
+  if (t.includes('quotation')) return { ar: 'عرض سعر', en: 'QUOTATION' };
+  if (t.includes('credit') || t.includes('return')) return { ar: 'إشعار دائن', en: 'CREDIT NOTE' };
+  if (t.includes('pos')) return { ar: 'إيصال نقطة بيع', en: 'POS RECEIPT' };
+  if (t.includes('receipt')) return { ar: 'سند قبض', en: 'RECEIPT' };
+  if (t.includes('voucher')) return { ar: 'سند صرف', en: 'VOUCHER' };
+  if (t.includes('statement')) return { ar: 'كشف حساب', en: 'STATEMENT' };
+  if (t.includes('journal')) return { ar: 'قيد محاسبي', en: 'JOURNAL ENTRY' };
+  if (t.includes('order')) return { ar: 'طلب', en: 'ORDER' };
+  return { ar: 'فاتورة', en: 'INVOICE' };
+}
+
+/** "VAT 10%" from a line's basis-point rate, or an em dash when untaxed. */
+function taxLabel(bp: number | null | undefined): string {
+  if (!bp) return '—';
+  const percent = bp / 100;
+  const text = Number.isInteger(percent) ? String(percent) : percent.toFixed(2).replace(/\.?0+$/, '');
+  return `VAT ${text}%`;
+}
+
+/** The document's own effective tax rate, taken from the payload or the lines. */
+function documentTaxRate(payload: FinancialDocumentPayload): number {
+  if (payload.taxRateBp) return payload.taxRateBp;
+  return payload.lines.find((l) => (l.taxPercentBp ?? 0) > 0)?.taxPercentBp ?? 0;
+}
+
+/**
+ * The faint "AUTO SERVICES" wordmark the approved sheet lays behind the priced
+ * body, exactly as the reference prints it.
+ *
+ * The reference sets the identity wordmark in the brand display face (Codec Pro
+ * Bold) at 51.75pt with a 6.72pt tracking, centred on the sheet (measured
+ * x 57.5-533.6, y 374.4-426.1 of a 595x842pt page) at ~9.7% opacity, in the
+ * identity navy. It repeats on every sheet, so the layer is position:fixed — an
+ * absolutely positioned mark would paint on page one only and leave continuation
+ * pages blank.
+ */
+export function watermark(issuer: DocumentIssuer): string {
+  if (issuer.documentWatermarkEnabled === false) return '';
+  const size = watermarkSizePt(issuer);
+  const mark = issuer.logoDataUri
+    ? `<img src="${esc(issuer.logoDataUri)}" alt="" aria-hidden="true" style="width:${size}pt;max-height:${size}pt;object-fit:contain">`
+    : oryxLogoMark(`${size}pt`, 'of-watermark-vector');
+  return `<div class="of-watermark" aria-hidden="true" style="opacity:${Math.max(0.02, Math.min(0.3, issuer.documentWatermarkOpacity ?? 0.10))}">${mark}</div>`;
+}
+
+/**
+ * The identity band: the official logo on the leading edge and the tagline on
+ * the trailing edge, measured from the approved reference (logo lockup at
+ * x 16.5-154, y 16.3-49.5; tagline right-aligned at the same height).
+ *
+ * The tagline is fixed English/Arabic marketing copy that is part of the
+ * approved identity, not tenant data, so it is written here rather than read
+ * from a settings row.
+ */
+export function identityBand(issuer: DocumentIssuer): string {
+  const logo = issuer.logoDataUri
+    ? `<img class="of-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
+    : `<div class="of-lockup">
+         ${oryxLogoMark('31.3pt', 'of-logo-mark')}
+         <div class="of-wordmark">
+           <div class="of-wordmark-ar">اوريكس</div>
+           <div class="of-wordmark-ar">لخـدمات</div>
+           <div class="of-wordmark-ar">السيارات</div>
+           <div class="of-wordmark-en">AUTO SERVICES</div>
+         </div>
+       </div>`;
+  return `
+  <div class="of-band">
+    <div class="of-band-lead">${logo}</div>
+    <div class="of-band-trail">
+      <div class="of-tag-ar" lang="ar" dir="rtl">خبراء فحص المركبات</div>
+      <div class="of-tag-en" lang="en" dir="ltr">VEHICLE INSPECTION EXPERTS</div>
+    </div>
+    <div class="of-badge" aria-hidden="true">
+      <!-- Exact filled vector contours from the approved oryx 22.pdf, page 1:
+           glyph paths 9 and 10, translated by (-556pt,-28pt). -->
+      <svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">
+        <g fill="#0a4175">
+          <path d="M12.48,12.16 C13.53,10.02 14.74,8.06 16.30,6.35 C17.49,5.05 18.85,3.99 20.48,3.29 C21.59,2.81 22.80,2.64 23.67,2.82 C23.66,2.84 23.66,2.87 23.65,2.88 C21.52,3.74 19.92,5.26 18.61,7.08 C17.62,8.46 16.74,9.92 15.83,11.36 C14.52,13.41 13.55,15.63 12.60,17.86 C12.58,17.91 12.56,17.95 12.52,18.01 C11.99,17.21 11.48,16.42 10.95,15.64 C10.08,14.35 9.19,13.06 8.32,11.77 C7.80,10.99 7.28,10.22 6.79,9.43 C6.64,9.19 6.53,8.89 6.51,8.61 C6.49,8.33 6.54,7.99 6.68,7.75 C7.01,7.20 7.57,6.90 8.17,6.72 C8.53,6.61 8.86,6.78 9.07,7.06 C9.70,7.84 10.33,8.62 10.89,9.44 C11.38,10.14 11.78,10.89 12.21,11.62 C12.30,11.78 12.38,11.95 12.48,12.16 Z"/>
+          <path d="M21.70,6.62 L19.98,8.34 C20.48,9.44 20.75,10.66 20.75,11.94 C20.75,16.78 16.84,20.69 12.00,20.69 C7.17,20.69 3.25,16.78 3.25,11.94 C3.25,7.11 7.17,3.19 12.00,3.19 C13.21,3.19 14.36,3.44 15.41,3.88 L17.14,2.14 C15.61,1.34 13.86,0.88 12.00,0.88 C5.89,0.88 0.94,5.83 0.94,11.94 C0.94,18.05 5.89,23.00 12.00,23.00 C18.11,23.00 23.06,18.05 23.06,11.94 C23.06,10.01 22.57,8.20 21.70,6.62 Z"/>
+        </g>
+      </svg>
+    </div>
+  </div>`;
+}
+
+/**
+ * The navy strip carrying the issuer's TRN.
+ *
+ * The reference prints it as a full-width navy band (x 26.5-571, y 108.4-125.3)
+ * with the number right-aligned in white, sitting directly above the
+ * document/customer panel.
+ */
+export function trnStrip(issuer: DocumentIssuer): string {
+  // Keep the navy identity strip on every official financial document.
+  // The TRN value itself is optional and is supplied only by Settings → General.
+  const trn = issuer.taxNumber
+    ? `TRN: <span class="num">${esc(issuer.taxNumber)}</span>`
+    : '';
+  return `
+  <div class="of-trn">${trn}</div>`;
+}
+
+/**
+ * The verification block for the official layout: a compact, ruled strip that
+ * carries the QR code, the plain-language instruction and the token.
+ *
+ * The approved reference predates QR verification and so carries none; the
+ * requirement is that a verifiable document shows its code without disturbing
+ * the approved sheet. The strip is therefore rendered only when the document is
+ * verifiable (every type except the internal journal entry) and only when the
+ * caller supplied a verification block, and it sits between the notes and the
+ * pinned signature strip where the reference leaves its whitespace. A document
+ * that is not verifiable prints nothing here, so no code is invented for it.
+ */
+export function verificationStrip(verification: DocumentVerification | null): string {
+  if (!verification) return '';
+  return `
+  <div class="of-verify avoid-break">
+    <div class="of-verify-qr">
+      <img src="${esc(verification.qrDataUri)}" alt="QR verification code">
+    </div>
+    <div class="of-verify-text">
+      <div class="of-verify-title">التحقق من صحة المستند · Document authenticity</div>
+      <p class="of-verify-body">
+        امسح رمز الاستجابة السريعة أو افتح الرابط وأدخل رمز التحقق للتأكد من أن هذا المستند صادر
+        رسميًا عن النظام ولم يُعدّل. / Scan the QR code or open the address and enter the code to
+        confirm this document was issued by the system and has not been altered.
+      </p>
+      <div class="of-verify-code num">${esc(verification.token)}</div>
+      <div class="of-verify-url ltr">${esc(verification.url)}</div>
+    </div>
+  </div>`;
+}
+
+/** The centred bilingual document title (reference y 79.7 / 93.9). */
+function titleBlock(payload: FinancialDocumentPayload): string {
+  const title = documentTitle(payload);
+  // Cash receipt/payment vouchers have a single English heading; invoices and
+  // the other documents keep their existing bilingual approved layout.
+  const englishOnly = /receipt|voucher/i.test(payload.titleEn) && !/pos/i.test(payload.titleEn);
+  return `
+  <div class="of-title">
+    ${englishOnly ? '' : `<div class="of-title-ar" lang="ar" dir="rtl">${esc(title.ar)}</div>`}
+    <div class="of-title-en" lang="en" dir="ltr">${esc(title.en)}</div>
+  </div>`;
+}
+
+/** The two-column document / customer information panel. */
+function infoPanel(
+  payload: FinancialDocumentPayload,
+  counterpartyName: string,
+  dateLabel: string,
+): string {
+  const payment = paymentLabel(payload);
+  const reference = paymentReference(payload);
+  const country = countryName(payload.counterparty.countryCode);
+  // The reference prints the country once; a record whose city and country are
+  // the same word must not print it twice.
+  const addrLines = [payload.counterparty.addressLine, payload.counterparty.city, country]
+    .filter(Boolean)
+    .filter((line, index, all) => all.findIndex((x) => x?.toLowerCase() === line?.toLowerCase()) === index);
+  const address = addrLines
+    .map((line) => `<span class="of-addr-line">${esc(line)}</span>`)
+    .join('');
+  const isQuotation = /quotation/i.test(payload.titleEn);
+  const isReceipt = /receipt/i.test(payload.titleEn);
+  const isVoucher = /voucher/i.test(payload.titleEn);
+  const partyLabel = isVoucher ? 'Supplier / Payee' : isReceipt ? 'Customer / Payer' : 'Customer Name';
+  // The reference quotation labels the date row "Quotation Date" and carries a
+  // second "Expiration Date"; an invoice labels it "Order Date" and has no
+  // expiration row. The dates print as "Sat 20/09/2026, 3:30 PM" in the
+  // reference, not as a bare day-month.
+  return `
+  <div class="of-panel">
+    <div class="of-panel-left${isQuotation ? ' of-panel-left-quote' : ''}">
+      <div class="of-docno" lang="en" dir="ltr">${esc(numberLabel(payload.titleEn))} # <span class="num">${esc(
+        payload.documentNumber ?? '',
+      )}</span></div>
+      <div class="of-lgrid">
+        <div class="of-field">
+          <span class="of-field-label">${esc(dateLabel)}</span>
+          <span class="of-field-value of-date num">${esc(docStamp(payload.documentDate))}</span>
+        </div>
+        ${
+          payload.dueDate
+            ? `<div class="of-field">
+                 <span class="of-field-label">${isQuotation ? 'Expiration Date' : 'Due Date'}</span>
+                 <span class="of-field-value of-date num">${esc(docStamp(payload.dueDate))}</span>
+               </div>`
+            : ''
+        }
+      </div>
+      ${
+        payload.salespersonName
+          ? `<div class="of-field">
+               <span class="of-field-label">Staf Name</span>
+               <span class="of-field-value">${esc(payload.salespersonName)}</span>
+             </div>`
+          : ''
+      }
+      ${
+        reference
+          ? `<div class="of-field">
+               <span class="of-field-label">Payment at Account</span>
+               <span class="of-field-value num">${esc(reference)}</span>
+             </div>`
+          : payment
+            ? `<div class="of-field">
+                 <span class="of-field-label">Payment</span>
+                 <span class="of-field-value">${esc(payment)}</span>
+               </div>`
+            : ''
+      }
+      ${
+        payload.paymentMethod === 'CREDIT' && payload.balanceMinor > 0
+          ? `<div class="of-field">
+               <span class="of-field-label">Payment Status</span>
+               <span class="of-field-value">${payload.paidMinor > 0 ? 'Partially Paid' : 'Unpaid'}</span>
+             </div>`
+          : ''
+      }
+    </div>
+    <div class="of-panel-right">
+      <div class="of-cp-row">
+        <span class="of-cp-label">${esc(partyLabel)}</span>
+        <span class="of-cp-value">${esc(counterpartyName)}</span>
+      </div>
+      ${
+        payload.counterparty.phone
+          ? `<div class="of-cp-row">
+               <span class="of-cp-label">Contact No.</span>
+               <span class="of-cp-value num">${esc(payload.counterparty.phone)}</span>
+             </div>`
+          : ''
+      }
+      ${
+        address
+          ? `<div class="of-cp-row of-cp-row-top">
+               <span class="of-cp-label">Address:</span>
+               <span class="of-cp-value">${address}</span>
+             </div>`
+          : ''
+      }
+    </div>
+  </div>`;
+}
+
+/** The five-column priced table from the reference document. */
+function lineTable(
+  payload: FinancialDocumentPayload,
+  locale: 'ar' | 'en',
+  quotation = false,
+): string {
+  const rows = payload.lines
+    .map((line) => {
+      const { name, note } = lineParts(line);
+      return `
+      <tr>
+        <td class="of-c-desc">
+          <span class="of-line-name">${esc(name)}</span>
+          ${note ? `<span class="of-line-sub">${esc(note)}</span>` : ''}
+        </td>
+        <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
+        <td class="of-c-price num">${esc(moneyPlain(line.unitPriceMinor, payload.currency))}</td>
+        <td class="of-c-tax">${esc(taxLabel(line.taxPercentBp))}</td>
+        <td class="of-c-amt num">${esc(money(lineAmountMinor(line.quantity, line.unitPriceMinor), payload.currency, locale))}</td>
+      </tr>`;
+    })
+    .join('');
+  return `
+  <table class="of-table${quotation ? ' of-table-quote' : ''}">
+    <thead>
+      <tr>
+        <th class="of-c-desc">Description</th>
+        <th class="of-c-qty">Quantity</th>
+        <th class="of-c-price">Unit Price</th>
+        <th class="of-c-tax">Taxes</th>
+        <th class="of-c-amt">Amount</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+/**
+ * The written amount, printed as a plain line under the totals.
+ *
+ * The approved sheet states the total in words beneath the figures, so a reader
+ * can verify the amount without reading the numerals. It is deliberately not
+ * boxed: it is part of the sheet, not a form field. The words come from the same
+ * `amountInWords` the browser print view uses, so the two can never disagree.
+ */
+function amountInWordsLine(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): string {
+  const words = amountInWords(payload.totalMinor, payload.currency);
+  const label = locale === 'ar' ? 'المبلغ كتابةً' : 'Amount in words';
+  return `
+  <div class="of-words">
+    <span class="of-words-label">${esc(label)}</span>
+    <span class="of-words-value">${esc(words)}</span>
+  </div>`;
+}
+
+/** The right-aligned totals block: untaxed amount, tax, discount, total. */
+function totalsBlock(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): string {
+  const rate = documentTaxRate(payload);
+  const rows: Array<[string, string]> = [
+    ['Untaxed Amount', money(payload.subtotalMinor, payload.currency, locale)],
+  ];
+  rows.push([rate ? `Tax ${rate / 100}%` : 'Tax', money(payload.taxMinor, payload.currency, locale)]);
+  rows.push(['Discount', money(payload.discountMinor, payload.currency, locale)]);
+  if (payload.roundingMinor) {
+    rows.push(['Rounding', money(payload.roundingMinor, payload.currency, locale)]);
+  }
+  rows.push(['Total', money(payload.totalMinor, payload.currency, locale)]);
+  // The financial document shows the amount before VAT, VAT, the fixed
+  // currency discount and the final total. Paid/Balance Due belong in the
+  // payment ledger, not as duplicate totals on a settled invoice.
+  return `
+  <table class="of-totals">
+    ${rows
+      .map(
+        ([label, value], index) =>
+          `<tr class="${index === rows.length - 1 ? 'of-total-grand' : ''}">
+             <th>${esc(label)}</th><td class="num">${esc(value)}</td>
+           </tr>`,
+      )
+      .join('')}
+  </table>`;
+}
+
+export function renderOfficialFinancialHtml(input: OfficialFinancialRenderInput): string {
+  const payload = input.payload;
+  const counterpartyName = payload.counterparty.nameEn || payload.counterparty.nameAr;
+  const lowerTitle = payload.titleEn.toLowerCase();
+  const dateLabel = lowerTitle.includes('quotation') ? 'Quotation Date'
+    : lowerTitle.includes('receipt') ? 'Receipt Date'
+    : lowerTitle.includes('voucher') ? 'Payment Date'
+    : lowerTitle.includes('return') || lowerTitle.includes('credit') ? 'Return Date'
+    : 'Order Date';
+  const numbered = { ...payload, documentNumber: input.documentNumber };
+  // The tenant's document language decides the reading direction. Arabic prints
+  // right-to-left (the identity band starts on the right, the description column
+  // leads on the right, the totals block sits at the left) and English the
+  // reverse. The CSS uses logical properties throughout, so the single `dir`
+  // attribute flips the whole page; both languages' labels are always present.
+  const docLocale: 'ar' | 'en' = input.issuer.documentLocale === 'ar' ? 'ar' : 'en';
+  const dir = docLocale === 'en' ? 'ltr' : 'rtl';
+  const lang = docLocale;
+
+  return `<!doctype html>
+<html lang="${lang}" dir="${dir}">
+<head>
+<meta charset="utf-8">
+<title>${esc(input.documentNumber)} · ${esc(dir === 'ltr' ? payload.titleEn : payload.titleAr)}</title>
+<style>${input.baseCss}
+${CHROME_CSS}
+${OFFICIAL_FINANCIAL_CSS}
+</style>
+</head>
+<body>
+<section class="of-page">
+  ${watermark(input.issuer)}
+  ${identityBand(input.issuer)}
+  <div class="of-body">
+  ${titleBlock(payload)}
+  ${trnStrip(input.issuer)}
+  ${infoPanel(numbered, counterpartyName, dateLabel)}
+  ${lineTable(payload, docLocale, /quotation/i.test(payload.titleEn))}
+  ${totalsBlock(payload, docLocale)}
+  ${amountInWordsLine(payload, docLocale)}
+  ${
+    payload.notes
+      ? `<div class="of-notes avoid-break">
+           <div class="of-notes-body">${escMultiline(payload.notes)}</div>
+         </div>`
+      : ''
+  }
+  ${verificationStrip(input.verification)}
+  </div>
+</section>
+</body>
+</html>`;
+}
+
+/**
+ * Print CSS for the official layout.
+ *
+ * The palette is the approved identity: the reference's own navy #0a1f44 for the
+ * identity text, #0f2b48 for the navy strip and #0a4175 for the shaded rows.
+ * Sizes are in points and mirror the measured reference geometry.
+ */
+export const OFFICIAL_FINANCIAL_CSS = `
+  /* The approved sheet is a single A4 page whose thanks/signature strip sits at
+     the foot, not directly under the table. The page box therefore fills the
+     printable area (842.25 - 5.7mm top - 14mm bottom ≈ 786pt) and the bottom
+     strip is pinned to its end, so a short invoice still prints its signatures
+     where the reference does. */
+  .of-page{ position:relative; min-height:746pt; box-sizing:border-box;
+    display:flex; flex-direction:column; padding:0;
+    /* The approved sheet sets its Latin labels and figures in a Latin face
+       (Verdana/CodecPro) and its Arabic in an Arabic face. The base print CSS
+       is Arabic-first, which would set every Latin word in the wide Naskh face
+       and widen the labels; the official sheet therefore leads with the Latin
+       stack and falls back to the Arabic face for the Arabic runs. */
+    font-family:${DOCUMENT_LATIN_STACK}; }
+  /* The reference prints the identity band wider than the priced content: the
+     logotype starts 9.9pt left of the table's left edge and the quality badge
+     ends 8.1pt right of it. The page margin is therefore measured to the band
+     (5.7mm / 5.6mm, matching the reference band edges) and the priced body is
+     inset back to the table's own 26.5pt / 571.5pt columns. A negative margin
+     on the band cannot be used: Chromium clips a child that overhangs the page
+     content box and the band loses its outer edge. */
+  .of-body{ padding-inline:10pt 8pt; flex:1 1 auto; }
+  /* The reference watermark is the "AUTO SERVICES" wordmark set in the brand
+     display face (Codec Pro Bold) at 51.75pt with a 6.72pt tracking, so the run
+     measures the reference's 476pt ink width, in the identity navy at ~9.7%
+     opacity (measured from the approved PDF), centred on the sheet.
+
+     A position:fixed mark makes Chromium repaint it on every printed page; an
+     absolutely positioned mark would paint on page one only and leave
+     continuation pages blank. */
+  .of-watermark{ position:fixed; inset-inline:0; top:285pt;
+    display:flex; align-items:center; justify-content:center;
+    pointer-events:none; z-index:0; }
+  .of-watermark img{ display:block; width:310pt; max-height:310pt; object-fit:contain; }
+  .of-watermark-vector{ display:block; width:310pt; height:auto; }
+  .of-band,.of-body{ position:relative; z-index:1; }
+  /* The approved invoice prints the identity band wider than the priced table:
+     the logotype starts ~10pt left of the content box and the quality badge ends
+     ~8pt right of it (measured logo x16.5, badge x579.5 against a content box of
+     26.5–571.5). The of-body wrapper insets the priced rows back to the table
+     columns, so the band sits at the page edge exactly as the reference does. */
+  .of-band{ display:flex; justify-content:space-between; align-items:center;
+    min-height:44.5pt; position:relative; }
+  /* The reference prints the same 22pt circled tick at the top-right of the
+     invoice header as on the report (measured x557-579, y29-51). It must sit
+     inside the printable box: a negative offset made the page wider than the
+     sheet, which made Chromium shrink the whole invoice ~1.6%. */
+  .of-badge{ position:absolute; right:0; top:13pt; line-height:0; }
+  .of-badge svg{ display:block; width:24pt; height:24pt; }
+  .of-band-lead{ flex:0 0 auto; }
+  /* The quality badge is anchored to the paper's right edge, so the tagline is
+     inset to clear the disc — without this it ran under the badge (the reference
+     stops the tagline at x553, leaving a 4pt gap before the disc at x557). */
+  .of-band-trail{ text-align:end; padding-inline-end:27.8pt; }
+  /* The reference stacks the official logotype (icon + three Arabic lines +
+     the Latin AUTO SERVICES line) in a single left-hand lockup. */
+  .of-lockup{ display:flex; align-items:center; gap:6pt; }
+  .of-logo-mark{ display:block; width:auto; }
+  .of-wordmark{ display:flex; flex-direction:column; line-height:1.0; }
+  .of-logo{ height:44.5pt; width:auto; }
+  .of-wordmark-ar{ font-size:14.5pt; font-weight:700; color:#0a1f44; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; direction:rtl; unicode-bidi:isolate; font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif; }
+  .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:0; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-title{ text-align:center; margin-top:15.3pt; }
+  /* The reference sets the title and the document number in the brand display
+     face (Codec Pro Bold); the Latin labels and figures stay in Verdana. */
+  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.35; direction:rtl; unicode-bidi:isolate; font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif; }
+  .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.15; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  /* The reference navy strip is 16.5pt tall (measured y 108.5-125.0) around one
+     8.8pt line, so its vertical padding is ~3.85pt, not the 2pt a bare line box
+     would give; the shortfall printed a white gap where the reference is navy. */
+  .of-trn{ margin-top:0; background:#0f2b48; color:#fff; font-size:8.8pt;
+    font-weight:700; text-align:end; padding:4.1pt 10pt; line-height:1.0; }
+  /* The reference panel has a hairline light border and no internal divider:
+     the left column is wide, the customer column is a label/value grid. */
+  .of-panel{ display:flex; border:1.5px solid #94a3b8; border-top:none;
+    line-height:1.2; }
+  /* Measured from the reference: the customer column's labels begin at x≈327
+     on a 545pt content width, so the left column is ~51% (not an even split).
+     The reference's panel ends at y225.5 with a visible bottom rule, ~7.5pt
+     above the table's top rule (y233); a 7pt bottom pad pushed our rule onto the
+     table border and merged the two lines. */
+  .of-panel-left{ flex:0 0 52%; padding:4.9pt 10pt 2.1pt; }
+  /* The approved quotation sets its field block 3.3pt lower than the invoice's
+     (Quotation Date 155.3 against Order Date 152.0) while the document number
+     stays at the same height, so only the field grid is inset. */
+  .of-panel-left-quote .of-lgrid{ margin-top:3.3pt; }
+  .of-panel-right{ flex:1 1 auto; padding:1.5pt 10pt; }
+  .of-docno{ font-size:13.3pt; font-weight:700; color:#0f2b48; margin-top:2.5pt; margin-bottom:1pt; direction:ltr; unicode-bidi:isolate; font-family:'ORYX Display','ORYX Latin','ORYX Arabic','ORYX Sans',sans-serif; }
+  /* The document number itself is a display-face run, so the shared numeric
+     Latin override (which would set it in Verdana) is reset for it. */
+  .of-docno .num{ font-family:inherit; }
+  .of-field{ margin-top:6pt; }
+  /* The reference prints the date and the expiration date side by side in one
+     row (invoice has only the date). */
+  /* The reference starts the second field column at a fixed 114.5pt from the
+     first (measured Quotation Date x37.2, Expiration Date x161.7), not at an
+     equal split of the panel, so the first track is fixed. */
+  .of-lgrid{ display:grid; grid-template-columns:114.5pt 1fr; gap:0 10pt; }
+  .of-field-label{ display:block; font-size:7.3pt; color:#64748b; font-weight:700; }
+  .of-field-value{ display:block; font-size:8.8pt; color:#0f2b48; font-weight:700;
+    white-space:nowrap; }
+  /* The reference prints the date and expiration values a step smaller than the
+     other field values (measured 7.7pt against 8.8pt). */
+  .of-field-value.of-date{ font-size:7.7pt; }
+  /* The reference customer column is a label/value grid whose labels are
+     right-aligned (every label ends on the same x, ≈392) with the values on a
+     common left edge (≈400), exactly as the approved sheet prints them. */
+  .of-cp-row{ display:grid; grid-template-columns:72pt 1fr; gap:0 8pt;
+    margin-top:6pt; align-items:baseline; }
+  .of-cp-row-top{ align-items:start; }
+  .of-cp-label{ font-size:7.3pt; color:#64748b; font-weight:700; text-align:end; }
+  .of-cp-value{ font-size:8.8pt; color:#0f2b48; font-weight:700; }
+  .of-addr-line{ display:block; line-height:1.6; }
+  .of-table{ margin-top:6pt; table-layout:fixed; }
+  /* The approved quotation sheet leaves a wider gap between the info panel
+     and the table than the invoice does (measured 31pt vs 17.5pt). */
+  .of-table-quote{ margin-top:13.9pt; }
+  /* The reference's header band is 29.5pt tall (rule y233 to rule y262.5)
+     around one 8.8pt line, so each side is ~7.75pt; 10pt made the band 34pt
+     and pushed every figure 4.5pt below the approved sheet. */
+  .of-table th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
+    padding:7.75pt 7pt; background:transparent; white-space:nowrap;
+    border-top:1.5px solid #94a3b8; border-bottom:1.5px solid #94a3b8; }
+  /* The reference shades a fixed band per body row and spaces the rows 33.5pt
+     apart (measured band tops 265.1, 298.5, 332.0), so a row that carries a
+     product name *and* a note beneath it occupies the same pitch as a
+     name-only row. Without the fixed pitch the note row grows by its second
+     line and pushes the totals block ~7pt down the page. */
+  .of-table tbody tr{ height:33.5pt; }
+  .of-table td{ font-size:8.8pt; color:#0f2b48; font-weight:700; padding:2pt 7pt;
+    vertical-align:middle; }
+  /* The reference insets the description column a little further than the
+     numeric columns, so its text starts at x≈37.5 rather than the cell edge. */
+  .of-table th.of-c-desc,.of-table td.of-c-desc{ padding-inline-start:13pt; }
+  .of-table td.of-c-price,.of-table td.of-c-amt{ white-space:nowrap; }
+  /* The reference right-aligns the unit-price and amount figures a little inside
+     the column edge (measured price x414.6, amount x519.1); the default cell
+     padding pushed them ~8-10pt right. */
+  .of-table td.of-c-price,.of-table th.of-c-price{ padding-right:15.8pt; }
+  /* The reference insets the tax and amount figures a touch further left than
+     their column header, so the body cells carry a smaller start inset. */
+  .of-table td.of-c-tax,.of-table td.of-c-amt{ padding-left:1.5pt; }
+  /* The approved sheet prints the tax label on one line inside a body row
+     ("VAT 10%"); without this it wraps and the row doubles in height. */
+  .of-table td.of-c-tax{ white-space:nowrap; }
+  /* The reference shades alternate body rows with the #0a4175 accent. */
+  .of-table tbody tr:nth-child(odd) td{ background:#dbe3ec; }
+  /* Column proportions are measured from the approved reference invoice: the
+     description column is much wider than a naive split, and the four numeric
+     columns are close to equal. Matching them keeps every label and figure on
+     the same x-position the printed document uses. */
+  .of-c-desc{ width:58.2%; }
+  .of-c-qty{ width:9.58%; text-align:center !important; }
+  .of-c-price{ width:11.58%; text-align:right !important; }
+  .of-c-tax{ width:10.64%; text-align:left !important; }
+  .of-c-amt{ width:10.0%; text-align:left !important; }
+  .of-line-name{ display:block; }
+  /* The line's note prints on its own line under the name, smaller and lighter,
+     exactly as the approved sheet prints a product's warranty note. */
+  .of-line-sub{ display:block; font-size:7.3pt; color:#64748b; font-weight:400; }
+  /* The reference totals block is a right-aligned table with only two rules:
+     one above the first row and one above the grand Total. */
+  .of-totals{ width:59.6%; margin-inline-start:auto; margin-top:8pt;
+    border-top:0.75px solid #0f2b48; }
+  .of-totals th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
+    padding:3.5pt 9pt; }
+  .of-totals td{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:end;
+    padding:3.5pt 2pt; }
+  .of-total-grand th,.of-total-grand td{ border-top:0.75px solid #0f2b48; }
+  /* Notes remain readable below the invoice without an unnecessary framed box. */
+  .of-notes{ margin-top:12pt; padding:0; border:0; background:transparent; }
+  .of-notes-body{ font-size:8.8pt; color:#334155; white-space:normal; }
+  /* The written amount is a plain line, not a box: it sits directly beneath the
+     totals block and states the total in words so a reader can verify it. */
+  .of-words{ width:59.6%; margin-inline-start:auto; margin-top:6pt;
+    font-size:8.8pt; color:#0f2b48; }
+  .of-words-label{ font-weight:700; margin-inline-end:6pt; }
+  .of-words-value{ font-weight:700; }
+  /* The verification strip: a compact ruled box above the signature strip. It is
+     deliberately restrained so it reads as a security footnote and never
+     competes with the priced table or the approved identity band. */
+  .of-verify{ display:flex; gap:12pt; align-items:center; margin-top:11pt;
+    border:0.75px solid #c2c9d5; border-radius:4pt; padding:7pt 10pt; }
+  .of-verify-qr{ flex:0 0 auto; }
+  .of-verify-qr img{ width:74pt; height:74pt; display:block; }
+  .of-verify-text{ flex:1 1 auto; }
+  .of-verify-title{ font-size:8.8pt; font-weight:700; color:#0f2b48; }
+  .of-verify-body{ font-size:7.2pt; color:#475569; margin:3pt 0 0; line-height:1.35; }
+  .of-verify-code{ margin-top:4pt; font-size:9pt; font-weight:700; color:#0f2b48;
+    letter-spacing:.6px; }
+  .of-verify-url{ font-size:7.2pt; color:#0a4175; margin-top:2pt; word-break:break-all; }
+`;

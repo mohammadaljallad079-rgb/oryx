@@ -1,4 +1,4 @@
-import { basisPointsOfMinor, lineAmountMinor, sumMinor } from '@oryx/shared';
+import { basisPointsOfMinor, lineAmountMinor, roundMinor, sumMinor, type RoundingMode } from '@oryx/shared';
 
 /**
  * A priced document line before rounding.
@@ -10,10 +10,16 @@ export interface PricedLineInput {
   quantity: number;
   unitPriceMinor: number;
   discountPercentBp?: number;
+  /** Fixed discount in minor units; when set, takes precedence over legacy percent. */
+  discountAmountMinor?: number;
   taxPercentBp?: number;
+  /** Preserve the actual VAT amount of an original posted invoice on a linked return. */
+  taxAmountMinor?: number;
 }
 
-export interface PricedLine extends Required<Omit<PricedLineInput, never>> {
+export interface PricedLine extends Required<Omit<PricedLineInput, 'discountAmountMinor' | 'taxAmountMinor'>> {
+  discountAmountMinor?: number;
+  taxAmountMinor?: number;
   lineSubtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
@@ -25,6 +31,8 @@ export interface DocumentTotals {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  /** Signed adjustment applied to `totalMinor` by the rounding mode. */
+  roundingMinor: number;
   totalMinor: number;
 }
 
@@ -35,34 +43,55 @@ export interface DocumentTotals {
  * are deterministic and reproducible: the same input always yields the same
  * minor-unit totals on the API, in the UI and in a report. The subtotal is the
  * sum of the rounded line subtotals (not a re-rounded aggregate), which is what
- * makes `subtotal - discount + tax === total` hold exactly.
+ * makes `subtotal + tax - discount === total` hold exactly.
+ *
+ * When `roundingMode` is not `NONE` the line total is snapped to the nearest
+ * whole (or half) major unit and the small difference is reported as
+ * `roundingMinor`, so `subtotal - discount + tax + rounding === total` still
+ * holds and the ledger can post the difference to a rounding account.
  */
-export function computeDocumentTotals(lines: PricedLineInput[]): DocumentTotals {
+export function computeDocumentTotals(
+  lines: PricedLineInput[],
+  roundingMode: RoundingMode = 'NONE',
+  currencyScale = 2,
+): DocumentTotals {
   const priced: PricedLine[] = lines.map((line) => {
     const discountPercentBp = line.discountPercentBp ?? 0;
     const taxPercentBp = line.taxPercentBp ?? 0;
     const lineSubtotalMinor = lineAmountMinor(line.quantity, line.unitPriceMinor);
-    const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
-    const net = lineSubtotalMinor - discountMinor;
-    const taxMinor = basisPointsOfMinor(net, taxPercentBp);
+    const discountMinor = line.discountAmountMinor === undefined
+      ? basisPointsOfMinor(lineSubtotalMinor, discountPercentBp)
+      : Math.min(lineSubtotalMinor, Math.max(0, line.discountAmountMinor));
+    // Company policy: VAT is based on the original extended price; the
+    // discount reduces the final payable amount only, not the tax base.
+    const taxMinor = line.taxAmountMinor === undefined
+      ? basisPointsOfMinor(lineSubtotalMinor, taxPercentBp)
+      : Math.max(0, line.taxAmountMinor);
     return {
       quantity: line.quantity,
       unitPriceMinor: line.unitPriceMinor,
       discountPercentBp,
+      discountAmountMinor: line.discountAmountMinor,
+      taxAmountMinor: line.taxAmountMinor,
       taxPercentBp,
       lineSubtotalMinor,
       discountMinor,
       taxMinor,
-      lineTotalMinor: net + taxMinor,
+      lineTotalMinor: lineSubtotalMinor + taxMinor - discountMinor,
     };
   });
 
   const subtotalMinor = sumMinor(priced.map((l) => l.lineSubtotalMinor));
   const discountMinor = sumMinor(priced.map((l) => l.discountMinor));
   const taxMinor = sumMinor(priced.map((l) => l.taxMinor));
-  const totalMinor = sumMinor(priced.map((l) => l.lineTotalMinor));
+  const exactTotalMinor = sumMinor(priced.map((l) => l.lineTotalMinor));
+  const { rounded: totalMinor, adjustment: roundingMinor } = roundMinor(
+    exactTotalMinor,
+    roundingMode,
+    currencyScale,
+  );
 
-  return { lines: priced, subtotalMinor, discountMinor, taxMinor, totalMinor };
+  return { lines: priced, subtotalMinor, discountMinor, taxMinor, roundingMinor, totalMinor };
 }
 
 /**

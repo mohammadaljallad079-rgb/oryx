@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useUi } from '@/lib/ui-context';
 import { customerApi, customerSession } from '@/lib/api';
 import { messageOf } from '@/lib/hooks';
-import { Alert, Button, Card, Field } from '@/components/ui';
+import { Alert, Button, Field } from '@/components/ui';
+import { AuthShell } from '@/components/premium';
 
 /** Customer self-registration. */
 export default function RegisterPage() {
@@ -41,8 +42,15 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="oryx-container" style={{ maxWidth: 460 }}>
-      <Card title={t('auth.registerTitle')}>
+    <AuthShell
+      title={t('auth.registerTitle')}
+      subtitle={t('auth.registerSubtitle')}
+      aside={
+        <Link href="/login" className="oryx-link">
+          {t('nav.login')}
+        </Link>
+      }
+    >
         <form onSubmit={onSubmit}>
           {error && (
             <div style={{ marginBottom: 14 }}>
@@ -92,15 +100,9 @@ export default function RegisterPage() {
             />
           </Field>
           <Button type="submit" variant="primary" disabled={busy}>
-            {t('auth.submitRegister')}
+            {busy ? t('common.saving') : t('auth.submitRegister')}
           </Button>
         </form>
-        <p style={{ marginTop: 16, marginBottom: 0 }}>
-          <Link href="/login" className="oryx-muted">
-            {t('nav.login')}
-          </Link>
-        </p>
-      </Card>
-    </div>
+    </AuthShell>
   );
 }

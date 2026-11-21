@@ -11,6 +11,8 @@ import {
 } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { SecretCipher } from '../auth/mfa.service';
+import { runSensageAnalysis } from '../ecosystem/ai-adapters';
+import { OCR_PROBE_IMAGE_BASE64, runOcrExtraction } from '../automotive/ocr-adapters';
 
 /** A credential value supplied by an operator. */
 export interface CredentialInput {
@@ -468,6 +470,21 @@ export class IntegrationsService {
     } else if (missing.length > 0) {
       status = 'INCOMPLETE';
       message = `Cannot test: missing ${missing.map((c) => c.key).join(', ')}.`;
+    } else if (providerKey === 'SENSAGE_AI') {
+      // SENSAGE is the one adapter whose vendor call *is* written, so a
+      // connection test performs a real request instead of reporting
+      // `INCOMPLETE`. A failure here is a genuine failure, and the provider is
+      // only `OPERATIONAL` once a call has actually succeeded.
+      const outcome = await this.verifySensage(companyId);
+      status = outcome.status;
+      message = outcome.message;
+    } else if (providerKey === 'REGISTRATION_OCR') {
+      // Registration-card OCR is the other adapter whose vendor call is
+      // written, so its connection test performs a real extraction against a
+      // small synthetic card. Only a validated response is reported `VERIFIED`.
+      const outcome = await this.verifyRegistrationOcr(companyId);
+      status = outcome.status;
+      message = outcome.message;
     } else {
       status = 'INCOMPLETE';
       message =
@@ -502,6 +519,91 @@ export class IntegrationsService {
     ]);
 
     return this.detail(providerKey, companyId);
+  }
+
+  /**
+   * Perform a real SENSAGE analysis as the connection test.
+   *
+   * A `test://` base URL exercises the deterministic adapter, which is a genuine
+   * code path and returns a validated result, so the suite can verify the whole
+   * pipeline without a vendor key. A real base URL performs a live call against a
+   * small synthetic image; only a validated response is reported `VERIFIED`.
+   */
+  private async verifySensage(
+    companyId: string | null,
+  ): Promise<{ status: IntegrationVerificationStatusDto; message: string }> {
+    const config = await this.resolveSensageConfig(companyId);
+    try {
+      const result = await runSensageAnalysis(
+        {
+          storageAssetId: 'integration-connection-test',
+          mimeType: 'image/jpeg',
+          focus: 'connection test',
+        },
+        config,
+      );
+      return {
+        status: 'VERIFIED',
+        message: `A live SENSAGE analysis call succeeded (${result.latencyMs} ms, model ${config.model}).`,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown failure.';
+      this.logger.warn(`SENSAGE connection test failed: ${message}`);
+      return { status: 'FAILED', message: `Connection test failed: ${message}` };
+    }
+  }
+
+  private async resolveSensageConfig(
+    companyId: string | null,
+  ): Promise<{ apiKey: string; baseUrl: string; model: string }> {
+    const apiKey = await this.revealCredential('SENSAGE_AI', 'SENSAGE_AI_API_KEY', companyId);
+    const baseUrl = await this.revealCredential('SENSAGE_AI', 'SENSAGE_AI_BASE_URL', companyId);
+    const model = await this.revealCredential('SENSAGE_AI', 'SENSAGE_AI_MODEL', companyId);
+    return {
+      apiKey: apiKey ?? '',
+      baseUrl: baseUrl ?? 'https://api.openai.com/v1',
+      model: model ?? 'gpt-4o-mini',
+    };
+  }
+
+  /**
+   * Perform a real registration-card extraction as the connection test.
+   *
+   * A `test://` base URL exercises the deterministic adapter, which is a genuine
+   * code path and returns a validated result, so the suite can verify the whole
+   * pipeline without a vendor key. A real base URL performs a live call against
+   * a small synthetic card; only a validated response is reported `VERIFIED`.
+   */
+  private async verifyRegistrationOcr(
+    companyId: string | null,
+  ): Promise<{ status: IntegrationVerificationStatusDto; message: string }> {
+    const [apiKey, baseUrl, model] = await Promise.all([
+      this.revealCredential('REGISTRATION_OCR', 'OCR_API_KEY', companyId),
+      this.revealCredential('REGISTRATION_OCR', 'OCR_BASE_URL', companyId),
+      this.revealCredential('REGISTRATION_OCR', 'OCR_MODEL', companyId),
+    ]);
+    try {
+      const result = await runOcrExtraction(
+        {
+          imageUrl: `data:image/png;base64,${OCR_PROBE_IMAGE_BASE64}`,
+          mimeType: 'image/png',
+          category: 'registration',
+        },
+        {
+          apiKey: apiKey ?? '',
+          baseUrl: baseUrl ?? 'https://api.openai.com/v1',
+          model: model && model.trim() !== '' ? model : 'gpt-4o-mini',
+        },
+      );
+      return {
+        status: 'VERIFIED',
+        message: `A live registration-card extraction succeeded (${result.latencyMs} ms, ${result.fields.length} field(s)).`,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown failure.';
+      this.logger.warn(`Registration OCR connection test failed: ${message}`);
+      return { status: 'FAILED', message: `Connection test failed: ${message}` };
+    }
   }
 
   /**

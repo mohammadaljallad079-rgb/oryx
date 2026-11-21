@@ -1,0 +1,140 @@
+{
+  "generatedAt": "2026-11-09T14:54:30.231Z",
+  "base": "http://127.0.0.1:3001",
+  "documents": [
+    {
+      "name": "vehicle-inspection-full.pdf",
+      "type": "VEHICLE_INSPECTION_REPORT",
+      "documentNumber": "Z00001",
+      "pageCount": 6,
+      "byteSize": 341452,
+      "verificationToken": "JCtlIRQG3d1MKDR38phoA4oN3ZVtU_YYvthkJazHujA",
+      "areas": [
+        "PAINT_BODY",
+        "CHASSIS_UNDERCARRIAGE",
+        "INTERIOR",
+        "EXTERIOR",
+        "ENGINE_COMPARTMENT",
+        "ROAD_TEST",
+        "COMPUTER_UNIT"
+      ]
+    },
+    {
+      "name": "vehicle-inspection-partial.pdf",
+      "type": "VEHICLE_INSPECTION_REPORT",
+      "documentNumber": "Z00002",
+      "pageCount": 5,
+      "byteSize": 281901,
+      "verificationToken": "Gsd8NvvIjeyt1GCWWnmLTQzHJRDG8CcHjU8oIeoOYN0",
+      "areas": [
+        "PAINT_BODY",
+        "ENGINE_COMPARTMENT",
+        "COMPUTER_UNIT"
+      ]
+    },
+    {
+      "name": "quotation.pdf",
+      "type": "QUOTATION",
+      "documentNumber": "Q00002",
+      "pageCount": 1,
+      "byteSize": 176676,
+      "verificationToken": "wKTaKRo1V9-r4b4qtX4AFJxC0hbmyqly4yXSTc3uFTY"
+    },
+    {
+      "name": "sales-order.pdf",
+      "type": "SALES_ORDER",
+      "documentNumber": "O00001",
+      "pageCount": 1,
+      "byteSize": 169286,
+      "verificationToken": "Us3kAzYylNlsgCklDkdkQ3j4oBH6_Amr5sQ-mI1EkvY"
+    },
+    {
+      "name": "sales-invoice.pdf",
+      "type": "SALES_INVOICE",
+      "documentNumber": "S00006",
+      "pageCount": 1,
+      "byteSize": 175329,
+      "verificationToken": "cTbLOW79K1p_oi-Vdc6TxvFQx2ArTw93CJ0coouHfYQ"
+    },
+    {
+      "name": "sales-return.pdf",
+      "type": "SALES_RETURN",
+      "documentNumber": "C00001",
+      "pageCount": 1,
+      "byteSize": 174282,
+      "verificationToken": "ZOAouffJ-pxgRbDoUcOnAbolQ6pJ1avm4Ulmi8YfxeU"
+    },
+    {
+      "name": "purchase-order.pdf",
+      "type": "PURCHASE_ORDER",
+      "documentNumber": "P00001",
+      "pageCount": 1,
+      "byteSize": 174221,
+      "verificationToken": "d46u4GQkXI1bl_5P34eblUqvQ6s7V5IjdIOJi6lU8k4"
+    },
+    {
+      "name": "purchase-invoice.pdf",
+      "type": "PURCHASE_INVOICE",
+      "documentNumber": "B00001",
+      "pageCount": 1,
+      "byteSize": 173599,
+      "verificationToken": "gF4I2vb_RPMJfq512r5iTKBeeduCFbN3R1qFa1igfBk"
+    },
+    {
+      "name": "purchase-return.pdf",
+      "type": "PURCHASE_RETURN",
+      "documentNumber": "U00001",
+      "pageCount": 1,
+      "byteSize": 173106,
+      "verificationToken": "UJuhOe0E-ADlwsxG57MFpJZ6XEQGM-6yT6H_Dnxr7JU"
+    },
+    {
+      "name": "payment-receipt.pdf",
+      "type": "PAYMENT_RECEIPT",
+      "documentNumber": "Y00002",
+      "pageCount": 1,
+      "byteSize": 172385,
+      "verificationToken": "gzeQIGSe1rORCpY3_VprPg9RojBZpuLAlPwMkcqCoYc"
+    },
+    {
+      "name": "payment-voucher.pdf",
+      "type": "PAYMENT_VOUCHER",
+      "documentNumber": "Y00003",
+      "pageCount": 1,
+      "byteSize": 172381,
+      "verificationToken": "jV3nRUfetAFRGA6g6ojsy2nhLKlwuRCBQ8Zbk7uwHZ8"
+    },
+    {
+      "name": "customer-statement.pdf",
+      "type": "CUSTOMER_STATEMENT",
+      "documentNumber": "G00001",
+      "pageCount": 1,
+      "byteSize": 217324,
+      "verificationToken": "m_pBbaD0YnBvj-LaR8hixxoGrwmjXAFDopRnn7SIWfg"
+    },
+    {
+      "name": "supplier-statement.pdf",
+      "type": "SUPPLIER_STATEMENT",
+      "documentNumber": "W00001",
+      "pageCount": 1,
+      "byteSize": 219700,
+      "verificationToken": "ho6CdaRGAeBTdqz8AG6wcb_FLHWq4dXEWpeGx2D4TM0"
+    },
+    {
+      "name": "journal-entry.pdf",
+      "type": "JOURNAL_ENTRY",
+      "documentNumber": "J00017",
+      "pageCount": 1,
+      "byteSize": 217724,
+      "verificationToken": "QOaxyMceVg2aI1eMAdvkz8B7EGexswdCKnZkOInBIdI"
+    },
+    {
+      "name": "pos-receipt.pdf",
+      "type": "POS_RECEIPT",
+      "documentNumber": "T00001",
+      "pageCount": 1,
+      "byteSize": 172125,
+      "verificationToken": "xKdc5M8Mn_ZdE8BpvvXNSIlhVZnqAL0r4qxLhtc1QA8"
+    }
+  ]
+}

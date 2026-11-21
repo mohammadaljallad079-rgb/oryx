@@ -5,6 +5,9 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { money } from '@/lib/erp-format';
+import { EntityPicker } from '@/components/inline-create';
+import { ProductModal } from '@/components/entity-modals';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -36,7 +39,7 @@ export default function SparePartsPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="spare-parts-page">
+    <div className="flex flex-col gap-4" data-testid="spare-parts-page">
       <SectionHeader
         title={t('nav.spare_parts')}
         subtitle={t('erp.parts.subtitle')}
@@ -98,8 +101,8 @@ function CatalogTab() {
               <tr key={p.id} data-testid={`part-catalog-${p.sku}`}>
                 <td className="font-mono text-[12px]">{p.sku}</td>
                 <td className="text-[12.5px]">{p.nameEn}</td>
-                <td className="tabular-nums text-[12.5px]">{(p.salesPriceMinor / 100).toFixed(2)}</td>
-                <td className="tabular-nums text-[12.5px]">{(p.costPriceMinor / 100).toFixed(2)}</td>
+                <td className="tabular-nums text-[12.5px]">{money(p.salesPriceMinor)}</td>
+                <td className="tabular-nums text-[12.5px]">{money(p.costPriceMinor)}</td>
                 <td className="tabular-nums text-[12.5px]">{(p.reorderLevel / 10000).toFixed(0)}</td>
               </tr>
             ))}
@@ -144,7 +147,7 @@ function ReferencesTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
-      <CreateReferenceModal open={open} products={products.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateReferenceModal open={open} products={products.data?.items ?? []} onProductCreated={products.reload} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
 }
@@ -154,11 +157,14 @@ function CreateReferenceModal({
   products,
   onClose,
   onCreated,
+  onProductCreated,
 }: {
   open: boolean;
   products: Array<{ id: string; sku: string; nameEn: string }>;
   onClose: () => void;
   onCreated: () => Promise<void>;
+  /** Reload the product catalogue after one is created from the picker. */
+  onProductCreated: () => Promise<void> | void;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
@@ -178,10 +184,23 @@ function CreateReferenceModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.product')} required>
-          <select className="oryx-select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} data-testid="reference-product">
-            <option value="">—</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.productId || null}
+            options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, productId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="reference-product"
+            createLabel={t('erp.inventory.newProduct')}
+            reloadOptions={onProductCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ProductModal
+                open
+                onClose={closeCreate}
+                onCreated={async () => { await onProductCreated(); }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.parts.partNumber')} required>
           <input className="oryx-input" value={form.partNumber} onChange={(e) => setForm({ ...form, partNumber: e.target.value })} data-testid="reference-number" />
@@ -258,7 +277,7 @@ function CompatibilityTab({ canManage }: { canManage: boolean }) {
                   {matches.data.items.map((m, i) => {
                     const prod = (m.product ?? {}) as { sku?: string; nameEn?: string; salesPriceMinor?: number };
                     return (
-                      <tr key={i}><td className="font-mono text-[12px]">{prod.sku}</td><td className="text-[12.5px]">{prod.nameEn}</td><td className="tabular-nums text-[12.5px]">{((prod.salesPriceMinor ?? 0) / 100).toFixed(2)}</td></tr>
+                      <tr key={i}><td className="font-mono text-[12px]">{prod.sku}</td><td className="text-[12.5px]">{prod.nameEn}</td><td className="tabular-nums text-[12.5px]">{money(prod.salesPriceMinor ?? 0)}</td></tr>
                     );
                   })}
                 </tbody>
@@ -268,7 +287,7 @@ function CompatibilityTab({ canManage }: { canManage: boolean }) {
         ) : null}
       </Card>
 
-      <CreateCompatibilityModal open={open} products={products.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateCompatibilityModal open={open} products={products.data?.items ?? []} onProductCreated={products.reload} onClose={() => setOpen(false)} onCreated={list.reload} />
     </div>
   );
 }
@@ -278,11 +297,14 @@ function CreateCompatibilityModal({
   products,
   onClose,
   onCreated,
+  onProductCreated,
 }: {
   open: boolean;
   products: Array<{ id: string; sku: string; nameEn: string }>;
   onClose: () => void;
   onCreated: () => Promise<void>;
+  /** Reload the product catalogue after one is created from the picker. */
+  onProductCreated: () => Promise<void> | void;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
@@ -308,10 +330,23 @@ function CreateCompatibilityModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.product')} required>
-          <select className="oryx-select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} data-testid="compatibility-product">
-            <option value="">—</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.productId || null}
+            options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, productId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="compatibility-product"
+            createLabel={t('erp.inventory.newProduct')}
+            reloadOptions={onProductCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ProductModal
+                open
+                onClose={closeCreate}
+                onCreated={async () => { await onProductCreated(); }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.automotive.make')} required><input className="oryx-input" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} data-testid="compatibility-make" /></Field>
         <Field label={t('erp.automotive.model')} required><input className="oryx-input" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} data-testid="compatibility-model" /></Field>

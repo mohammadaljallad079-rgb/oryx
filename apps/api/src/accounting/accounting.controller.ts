@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
@@ -15,6 +15,7 @@ import {
   CreateJournalDto,
   LedgerQueryDto,
   ListQueryDto,
+  NextAccountCodeQueryDto,
   RecordPaymentDto,
   ReverseJournalDto,
   SetPeriodStatusDto,
@@ -52,6 +53,13 @@ export class AccountingController {
     return this.accounting.createAccount(dto, p, actorFrom(p, req));
   }
 
+  @Get('accounts/next-code')
+  @RequireAnyPermission('erp.accounting.read', 'erp.accounting.coa.manage')
+  @ApiOperation({ summary: 'Suggest the next account code for a type' })
+  nextAccountCode(@Query() query: NextAccountCodeQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.accounting.nextAccountCode(query.type, query.parentId, p);
+  }
+
   @Patch('accounts/:id')
   @RequirePermissions('erp.accounting.coa.manage')
   @ApiOperation({ summary: 'Update an account' })
@@ -64,12 +72,24 @@ export class AccountingController {
     return this.accounting.updateAccount(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('accounts/:id')
+  @RequirePermissions('erp.accounting.coa.manage')
+  @ApiOperation({ summary: 'Delete an account that has no children and no postings' })
+  deleteAccount(
+    @Param('id') id: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.accounting.deleteAccount(id, p, actorFrom(p, req));
+  }
+
   @Post('accounts/seed-standard-chart')
   @RequirePermissions('erp.accounting.coa.manage')
   @ApiOperation({ summary: 'Seed the standard chart of accounts when empty' })
   async seedChart(@CurrentPrincipal() p: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(p);
-    return this.accounting.seedStandardChart(companyId, 'SAR', p.userId);
+    const currency = await this.context.companyCurrency(companyId);
+    return this.accounting.seedStandardChart(companyId, currency, p.userId);
   }
 
   // ------------------------------------------------------------ fiscal years
@@ -89,6 +109,17 @@ export class AccountingController {
     @Req() req: RequestLike,
   ) {
     return this.accounting.createFiscalYear(dto, p, actorFrom(p, req));
+  }
+
+  @Delete('fiscal-years/:id')
+  @RequirePermissions('erp.accounting.fiscal.manage')
+  @ApiOperation({ summary: 'Delete a fiscal year that has no journals' })
+  deleteFiscalYear(
+    @Param('id') id: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.accounting.deleteFiscalYear(id, p, actorFrom(p, req));
   }
 
   @Patch('fiscal-periods/:id/status')

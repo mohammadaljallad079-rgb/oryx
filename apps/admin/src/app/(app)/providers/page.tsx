@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { money } from '@/lib/erp-format';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { EntityPicker } from '@/components/inline-create';
+import { MarketplaceProviderModal } from '@/components/entity-modals';
 import {
   Badge,
   Button,
@@ -28,6 +31,9 @@ interface ProviderRow {
   status: string;
   commissionPercentBp: number;
   approvedAt: string | null;
+  /** Auto Map coordinates (P3); null when the provider has no known location. */
+  latitude?: number | null;
+  longitude?: number | null;
   _count?: { listings: number; requests: number };
 }
 
@@ -76,7 +82,7 @@ export default function ProvidersPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="providers-page">
+    <div className="flex flex-col gap-4" data-testid="providers-page">
       <SectionHeader
         title={t('nav.provider_portal')}
         subtitle={t('erp.providers.subtitle')}
@@ -119,10 +125,10 @@ function ProvidersTab({ canDecide }: { canDecide: boolean }) {
           <span className="oryx-label">{t('common.status')}</span>
           <select className="oryx-select" value={status} onChange={(e) => setStatus(e.target.value)} data-testid="provider-status">
             <option value="">{t('common.all')}</option>
-            <option value="PENDING">PENDING</option>
-            <option value="APPROVED">APPROVED</option>
-            <option value="SUSPENDED">SUSPENDED</option>
-            <option value="REJECTED">REJECTED</option>
+            <option value="PENDING">{t('common.statusPending')}</option>
+            <option value="APPROVED">{t('common.statusApproved')}</option>
+            <option value="SUSPENDED">{t('common.statusSuspended')}</option>
+            <option value="REJECTED">{t('common.statusRejected')}</option>
           </select>
         </label>
       </div>
@@ -191,6 +197,58 @@ function ProviderModal({
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Auto Map coordinates (P3), seeded from the provider row and editable here.
+  const [lat, setLat] = useState('');
+  const [lng, setLng] = useState('');
+  const [locBusy, setLocBusy] = useState(false);
+  const [locError, setLocError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLat(provider?.latitude != null ? String(provider.latitude) : '');
+    setLng(provider?.longitude != null ? String(provider.longitude) : '');
+    setLocError(null);
+  }, [provider?.id, provider?.latitude, provider?.longitude]);
+
+  async function saveLocation(explicit?: { latitude: number | null; longitude: number | null }) {
+    if (!provider) return;
+    let latitude: number | null;
+    let longitude: number | null;
+    if (explicit) {
+      ({ latitude, longitude } = explicit);
+    } else {
+      // Clearing is an explicit action: an empty pair removes the provider from
+      // every proximity query rather than storing a half-typed point.
+      const clearing = lat.trim() === '' && lng.trim() === '';
+      if (!clearing && (lat.trim() === '' || lng.trim() === '')) {
+        setLocError(t('erp.providers.locationBothRequired'));
+        return;
+      }
+      latitude = clearing ? null : Number(lat);
+      longitude = clearing ? null : Number(lng);
+      if (!clearing && (!Number.isFinite(latitude) || !Number.isFinite(longitude))) {
+        setLocError(t('erp.providers.locationInvalid'));
+        return;
+      }
+      if (
+        !clearing &&
+        ((latitude as number) < -90 || (latitude as number) > 90 ||
+          (longitude as number) < -180 || (longitude as number) > 180)
+      ) {
+        setLocError(t('erp.providers.locationRange'));
+        return;
+      }
+    }
+    setLocBusy(true);
+    setLocError(null);
+    try {
+      await api.setProviderLocation(provider.id, { latitude, longitude });
+      onClose();
+    } catch (e) {
+      setLocError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setLocBusy(false);
+    }
+  }
 
   async function decide(decision: 'APPROVED' | 'REJECTED' | 'SUSPENDED') {
     if (!provider) return;
@@ -237,6 +295,53 @@ function ProviderModal({
             )}
           </div>
 
+          <div className="border-t border-[var(--border)] pt-3">
+            <div className="mb-1 text-[12px] font-semibold">{t('erp.providers.autoMap')}</div>
+            <p className="mb-2 text-[11.5px] text-[var(--muted)]">{t('erp.providers.autoMapHint')}</p>
+            {locError ? <ErrorBanner message={locError} /> : null}
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label={t('erp.providers.latitude')}>
+                <input
+                  className="oryx-input"
+                  inputMode="decimal"
+                  value={lat}
+                  onChange={(e) => setLat(e.target.value)}
+                  placeholder="26.2285"
+                  data-testid="provider-latitude"
+                />
+              </Field>
+              <Field label={t('erp.providers.longitude')}>
+                <input
+                  className="oryx-input"
+                  inputMode="decimal"
+                  value={lng}
+                  onChange={(e) => setLng(e.target.value)}
+                  placeholder="50.5860"
+                  data-testid="provider-longitude"
+                />
+              </Field>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="primary" disabled={locBusy} onClick={() => void saveLocation()} data-testid="provider-save-location">
+                {t('common.save')}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={locBusy || (provider.latitude == null && provider.longitude == null)}
+                onClick={() => void saveLocation({ latitude: null, longitude: null })}
+                data-testid="provider-clear-location"
+              >
+                {t('erp.providers.clearLocation')}
+              </Button>
+              <Badge tone={provider.latitude != null && provider.longitude != null ? 'success' : 'neutral'}>
+                {provider.latitude != null && provider.longitude != null
+                  ? t('erp.providers.onMap')
+                  : t('erp.providers.offMap')}
+              </Badge>
+            </div>
+          </div>
+
           {canDecide ? (
             <div className="flex flex-col gap-2 border-t border-[var(--border)] pt-3">
               <Field label={t('erp.providers.decisionNote')}>
@@ -263,6 +368,7 @@ function ProviderModal({
 
 function RequestsTab({ canAssign }: { canAssign: boolean }) {
   const { t } = useUi();
+  const { can } = useAuth();
   const [status, setStatus] = useState('');
   const list = useAsync(() => api.serviceRequests({ status: status || undefined }), [status]);
   const providers = useAsync(() => api.marketplaceProviders({ status: 'APPROVED' }), []);
@@ -352,14 +458,27 @@ function RequestsTab({ canAssign }: { canAssign: boolean }) {
       >
         {error ? <ErrorBanner message={error} /> : null}
         <Field label={t('erp.providers.provider')} required>
-          <select className="oryx-select" value={providerId} onChange={(e) => setProviderId(e.target.value)} data-testid="assign-provider">
-            <option value="">—</option>
-            {(providers.data?.items ?? []).map((p) => (
-              <option key={(p as ProviderRow).id} value={(p as ProviderRow).id}>
-                {(p as ProviderRow).code} — {(p as ProviderRow).nameEn}
-              </option>
-            ))}
-          </select>
+          <EntityPicker
+            value={providerId || null}
+            options={(providers.data?.items ?? []).map((p) => ({
+              value: (p as ProviderRow).id,
+              label: `${(p as ProviderRow).code} — ${(p as ProviderRow).nameEn}`,
+            }))}
+            onChange={(v) => setProviderId(v ?? '')}
+            placeholder={t('common.select')}
+            testId="assign-provider"
+            createLabel={t('erp.automotive.newProvider')}
+            reloadOptions={providers.reload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <MarketplaceProviderModal
+                open
+                autoApprove={can('erp.marketplace.provider.manage')}
+                onClose={closeCreate}
+                onCreated={providers.reload}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
       </Modal>
     </Card>
@@ -410,9 +529,9 @@ function SettlementsTab({ canSettle }: { canSettle: boolean }) {
                 <td className="text-[12px]">
                   {new Date(s.periodStart).toLocaleDateString()} – {new Date(s.periodEnd).toLocaleDateString()}
                 </td>
-                <td className="tabular-nums text-[12.5px]">{(s.grossMinor / 1000).toFixed(3)} {s.currency}</td>
-                <td className="tabular-nums text-[12.5px]">{(s.commissionMinor / 1000).toFixed(3)}</td>
-                <td className="tabular-nums text-[12.5px] font-semibold">{(s.netMinor / 1000).toFixed(3)}</td>
+                <td className="tabular-nums text-[12.5px]">{money(s.grossMinor, s.currency)}</td>
+                <td className="tabular-nums text-[12.5px]">{money(s.commissionMinor, s.currency)}</td>
+                <td className="tabular-nums text-[12.5px] font-semibold">{money(s.netMinor, s.currency)}</td>
                 <td><StatusBadge status={s.status} label={s.status} /></td>
               </tr>
             ))}

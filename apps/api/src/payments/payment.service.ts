@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { currencyScale } from '@oryx/shared';
+import { currencyScale, DEFAULT_CURRENCY } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import {
@@ -130,7 +130,7 @@ export class PaymentService {
     if (existing) return existing;
 
     const gateway = this.gatewayFor(input.provider);
-    const currency = input.currency ?? 'BHD';
+    const currency = input.currency ?? DEFAULT_CURRENCY;
     const intentNumber = await this.nextIntentNumber(input.companyId);
 
     const intent = await this.prisma.paymentIntent.create({
@@ -790,6 +790,65 @@ export class PaymentService {
     return intent;
   }
 
+  /**
+   * Delete an intent that never moved money.
+   *
+   * An intent that ever reached a terminal state (succeeded, failed, cancelled
+   * or refunded) is part of the financial record and cannot be removed; a
+   * pending or requires-action intent carries no money and no ledger entry, so
+   * it can go. Transactions and refunds attached to a deletable intent are
+   * non-financial too, so they are removed with it.
+   */
+  async deleteIntent(companyId: string, intentId: string, actorUserId: string) {
+    const intent = await this.prisma.paymentIntent.findFirst({
+      where: { id: intentId, companyId },
+      select: { id: true, intentNumber: true, status: true },
+    });
+    if (!intent) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Payment intent not found.');
+    if (!['PENDING', 'REQUIRES_METHOD', 'REQUIRES_ACTION'].includes(intent.status)) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This payment has a financial result and cannot be deleted.',
+      );
+    }
+    await this.posting.withTransaction(async (tx) => {
+      await tx.paymentTransaction.deleteMany({ where: { companyId, intentId } });
+      await tx.refund.deleteMany({ where: { companyId, intentId } });
+      await tx.paymentIntent.delete({ where: { id: intentId } });
+    });
+    await this.audit.record({
+      actorUserId,
+      companyId,
+      action: 'payments.intent_deleted',
+      targetType: 'PAYMENT_INTENT',
+      targetId: intentId,
+      summary: `Deleted pending payment intent ${intent.intentNumber}`,
+    });
+    return { id: intentId, deleted: true as const };
+  }
+
+  /**
+   * Delete an unmatched reconciliation batch. A matched batch evidences settled
+   * money and is kept.
+   */
+  async deleteReconciliation(companyId: string, id: string, actorUserId: string) {
+    const row = await this.prisma.paymentReconciliation.findFirst({ where: { id, companyId } });
+    if (!row) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Reconciliation not found.');
+    if (row.matched) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'A matched reconciliation cannot be deleted.');
+    }
+    await this.prisma.paymentReconciliation.delete({ where: { id } });
+    await this.audit.record({
+      actorUserId,
+      companyId,
+      action: 'payments.reconciliation_deleted',
+      targetType: 'PAYMENT_RECONCILIATION',
+      targetId: id,
+      summary: `Deleted reconciliation for ${row.provider} ${row.businessDate.toISOString().slice(0, 10)}`,
+    });
+    return { id, deleted: true as const };
+  }
+
   /** Payment history for one customer account, for the website and app. */
   async customerPaymentHistory(
     customerAccountId: string,
@@ -828,26 +887,26 @@ export class PaymentService {
   private async nextIntentNumber(companyId: string): Promise<string> {
     const count = await this.prisma.paymentIntent.count({ where: { companyId } });
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `PI-${String(count + 1 + attempt).padStart(6, '0')}`;
+      const candidate = `I${String(count + 1 + attempt).padStart(6, '0')}`;
       const clash = await this.prisma.paymentIntent.findFirst({
         where: { companyId, intentNumber: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `PI-${Date.now().toString(36).toUpperCase()}`;
+    return `I${Date.now().toString(36).toUpperCase()}`;
   }
 
   private async nextRefundNumber(companyId: string): Promise<string> {
     const count = await this.prisma.refund.count({ where: { companyId } });
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `RF-${String(count + 1 + attempt).padStart(6, '0')}`;
+      const candidate = `F${String(count + 1 + attempt).padStart(6, '0')}`;
       const clash = await this.prisma.refund.findFirst({
         where: { companyId, refundNumber: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `RF-${Date.now().toString(36).toUpperCase()}`;
+    return `F${Date.now().toString(36).toUpperCase()}`;
   }
 }

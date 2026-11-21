@@ -3,12 +3,18 @@ import {
   addMinor,
   allocateMinor,
   basisPointsOfMinor,
+  fromHours,
   fromMinor,
   fromQuantity,
+  hoursAmountMinor,
+  hoursToQuantity,
   isBalanced,
   lineAmountMinor,
+  roundMinor,
+  roundingIncrementMinor,
   subMinor,
   sumMinor,
+  toHours,
   toMinor,
   toQuantity,
 } from '../src/money';
@@ -58,6 +64,20 @@ describe('money — exact minor-unit arithmetic', () => {
     expect(fromQuantity(toQuantity('2.5'))).toBe('2.5000');
   });
 
+  it('prices labour hours at hundredths scale, not quantity scale', () => {
+    // 2.5 h at 25.00/h = 62.50; using lineAmountMinor would yield 0.62.
+    expect(hoursAmountMinor(toHours('2.5'), toMinor('25.00'))).toBe(6250);
+    expect(lineAmountMinor(toHours('2.5'), toMinor('25.00'))).toBe(63);
+    expect(hoursAmountMinor(toHours(1), toMinor('40.00'))).toBe(4000);
+    expect(fromHours(toHours('2.5'))).toBe('2.50');
+  });
+
+  it('rescales labour hours onto quantity units for invoicing', () => {
+    // 2.5 h becomes 25000 in 10^4 quantity units, so a 25.00 rate yields 62.50.
+    expect(hoursToQuantity(toHours('2.5'))).toBe(25000);
+    expect(lineAmountMinor(hoursToQuantity(toHours('2.5')), toMinor('25.00'))).toBe(6250);
+  });
+
   it('applies basis-point percentages exactly', () => {
     // 15% VAT on 100.00 = 15.00
     expect(basisPointsOfMinor(10000, 1500)).toBe(1500);
@@ -86,5 +106,48 @@ describe('money — exact minor-unit arithmetic', () => {
   it('detects balanced and unbalanced amounts', () => {
     expect(isBalanced([10000, -10000])).toBe(true);
     expect(isBalanced([10000, -9999])).toBe(false);
+  });
+
+  describe('whole-amount rounding', () => {
+    it('exposes the increment each mode snaps to', () => {
+      expect(roundingIncrementMinor('NONE', 2)).toBe(1);
+      expect(roundingIncrementMinor('NEAREST_WHOLE', 2)).toBe(100);
+      expect(roundingIncrementMinor('NEAREST_HALF', 2)).toBe(50);
+      // A three-decimal currency (BHD) rounds to 1000 minor units per whole.
+      expect(roundingIncrementMinor('NEAREST_WHOLE', 3)).toBe(1000);
+      expect(roundingIncrementMinor('NEAREST_HALF', 3)).toBe(500);
+    });
+
+    it('leaves the total exact in NONE mode', () => {
+      expect(roundMinor(12345, 'NONE', 2)).toEqual({ rounded: 12345, adjustment: 0 });
+    });
+
+    it('rounds half-up to the nearest whole major unit', () => {
+      // 123.45 -> 123.00, a 0.45 loss (negative adjustment).
+      expect(roundMinor(12345, 'NEAREST_WHOLE', 2)).toEqual({ rounded: 12300, adjustment: -45 });
+      // 123.50 -> 124.00, exactly half rounds up.
+      expect(roundMinor(12350, 'NEAREST_WHOLE', 2)).toEqual({ rounded: 12400, adjustment: 50 });
+      // 123.51 -> 124.00.
+      expect(roundMinor(12351, 'NEAREST_WHOLE', 2)).toEqual({ rounded: 12400, adjustment: 49 });
+    });
+
+    it('rounds half-up to the nearest half major unit', () => {
+      expect(roundMinor(12325, 'NEAREST_HALF', 2)).toEqual({ rounded: 12350, adjustment: 25 });
+      expect(roundMinor(12324, 'NEAREST_HALF', 2)).toEqual({ rounded: 12300, adjustment: -24 });
+      expect(roundMinor(12375, 'NEAREST_HALF', 2)).toEqual({ rounded: 12400, adjustment: 25 });
+    });
+
+    it('rounds negatives symmetrically so a credit note mirrors an invoice', () => {
+      expect(roundMinor(-12345, 'NEAREST_WHOLE', 2)).toEqual({ rounded: -12300, adjustment: 45 });
+      expect(roundMinor(-12350, 'NEAREST_WHOLE', 2)).toEqual({ rounded: -12400, adjustment: -50 });
+    });
+
+    it('keeps the adjustment consistent with the rounded total', () => {
+      for (const total of [1, 49, 50, 51, 99, 100, 101, 9999, 10001]) {
+        const { rounded, adjustment } = roundMinor(total, 'NEAREST_WHOLE', 2);
+        expect(rounded).toBe(total + adjustment);
+        expect(rounded % 100).toBe(0);
+      }
+    });
   });
 });

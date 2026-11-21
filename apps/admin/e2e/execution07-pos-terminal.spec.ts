@@ -1,0 +1,425 @@
+import { expect, test } from '@playwright/test';
+import { ENTERPRISE_ADMIN, SUPER_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
+
+/**
+ * The point-of-sale terminal.
+ *
+ * Drives the real till against the seeded demo tenant: opens a cashier session
+ * through the API (a branch may only have one), loads the product grid, adds a
+ * line by tapping a tile, adds a second by scanning a barcode into the search
+ * field, and completes the sale. The receipt is then asserted through the API so
+ * a success toast over a rejected request cannot pass.
+ *
+ * Nothing is stubbed: the grid reads `GET /inventory/pos-catalog` and the sale
+ * posts to `POST /sales/pos-sales`, the same routes the terminal uses in
+ * production.
+ */
+
+const API = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
+
+test.describe('Point of sale — card terminal', () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page, ENTERPRISE_ADMIN);
+    await setLocale(page, 'en');
+    await setTheme(page, 'dark');
+  });
+
+  test('1. the till sells a scanned and a tapped product end to end', async ({ page }) => {
+    const bearer = await apiToken(page, ENTERPRISE_ADMIN);
+
+    // Guarantee an open session and a scannable product. The catalogue endpoint
+    // is the source of truth for what the grid will show.
+    const setup = await page.evaluate(
+      async ({ api, bearer: token }) => {
+        const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+        const me = (await (await fetch(`${api}/auth/me`, { headers })).json()) as {
+          context: { companyId: string };
+        };
+        const context = (await (await fetch(`${api}/auth/context`, { headers })).json()) as {
+          branches: Array<{ id: string }>;
+        };
+        const warehouses = (await (await fetch(`${api}/inventory/warehouses?pageSize=1`, { headers })).json()) as {
+          items: Array<{ id: string }>;
+        };
+        const branchId = context.branches[0].id;
+        const warehouseId = warehouses.items[0].id;
+
+        const sessions = (await (await fetch(`${api}/sales/cashier-sessions`, { headers })).json()) as {
+          items: Array<{ id: string; status: string; branchId: string }>;
+        };
+        const open = sessions.items.find((s) => s.status === 'OPEN' && s.branchId === branchId);
+        if (!open) {
+          const res = await fetch(`${api}/sales/cashier-sessions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ branchId, warehouseId, openingFloatMinor: 0 }),
+          });
+          if (!res.ok) throw new Error(`open session failed: ${res.status} ${await res.text()}`);
+        }
+
+        const catalog = (await (await fetch(`${api}/inventory/pos-catalog`, { headers })).json()) as {
+          items: Array<{ sku: string; barcode: string | null; salesPriceMinor: number; stockStatus: string }>;
+        };
+        const sellable = catalog.items.find((p) => p.stockStatus !== 'OUT');
+        if (!sellable) throw new Error('no sellable product in the POS catalogue');
+        return { companyId: me.context.companyId, branchId, warehouseId, product: sellable };
+      },
+      { api: API, bearer },
+    );
+
+    await page.goto('/sales');
+    await expect(page.getByTestId('sales-page')).toBeVisible();
+    await page.getByTestId('sales-tab-pos').click();
+
+    // When an active session is present, the cashier opens the workstation
+    // directly; the legacy "new sale" button is no longer required.
+    await expect(page.getByTestId('pos-search')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('pos-command-bar')).toBeVisible();
+    await expect(page.getByTestId('pos-command-bar')).toContainText('Point of sale');
+    await expect(page.getByTestId('pos-command-bar')).toContainText('Active session');
+
+    // Record the receipt count so the sale this test creates can be identified.
+    const receiptsBefore = await page.evaluate(
+      async ({ api, bearer: token }) => {
+        const headers = { Authorization: `Bearer ${token}` };
+        const rows = (await (await fetch(`${api}/sales/pos-sales?page=1`, { headers })).json()) as {
+          total: number;
+        };
+        return rows.total;
+      },
+      { api: API, bearer },
+    );
+
+    // Terminal is already open on the current cashier session.
+
+    // The grid loads from the catalogue endpoint.
+    const grid = page.getByTestId('pos-grid');
+    await expect(grid).toBeVisible({ timeout: 30_000 });
+    // The full-height workstation must not push the order rail outside the
+    // visible screen when the catalogue is tall.
+    const rail = page.locator('.oryx-pos__rail');
+    await expect(rail).toBeVisible();
+    const railRect = await rail.boundingBox();
+    const viewport = page.viewportSize();
+    expect(railRect).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(railRect!.x).toBeGreaterThanOrEqual(0);
+    expect(railRect!.x + railRect!.width).toBeLessThanOrEqual(viewport!.width + 1);
+    expect(railRect!.y).toBeGreaterThanOrEqual(0);
+    expect(railRect!.y).toBeLessThan(viewport!.height);
+    // On a normal desktop the grid must show several products across the
+    // viewport, not a narrow strip of three oversized cards.
+    if (viewport!.width >= 1024) {
+      const columns = await grid.evaluate((element) =>
+        window.getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length,
+      );
+      expect(columns).toBeGreaterThanOrEqual(4);
+    }
+    const tile = page.getByTestId(`pos-product-${setup.product.sku}`);
+    await expect(tile).toBeVisible({ timeout: 30_000 });
+
+    // Tap the tile and ensure a missing catalogue price can be explicitly
+    // entered before checking out. Never silently charge 1 fils.
+    await tile.click();
+    // Selecting a product must immediately display a real line in the
+    // independently scrolling order rail, without opening another panel.
+    await expect(page.getByTestId(`pos-cart-line-${setup.product.sku}`)).toBeVisible();
+    await expect(page.getByTestId('pos-premium-workstation')).toBeVisible();
+    await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toBeVisible();
+    await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toHaveCSS('max-height', '38px');
+    const closeButton = page.getByRole('dialog').getByRole('button', { name: /close/i }).first();
+    const closeBox = await closeButton.boundingBox();
+    expect(closeBox).not.toBeNull();
+    expect(closeBox!.width).toBeGreaterThanOrEqual(44);
+    expect(closeBox!.height).toBeGreaterThanOrEqual(44);
+    expect(closeBox!.x).toBeGreaterThanOrEqual(0);
+    expect(closeBox!.x + closeBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
+
+    // The POS status and category filters must occupy the SAME top row,
+    // rather than stacking three bands above the cart.
+    const firstRow = await page.evaluate(() => {
+      const quick = document.querySelector('.oryx-pos--new-cashier > .oryx-pos__quickbar');
+      const categories = document.querySelector('.oryx-pos--new-cashier > .oryx-pos__categories');
+      if (!quick || !categories) return null;
+      const q = quick.getBoundingClientRect();
+      const c = categories.getBoundingClientRect();
+      return { aligned: Math.abs(q.top - c.top) < 2, compact: q.height <= 39 };
+    });
+    expect(firstRow?.aligned).toBe(true);
+    expect(firstRow?.compact).toBe(true);
+
+    await expect(page.getByTestId('pos-checkout-cart')).toBeVisible();
+    // V4 acceptance: products and the selected-cart rail occupy independent
+    // visible regions, and both scrolling regions remain accessible.
+    const layout = await page.evaluate(() => {
+      const categories = document.querySelector<HTMLElement>('.oryx-pos--workspace-v4 .oryx-pos__categories');
+      const catalog = document.querySelector<HTMLElement>('.oryx-pos--workspace-v4 .oryx-pos__catalog');
+      const cart = document.querySelector<HTMLElement>('.oryx-pos--workspace-v4 .oryx-pos__rail');
+      const products = document.querySelector<HTMLElement>('.oryx-pos--workspace-v4 .oryx-pos__grid');
+      const lines = document.querySelector<HTMLElement>('.oryx-pos--workspace-v4 .oryx-pos__lines');
+      if (!categories || !catalog || !cart || !products || !lines) return null;
+      const a = catalog.getBoundingClientRect();
+      const b = cart.getBoundingClientRect();
+      return {
+        overlap: Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)),
+        categoriesAboveCatalog: categories.getBoundingClientRect().bottom <= a.top + 1,
+        catalogWidth: a.width,
+        cartWidth: b.width,
+        productsScroll: getComputedStyle(products).overflowY,
+        cartScroll: getComputedStyle(lines).overflowY,
+        cartCount: lines.querySelectorAll('[data-testid^="pos-cart-line-"]').length,
+      };
+    });
+    expect(layout).not.toBeNull();
+    if (viewport!.width >= 901) {
+      expect(layout!.overlap).toBeLessThanOrEqual(1);
+      expect(layout!.catalogWidth).toBeGreaterThan(250);
+      expect(layout!.cartWidth).toBeGreaterThanOrEqual(310);
+      expect(layout!.categoriesAboveCatalog).toBe(true);
+      if (viewport!.width >= 1200) expect(layout!.catalogWidth).toBeGreaterThan(650);
+    }
+    expect(layout!.productsScroll).toBe('auto');
+    expect(layout!.cartScroll).toBe('auto');
+    expect(layout!.cartCount).toBeGreaterThan(0);
+
+    // Reported regression: on a short 720px cashier screen the large headers
+    // squeezed the basket to one item, and newly selected items stayed below
+    // the fold until somebody manually scrolled the cart. Verify the second
+    // and third distinct products become visible inside the cart automatically.
+    await page.setViewportSize({ width: 1265, height: 720 });
+    const basket = page.getByTestId('pos-cart-lines');
+    const availableTiles = page.locator('[data-testid^="pos-product-"]:not([disabled])');
+    const extraSkus: string[] = [];
+    for (let index = 0; index < await availableTiles.count() && extraSkus.length < 2; index++) {
+      const next = availableTiles.nth(index);
+      const name = await next.getAttribute('data-testid');
+      const sku = name?.replace(/^pos-product-/, '') ?? '';
+      if (!sku || sku === setup.product.sku || extraSkus.includes(sku)) continue;
+      await next.click();
+      extraSkus.push(sku);
+      await expect(page.getByTestId(`pos-cart-line-${sku}`)).toBeVisible();
+      const lastIsInCartViewport = await page.getByTestId(`pos-cart-line-${sku}`).evaluate((element) => {
+        const viewport = element.closest('[data-testid="pos-cart-lines"]')?.getBoundingClientRect();
+        const item = element.getBoundingClientRect();
+        return !!viewport && item.top >= viewport.top - 1 && item.bottom <= viewport.bottom + 1;
+      });
+      expect(lastIsInCartViewport).toBe(true);
+    }
+    expect(extraSkus.length).toBe(2);
+    const basketHeight = await basket.evaluate((element) => element.getBoundingClientRect().height);
+    expect(basketHeight).toBeGreaterThan(115);
+    for (const sku of extraSkus) {
+      await page.getByTestId(`pos-remove-${sku}`).click();
+    }
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    await expect(tile.locator('.oryx-pos-tile__selected')).toHaveText('1');
+    // The approved cart design adjusts quantity without opening the detail editor.
+    await page.getByTestId(`pos-increment-${setup.product.sku}`).click();
+    await expect(page.getByTestId(`pos-quantity-label-${setup.product.sku}`)).toHaveText('2');
+    await page.getByTestId(`pos-decrement-${setup.product.sku}`).click();
+    await expect(page.getByTestId(`pos-quantity-label-${setup.product.sku}`)).toHaveText('1');
+    // Compact cart rows display all selected products; editing expands a row.
+    const priceEditor = page.getByTestId(`pos-price-${setup.product.sku}`);
+    if (!(await priceEditor.isVisible())) {
+      await page.getByTestId(`pos-edit-line-${setup.product.sku}`).click();
+    }
+    await expect(priceEditor).toBeVisible();
+    if (setup.product.salesPriceMinor <= 1) {
+      await expect(page.getByTestId('save-pos-sale')).toBeDisabled();
+      const price = page.getByTestId(`pos-price-${setup.product.sku}`);
+      await price.fill('5.000');
+      await price.blur();
+      await expect(price).toHaveValue('5.000');
+    }
+    // Regression: one 28.000 BHD item must total 28 dinars before VAT,
+    // never mere fils because the shared pricing engine expects 10^4 quantity units.
+    const exactPrice = page.getByTestId(`pos-price-${setup.product.sku}`);
+    await exactPrice.fill('28.000');
+    await exactPrice.blur();
+
+    // Cart Amount is QTY × UNIT PRICE. A discount must never reduce this
+    // displayed amount; tax belongs exclusively in the totals calculation.
+    const lineAmount = page.getByTestId(`pos-line-amount-${setup.product.sku}`);
+    await expect(lineAmount).toContainText('28.000 BHD');
+    const lineDiscount = page.getByTestId(`pos-discount-${setup.product.sku}`);
+    await lineDiscount.fill('1.000');
+    await expect(lineAmount).toContainText('28.000 BHD');
+    await expect(page.getByTestId(`pos-line-total-${setup.product.sku}`)).toContainText('28.000 BHD');
+    await page.getByTestId(`pos-increment-${setup.product.sku}`).click();
+    await expect(lineAmount).toContainText('56.000 BHD');
+    await page.getByTestId(`pos-decrement-${setup.product.sku}`).click();
+    await lineDiscount.fill('0');
+    await expect(page.locator('.oryx-pos__totals')).toContainText('28.000 BHD');
+    const total = page.getByTestId('pos-total');
+    await expect(total).toBeVisible();
+    const firstTotal = await total.textContent();
+
+    // Scan the barcode (or the SKU when a product has none) and press Enter: the
+    // field clears and the line quantity grows.
+    const scan = page.getByTestId('pos-search');
+    await scan.fill(setup.product.barcode ?? setup.product.sku);
+    await scan.press('Enter');
+    await expect(scan).toHaveValue('');
+
+    // Pay with an over-tender so the change is exercised, then complete.
+    await page.getByTestId('pos-paid').fill('1000');
+    await page.getByTestId('save-pos-sale').click();
+
+    // The receipt is written through the API — assert the record, not the toast.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            async ({ api, bearer: token }) => {
+              const headers = { Authorization: `Bearer ${token}` };
+              const rows = (await (await fetch(`${api}/sales/pos-sales?page=1`, { headers })).json()) as {
+                total: number;
+              };
+              return rows.total;
+            },
+            { api: API, bearer },
+          ),
+        { timeout: 30_000 },
+      )
+      .toBeGreaterThan(receiptsBefore);
+
+    // The grid total was a real figure, not a placeholder.
+    expect(firstTotal).toMatch(/\d/);
+  });
+
+  test('2. the till filters by category, shows on-hand stock and offers tender methods', async ({ page }) => {
+    const bearer = await apiToken(page, ENTERPRISE_ADMIN);
+
+    // Guarantee an open session (a branch may only have one) and read the
+    // catalogue so the assertions match the tenant's real data.
+    const setup = await page.evaluate(
+      async ({ api, bearer: token }) => {
+        const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+        const context = (await (await fetch(`${api}/auth/context`, { headers })).json()) as {
+          branches: Array<{ id: string }>;
+        };
+        const warehouses = (await (await fetch(`${api}/inventory/warehouses?pageSize=1`, { headers })).json()) as {
+          items: Array<{ id: string }>;
+        };
+        const branchId = context.branches[0].id;
+        const warehouseId = warehouses.items[0].id;
+        const sessions = (await (await fetch(`${api}/sales/cashier-sessions`, { headers })).json()) as {
+          items: Array<{ status: string; branchId: string }>;
+        };
+        if (!sessions.items.some((s) => s.status === 'OPEN' && s.branchId === branchId)) {
+          const res = await fetch(`${api}/sales/cashier-sessions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ branchId, warehouseId, openingFloatMinor: 0 }),
+          });
+          if (!res.ok) throw new Error(`open session failed: ${res.status} ${await res.text()}`);
+        }
+        const catalog = (await (await fetch(`${api}/inventory/pos-catalog`, { headers })).json()) as {
+          items: Array<{ sku: string; category: string | null; trackStock: boolean }>;
+        };
+        const categories = (await (await fetch(`${api}/inventory/pos-categories`, { headers })).json()) as {
+          items: string[];
+        };
+        const withCategory = catalog.items.find((p) => p.category);
+        return { categories: categories.items, withCategory: withCategory ?? null };
+      },
+      { api: API, bearer },
+    );
+
+    await page.goto('/sales');
+    await expect(page.getByTestId('sales-page')).toBeVisible();
+    await page.getByTestId('sales-tab-pos').click();
+    await expect(page.getByTestId('pos-search')).toBeVisible({ timeout: 30_000 });
+
+    await expect(page.getByTestId('pos-grid')).toBeVisible({ timeout: 30_000 });
+
+    // The category chips are derived from the tenant's own products.
+    expect(setup.categories.length).toBeGreaterThan(0);
+    const chips = page.getByTestId('pos-categories');
+    await expect(chips).toBeVisible();
+
+    const firstCategory = setup.categories[0];
+    const chip = page.getByTestId(`pos-category-${firstCategory}`);
+    await expect(chip).toBeVisible();
+    await chip.click();
+    await expect(chip).toHaveClass(/oryx-pos__category--active/);
+
+    // Every tile now belongs to the chosen category. The tile name is not the
+    // category, so assert through the API: filter the grid to a category whose
+    // product exists and confirm that product's tile is shown.
+    if (setup.withCategory) {
+      const tile = page.getByTestId(`pos-product-${setup.withCategory.sku}`);
+      // The chip may not match the picked product's category; reset to All first.
+      await page.getByTestId('pos-category-all').click();
+      await expect(tile).toBeVisible({ timeout: 30_000 });
+
+      // The on-hand badge is rendered from the catalogue's stock position.
+      const stock = page.getByTestId(`pos-stock-${setup.withCategory.sku}`);
+      await expect(stock).toBeVisible();
+      await expect(stock).toContainText(setup.withCategory.trackStock ? /Available/ : /Service/);
+    }
+
+    // The four tender methods are buttons, and selecting one marks it pressed.
+    const card = page.getByTestId('pos-pay-CARD');
+    await expect(card).toBeVisible();
+    await card.click();
+    await expect(card).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('pos-pay-CASH')).toHaveAttribute('aria-pressed', 'false');
+
+    // "Exact" fills the tendered amount; the cash-only "round cash" helper
+    // appears only when cash is selected.
+    await expect(page.getByTestId('pos-paid-round')).toHaveCount(0);
+    await page.getByTestId('pos-pay-CASH').click();
+    await expect(page.getByTestId('pos-paid-round')).toBeVisible();
+
+    // The redesigned POS inherits the ORYX theme instead of forcing lavender.
+    const workstation = page.getByTestId('pos-premium-workstation');
+    const darkColor = await workstation.evaluate((el) => getComputedStyle(el).backgroundColor);
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+    const lightColor = await workstation.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(lightColor).not.toBe(darkColor);
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  });
+});
+
+test.describe('Full-viewport data entry forms', () => {
+  test('company creation uses the whole viewport and keeps actions visible', async ({ page }) => {
+    await page.setViewportSize({ width: 1265, height: 720 });
+    await signIn(page, SUPER_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/companies');
+    await page.getByTestId('new-company').click();
+    const dialog = page.getByRole('dialog', { name: /company/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByTestId('company-name-en')).toBeVisible();
+    const geometry = await dialog.locator('.oryx-modal').evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      const content = node.children[1] as HTMLElement;
+      return {
+        width: rect.width,
+        height: rect.height,
+        scroll: getComputedStyle(content).overflowY,
+      };
+    });
+    expect(geometry.width).toBeGreaterThanOrEqual(1264);
+    expect(geometry.height).toBeGreaterThanOrEqual(719);
+    expect(geometry.scroll).toBe('auto');
+    await expect(dialog.getByTestId('create-company-submit')).toBeVisible();
+  });
+
+  test('branch creation is a full-viewport editor, not a narrow dialog', async ({ page }) => {
+    await page.setViewportSize({ width: 1265, height: 720 });
+    await signIn(page, ENTERPRISE_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/branches');
+    await page.getByTestId('new-branch').click();
+    const dialog = page.getByRole('dialog').last();
+    await expect(dialog).toBeVisible();
+    const geometry = await dialog.locator('.oryx-modal').boundingBox();
+    expect(geometry).not.toBeNull();
+    expect(geometry!.width).toBeGreaterThanOrEqual(1264);
+    expect(geometry!.height).toBeGreaterThanOrEqual(719);
+    await expect(dialog.getByTestId('create-branch-submit')).toBeVisible();
+  });
+});

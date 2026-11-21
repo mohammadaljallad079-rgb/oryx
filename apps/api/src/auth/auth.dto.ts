@@ -1,6 +1,8 @@
 import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { TrimString } from '../common/transformers';
 
 export class LoginDto {
+  @TrimString()
   @IsEmail()
   email!: string;
 
@@ -78,6 +80,10 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsIn(['dark', 'light'])
   preferredTheme?: 'dark' | 'light';
+
+  @IsOptional()
+  @IsIn(['SM', 'MD', 'LG'])
+  preferredFontScale?: 'SM' | 'MD' | 'LG';
 }
 
 export class ChangePasswordDto {

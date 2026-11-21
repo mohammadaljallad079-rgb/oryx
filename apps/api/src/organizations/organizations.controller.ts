@@ -20,6 +20,7 @@ import { OrganizationsService, type ActorContext } from './organizations.service
 import {
   CreateBranchDto,
   CreateCompanyDto,
+  DeleteCompanyDto,
   ListQueryDto,
   SetCompanyStatusDto,
   UpdateBranchDto,
@@ -54,6 +55,13 @@ export class CompaniesController {
   @ApiOperation({ summary: 'List companies visible to the current principal' })
   list(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.orgs.listCompanies(query, actorFrom(p, req));
+  }
+
+  @Get('available-managers')
+  @RequirePermissions('platform.company.create')
+  @ApiOperation({ summary: 'Search existing active user accounts for company administrator assignment' })
+  availableManagers(@Query('search') search: string | undefined, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.orgs.availableCompanyManagers(search, actorFrom(p, req));
   }
 
   @Post()
@@ -92,6 +100,18 @@ export class CompaniesController {
     @Req() req: RequestLike,
   ) {
     return this.orgs.setCompanyStatus(id, dto.status, dto.reason, actorFrom(p, req));
+  }
+
+  @Delete(':id')
+  @RequirePermissions('platform.company.delete')
+  @ApiOperation({ summary: 'Permanently delete a company and all of its records (platform only)' })
+  remove(
+    @Param('id') id: string,
+    @Body() dto: DeleteCompanyDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.orgs.deleteCompany(id, dto.confirm === true, actorFrom(p, req));
   }
 
   @Get(':companyId/branches')

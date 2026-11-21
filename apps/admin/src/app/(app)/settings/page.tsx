@@ -7,13 +7,23 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
 import { Badge, Button, Card, EmptyState, ErrorBanner, Field, SectionHeader, Skeleton } from '@/components/ui';
+import { BrandingPanel } from '@/components/branding-panel';
+import { CompanySettingsPanel } from '@/components/company-settings-panel';
+import { TaxRatesPanel } from '@/components/tax-rates-panel';
+import { CompanySettingsCentre } from '@/components/company-settings-centre';
 
 export default function SettingsPage() {
-  const { t, locale, theme, setLocale, setTheme } = useUi();
-  const { user, companyId, isPlatform, updatePreferences, refreshSession } = useAuth();
+  const { t, locale, theme, fontScale, setLocale, setTheme, setFontScale } = useUi();
+  const { user, companyId, isPlatform, can, updatePreferences, refreshSession } = useAuth();
+  const [settingsSection, setSettingsSection] = useState<'general' | 'sales'>('general');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({ fullNameEn: '', fullNameAr: '' });
+
+  // Writes need `company.settings.update`; a Super Admin holds the platform
+  // variant of that check through its own role. Rendering the editor without
+  // the permission would show controls that the API rejects with a 403.
+  const canEditBranding = can('company.settings.update');
 
   const entitlements = useAsync(
     () => (companyId ? api.entitlements(companyId) : Promise.resolve(null)),
@@ -37,7 +47,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5" data-testid="settings-page">
+    <div className="flex flex-col gap-4" data-testid="settings-page">
       <SectionHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
       {saved ? (
@@ -55,7 +65,7 @@ export default function SettingsPage() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
+        <Card className="p-4">
           <p className="oryx-panel-title m-0 mb-4">{t('settings.profile')}</p>
           <div className="grid gap-4">
             <Field label={t('auth.email')}>
@@ -85,7 +95,7 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4">
           <p className="oryx-panel-title m-0 mb-4">{t('settings.preferences')}</p>
 
           <div className="mb-4">
@@ -109,7 +119,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div>
+          <div className="mb-4">
             <p className="oryx-label">{t('settings.locale')}</p>
             <div className="flex gap-2">
               {(['ar', 'en'] as const).map((code) => (
@@ -130,17 +140,89 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          <div>
+            <p className="oryx-label">{t('settings.fontSize')}</p>
+            <div className="flex flex-wrap gap-2">
+              {(['SM', 'MD', 'LG'] as const).map((scale) => (
+                <Button
+                  key={scale}
+                  size="sm"
+                  variant={fontScale === scale ? 'primary' : 'default'}
+                  onClick={() => {
+                    setFontScale(scale);
+                    void updatePreferences({ preferredFontScale: scale }).catch(() => undefined);
+                  }}
+                  data-testid={`font-scale-${scale}`}
+                >
+                  <span aria-hidden style={{ fontSize: scale === 'SM' ? 12 : scale === 'LG' ? 17 : 14 }}>A</span>
+                  {t(`settings.fontScale.${scale}` as const)}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           <hr className="oryx-divider my-4" />
           <div className="flex flex-wrap gap-2">
             <Badge tone={isPlatform ? 'gold' : 'info'}>{isPlatform ? 'Super Admin' : 'Company user'}</Badge>
             <Badge tone="neutral">{locale.toUpperCase()}</Badge>
             <Badge tone="neutral">{theme}</Badge>
+            <Badge tone="neutral">{fontScale}</Badge>
           </div>
         </Card>
       </div>
 
+      {companyId && canEditBranding ? (
+        <Card className="p-4" data-testid="settings-branding">
+          <p className="oryx-panel-title m-0 mb-1">{t('branding.title')}</p>
+          <p className="oryx-muted m-0 mb-4 text-[12px]">{t('branding.subtitle')}</p>
+          <BrandingPanel companyId={companyId} />
+        </Card>
+      ) : null}
+
       {companyId ? (
-        <Card className="p-5" data-testid="settings-entitlements">
+        <Card className="p-4" data-testid="settings-payment-shortcut">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="oryx-panel-title m-0">{locale === 'ar' ? 'طرق الدفع' : 'Payment methods'}</p>
+              <p className="oryx-muted m-0 text-xs">
+                {locale === 'ar' ? 'إضافة وتعديل وتفعيل طرق دفع الفواتير ونقاط البيع' : 'Manage invoice and POS tender methods'}
+              </p>
+            </div>
+            <Button variant="primary" data-testid="open-payment-method-settings" onClick={() => {
+              setSettingsSection('sales');
+              document.querySelector('[data-testid="settings-centre-card"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}>
+              <Icon name="wallet" size={16} />
+              {locale === 'ar' ? 'إدارة طرق الدفع' : 'Manage payment methods'}
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      {companyId ? (
+        <Card className="p-4" data-testid="settings-centre-card">
+          <p className="oryx-panel-title m-0 mb-1">{t('settings.centre')}</p>
+          <p className="oryx-muted m-0 mb-4 text-[12px]">{t('settings.centreHint')}</p>
+          <CompanySettingsCentre canEdit={canEditBranding} initialSection={settingsSection} />
+        </Card>
+      ) : null}
+
+      <Card className="p-4" data-testid="settings-company">
+        <p className="oryx-panel-title m-0 mb-1">{t('settings.company')}</p>
+        <p className="oryx-muted m-0 mb-4 text-[12px]">{t('settings.companyHint')}</p>
+        <CompanySettingsPanel />
+      </Card>
+
+      {companyId ? (
+        <Card className="p-4" data-testid="settings-taxes">
+          <p className="oryx-panel-title m-0 mb-1">{t('tax.title')}</p>
+          <p className="oryx-muted m-0 mb-4 text-[12px]">{t('tax.hint')}</p>
+          <TaxRatesPanel />
+        </Card>
+      ) : null}
+
+      {companyId ? (
+        <Card className="p-4" data-testid="settings-entitlements">
           <p className="oryx-panel-title m-0 mb-1">{t('subscriptions.licence')}</p>
           <p className="oryx-muted m-0 mb-4 text-[12px]">{t('dash.moduleAdoptionHint')}</p>
           {entitlements.loading ? (

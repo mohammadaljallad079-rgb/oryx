@@ -1,6 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsOptional } from 'class-validator';
+import { memoryStorage } from 'multer';
+import type { Response } from 'express';
+import { ATTACHMENT_MAX_BYTES } from '@oryx/shared';
 import {
   CurrentPrincipal,
   RequireAnyPermission,
@@ -9,27 +13,43 @@ import {
   type RequestPrincipal,
 } from '../auth/auth.decorators';
 import { actorFrom } from '../common/erp-context.service';
+import type { UploadedFileLike } from '../attachments/attachments.service';
 import { HrService } from './hr.service';
+import { HrExportService } from './hr-export.service';
+import { EmployeeFileService } from './employee-file.service';
 import {
   AdjustBalanceDto,
   CreateAdvanceDto,
+  CreateBonusDto,
   CreateContractDto,
   CreateDepartmentDto,
+  UpdateDepartmentDto,
   CreateDocumentDto,
   CreateEmployeeDto,
   CreateJobTitleDto,
   CreateLeaveTypeDto,
   CreatePayrollPeriodDto,
   CreatePayrollRunDto,
+  CreatePenaltyDto,
   CreateSalaryStructureDto,
   CreateShiftDto,
+  CreateWorkSiteDto,
   DecideLeaveDto,
+  FileRangeQueryDto,
   ListQueryDto,
   RecordAttendanceDto,
   RequestLeaveDto,
+  SelfBreakDto,
+  SelfCheckInDto,
+  SelfCheckOutDto,
   SettleAdvanceDto,
   StartLifecycleDto,
+  UpdateAttendancePolicyDto,
+  UpdateBonusDto,
   UpdateEmployeeDto,
+  UpdateLeaveRequestDto,
+  UpdatePenaltyDto,
+  UpdateWorkSiteDto,
 } from './hr.dto';
 
 interface RequestLike {
@@ -48,7 +68,11 @@ class ToggleItemDto {
 @RequireModule('human_resources')
 @Controller('hr')
 export class HrController {
-  constructor(private readonly hr: HrService) {}
+  constructor(
+    private readonly hr: HrService,
+    private readonly hrExport: HrExportService,
+    private readonly file: EmployeeFileService,
+  ) {}
 
   // ------------------------------------------------------------ departments
   @Get('departments')
@@ -63,6 +87,20 @@ export class HrController {
   @ApiOperation({ summary: 'Create a department' })
   createDepartment(@Body() dto: CreateDepartmentDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.hr.createDepartment(dto, p, actorFrom(p, req));
+  }
+
+  @Patch('departments/:id')
+  @RequirePermissions('erp.hr.department.manage')
+  @ApiOperation({ summary: 'Update a department within the current company' })
+  updateDepartment(@Param('id') id: string, @Body() dto: UpdateDepartmentDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.updateDepartment(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('departments/:id')
+  @RequirePermissions('erp.hr.department.manage')
+  @ApiOperation({ summary: 'Permanently delete an unused department' })
+  deleteDepartment(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.deleteDepartment(id, p, actorFrom(p, req));
   }
 
   @Get('job-titles')
@@ -108,6 +146,13 @@ export class HrController {
     return this.hr.updateEmployee(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('employees/:id')
+  @RequirePermissions('erp.hr.employee.manage')
+  @ApiOperation({ summary: 'Delete an employee that has no payroll history' })
+  deleteEmployee(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.deleteEmployee(id, p, actorFrom(p, req));
+  }
+
   // -------------------------------------------------------------- contracts
   @Post('employees/:id/contracts')
   @RequirePermissions('erp.hr.employee.manage')
@@ -126,9 +171,53 @@ export class HrController {
 
   @Post('employees/:id/documents')
   @RequirePermissions('erp.hr.employee.manage')
-  @ApiOperation({ summary: 'Add an employee document' })
-  createDocument(@Param('id') id: string, @Body() dto: CreateDocumentDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
-    return this.hr.createDocument(id, dto, p, actorFrom(p, req));
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: ATTACHMENT_MAX_BYTES, files: 1 },
+    }),
+  )
+  @ApiOperation({ summary: 'Add an employee document, optionally with an uploaded file' })
+  createDocument(
+    @Param('id') id: string,
+    @Body() dto: CreateDocumentDto,
+    @UploadedFile() file: UploadedFileLike,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.hr.createDocument(id, dto, file, p, actorFrom(p, req));
+  }
+
+  @Get('employees/:id/documents/:documentId/file')
+  @RequirePermissions('erp.hr.document.read')
+  @ApiOperation({ summary: 'Preview or download an employee document file' })
+  async documentFile(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Res() res: Response,
+  ): Promise<void> {
+    const file = await this.hr.resolveDocumentFile(id, documentId, p);
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Length', String(file.sizeBytes));
+    // `inline` lets the browser preview a PDF or image; the filename is
+    // RFC 5987 encoded so a name with spaces or Arabic survives the header.
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    this.hr.streamDocumentFile(file.path).pipe(res);
+  }
+
+  @Delete('employees/:id/documents/:documentId')
+  @RequirePermissions('erp.hr.employee.manage')
+  @ApiOperation({ summary: 'Remove an employee document and any stored file' })
+  deleteDocument(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.hr.deleteDocument(id, documentId, p, actorFrom(p, req));
   }
 
   // -------------------------------------------------------------- lifecycle
@@ -180,6 +269,13 @@ export class HrController {
   @ApiOperation({ summary: 'Submit a leave request (balance is enforced)' })
   requestLeave(@Body() dto: RequestLeaveDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.hr.requestLeave(dto, p, actorFrom(p, req));
+  }
+
+  @Patch('leave-requests/:id')
+  @RequirePermissions('erp.hr.leave.request')
+  @ApiOperation({ summary: 'Edit a submitted leave request (balance stays in step)' })
+  updateLeaveRequest(@Param('id') id: string, @Body() dto: UpdateLeaveRequestDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.updateLeaveRequest(id, dto, p, actorFrom(p, req));
   }
 
   @Post('leave-requests/:id/decide')
@@ -311,5 +407,343 @@ export class HrController {
   @ApiOperation({ summary: 'Workforce dashboard' })
   dashboard(@Query('companyId') companyId: string | undefined, @CurrentPrincipal() p: RequestPrincipal) {
     return this.hr.workforceDashboard(p, companyId);
+  }
+
+  // ------------------------------------------------------- policy & worksites
+  @Get('attendance-policy')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.attendance.manage', 'erp.hr.attendance.policy')
+  @ApiOperation({ summary: 'Read the attendance and payroll policy' })
+  getPolicy(@CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.getPolicy(p);
+  }
+
+  @Patch('attendance-policy')
+  @RequirePermissions('erp.hr.attendance.policy')
+  @ApiOperation({ summary: 'Update the attendance and payroll policy' })
+  updatePolicy(@Body() dto: UpdateAttendancePolicyDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.updatePolicy(dto, p, actorFrom(p, req));
+  }
+
+  @Get('work-sites')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.worksite.manage', 'erp.hr.attendance.manage')
+  @ApiOperation({ summary: 'List geofenced work sites' })
+  workSites(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.listWorkSites(query, p);
+  }
+
+  @Post('work-sites')
+  @RequirePermissions('erp.hr.worksite.manage')
+  @ApiOperation({ summary: 'Create a work site' })
+  createWorkSite(@Body() dto: CreateWorkSiteDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.createWorkSite(dto, p, actorFrom(p, req));
+  }
+
+  @Patch('work-sites/:id')
+  @RequirePermissions('erp.hr.worksite.manage')
+  @ApiOperation({ summary: 'Update a work site' })
+  updateWorkSite(@Param('id') id: string, @Body() dto: UpdateWorkSiteDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.updateWorkSite(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('work-sites/:id')
+  @RequirePermissions('erp.hr.worksite.manage')
+  @ApiOperation({ summary: 'Delete a work site' })
+  deleteWorkSite(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.deleteWorkSite(id, p, actorFrom(p, req));
+  }
+
+  @Get('work-sites/:id/qr-token')
+  @RequirePermissions('erp.hr.worksite.manage')
+  @ApiOperation({ summary: 'Current rotating QR token for a work site kiosk' })
+  workSiteQrToken(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.workSiteQrToken(id, p);
+  }
+
+  // --------------------------------------------------------- self-service
+  @Get('attendance/me')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: "Today's attendance for the signed-in employee" })
+  myAttendance(@CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.myAttendanceToday(p);
+  }
+
+  @Get('attendance/me/history')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: "The signed-in employee's own attendance history" })
+  myAttendanceHistory(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.myAttendanceHistory(p, query.from, query.to);
+  }
+
+  @Post('attendance/check-in')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: 'Self check-in with optional GPS/Wi-Fi/QR verification' })
+  selfCheckIn(@Body() dto: SelfCheckInDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.selfCheckIn(dto, p, actorFrom(p, req), this.canManage(p));
+  }
+
+  @Post('attendance/check-out')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: 'Self check-out and derive the day' })
+  selfCheckOut(@Body() dto: SelfCheckOutDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.selfCheckOut(dto, p, actorFrom(p, req), this.canManage(p));
+  }
+
+  @Post('attendance/break/start')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: 'Start a break' })
+  selfBreakStart(@Body() dto: SelfBreakDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.selfBreakStart(dto, p, actorFrom(p, req), this.canManage(p));
+  }
+
+  @Post('attendance/break/end')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: 'End the open break' })
+  selfBreakEnd(@Body() dto: SelfBreakDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.selfBreakEnd(dto, p, actorFrom(p, req), this.canManage(p));
+  }
+
+  // --------------------------------------------------------- salary history
+  @Get('employees/:id/salary-history')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.salary.manage')
+  @ApiOperation({ summary: 'Effective salary structures and change log for an employee' })
+  salaryHistory(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.listSalaryHistory(id, p);
+  }
+
+  // ----------------------------------------------------------- payslips
+  @Get('payslips/me')
+  @RequirePermissions('erp.hr.payslip.self')
+  @ApiOperation({ summary: 'The signed-in employee’s own payslips' })
+  myPayslips(@CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.myPayslips(p);
+  }
+
+  @Get('payslips/:id/pdf')
+  @RequireAnyPermission('erp.hr.payslip.read', 'erp.hr.payslip.self', 'erp.hr.payroll.approve')
+  @ApiOperation({ summary: 'Download a payslip as PDF' })
+  async payslipPdf(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Res() res: Response) {
+    await this.hr.assertPayslipReadable(id, p);
+    const { bytes, filename } = await this.hrExport.payslipPdf(id, p);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(bytes);
+  }
+
+  // ----------------------------------------------------------- HR reports
+  @Get('reports/attendance')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Attendance detail report' })
+  reportAttendance(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportAttendance(query, p);
+  }
+
+  @Get('reports/late-absence')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Late arrival and absence report' })
+  reportLateAbsence(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportLateAbsence(query, p);
+  }
+
+  @Get('reports/overtime')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Overtime report' })
+  reportOvertime(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportOvertime(query, p);
+  }
+
+  @Get('reports/worked-hours')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Worked hours report' })
+  reportWorkedHours(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportWorkedHours(query, p);
+  }
+
+  @Get('reports/payroll')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Monthly payroll report' })
+  reportPayroll(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportPayroll(query, p);
+  }
+
+  @Get('reports/deductions-allowances')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Deductions and allowances report' })
+  reportDeductions(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportDeductionsAllowances(query, p);
+  }
+
+  @Get('reports/employee-payroll')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Employee payroll register' })
+  reportEmployeePayroll(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportEmployeePayroll(query, p);
+  }
+
+  @Get('reports/payroll-cost')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Payroll cost by department and branch' })
+  reportPayrollCost(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportPayrollCost(query, p);
+  }
+
+  @Get('reports/:kind/export')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Export an HR report as CSV' })
+  async exportReport(@Param('kind') kind: string, @Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal, @Res() res: Response) {
+    const result = await this.hr.runReport(kind, query, p);
+    const csv = this.hrExport.toCsv(result as Record<string, unknown>);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="hr-${kind}-${new Date().toISOString().slice(0, 10)}.csv"`);
+    // A BOM makes Excel open a UTF-8 CSV in the right encoding, so the Arabic
+    // headers and names do not turn into mojibake.
+    res.send(`\uFEFF${csv}`);
+  }
+
+  // ------------------------------------------------ employee electronic file
+  //
+  // Every tab of the file reads the same records the rest of HR writes. Pay and
+  // the payroll ledger need `erp.hr.salary.read` on top of the HR read
+  // permission; the service omits those fields rather than blanking them.
+
+  @Get('employees/:id/file/counts')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.salary.read')
+  @ApiOperation({ summary: 'Tab badge counts for the employee electronic file' })
+  fileCounts(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.counts(id, p);
+  }
+
+  @Get('employees/:id/file/personal-card')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.salary.read')
+  @ApiOperation({ summary: 'The employee personal card (pay omitted without salary access)' })
+  filePersonalCard(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.personalCard(id, p);
+  }
+
+  @Get('employees/:id/file/payroll')
+  @RequirePermissions('erp.hr.salary.read')
+  @ApiOperation({ summary: 'The employee payroll ledger for a date window' })
+  filePayroll(
+    @Param('id') id: string,
+    @Query() query: FileRangeQueryDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+  ) {
+    return this.file.payrollLedger(id, query, p);
+  }
+
+  @Get('employees/:id/file/leave')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.leave.manage')
+  @ApiOperation({ summary: 'The employee leave history and balances' })
+  fileLeave(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.leave(id, p);
+  }
+
+  @Get('employees/:id/file/penalties')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.penalty.manage')
+  @ApiOperation({ summary: 'The employee disciplinary actions' })
+  filePenalties(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.listPenalties(id, p);
+  }
+
+  @Post('employees/:id/file/penalties')
+  @RequirePermissions('erp.hr.penalty.manage')
+  @ApiOperation({ summary: 'Record a disciplinary action' })
+  createPenalty(
+    @Param('id') id: string,
+    @Body() dto: CreatePenaltyDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.file.createPenalty(id, dto, p, actorFrom(p, req));
+  }
+
+  @Patch('file/penalties/:penaltyId')
+  @RequirePermissions('erp.hr.penalty.manage')
+  @ApiOperation({ summary: 'Edit a disciplinary action' })
+  updatePenalty(
+    @Param('penaltyId') penaltyId: string,
+    @Body() dto: UpdatePenaltyDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.file.updatePenalty(penaltyId, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('file/penalties/:penaltyId')
+  @RequirePermissions('erp.hr.penalty.manage')
+  @ApiOperation({ summary: 'Delete a disciplinary action' })
+  deletePenalty(
+    @Param('penaltyId') penaltyId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.file.deletePenalty(penaltyId, p, actorFrom(p, req));
+  }
+
+  @Get('employees/:id/file/bonuses')
+  @RequirePermissions('erp.hr.salary.read')
+  @ApiOperation({ summary: 'The employee bonuses and incentives' })
+  fileBonuses(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.listBonuses(id, p);
+  }
+
+  @Post('employees/:id/file/bonuses')
+  @RequirePermissions('erp.hr.bonus.manage')
+  @ApiOperation({ summary: 'Grant a bonus or incentive' })
+  createBonus(
+    @Param('id') id: string,
+    @Body() dto: CreateBonusDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.file.createBonus(id, dto, p, actorFrom(p, req));
+  }
+
+  @Patch('file/bonuses/:bonusId')
+  @RequirePermissions('erp.hr.bonus.manage')
+  @ApiOperation({ summary: 'Edit a bonus that payroll has not paid yet' })
+  updateBonus(
+    @Param('bonusId') bonusId: string,
+    @Body() dto: UpdateBonusDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.file.updateBonus(bonusId, dto, p, actorFrom(p, req));
+  }
+
+  @Post('file/bonuses/:bonusId/approve')
+  @RequirePermissions('erp.hr.bonus.manage')
+  @ApiOperation({ summary: 'Approve a bonus so the next payroll run pays it' })
+  approveBonus(
+    @Param('bonusId') bonusId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.file.approveBonus(bonusId, p, actorFrom(p, req));
+  }
+
+  @Delete('file/bonuses/:bonusId')
+  @RequirePermissions('erp.hr.bonus.manage')
+  @ApiOperation({ summary: 'Delete a bonus that payroll has not paid yet' })
+  deleteBonus(
+    @Param('bonusId') bonusId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.file.deleteBonus(bonusId, p, actorFrom(p, req));
+  }
+
+  @Get('employees/:id/file/reports')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'The employee report pack for a date window' })
+  fileReports(
+    @Param('id') id: string,
+    @Query() query: FileRangeQueryDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+  ) {
+    return this.file.reports(id, query, p);
+  }
+
+  private canManage(p: RequestPrincipal): boolean {
+    return p.grantedPermissions.includes('erp.hr.attendance.manage');
   }
 }

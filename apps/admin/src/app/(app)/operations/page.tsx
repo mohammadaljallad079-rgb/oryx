@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { api } from '@/lib/api';
+import { Suspense, useEffect, useState } from 'react';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { EntityPicker } from '@/components/inline-create';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -23,7 +26,17 @@ import type { ProjectDto, ProjectTaskDto, WorkOrderDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'projects' | 'tasks' | 'work-orders' | 'approvals' | 'calendar' | 'notifications';
 
+const TAB_KEYS = ['dashboard', 'projects', 'work-orders', 'tasks', 'approvals', 'calendar', 'notifications'] as const;
+
 export default function OperationsPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <OperationsInner />
+    </Suspense>
+  );
+}
+
+function OperationsInner() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -39,7 +52,8 @@ export default function OperationsPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="operations-page">
+    <div className="flex flex-col gap-4" data-testid="operations-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.operations')}
         subtitle={t('erp.operations.subtitle')}
@@ -62,7 +76,7 @@ export default function OperationsPage() {
         ))}
       </div>
 
-      {tab === 'dashboard' ? <DashboardTab /> : null}
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="operations" testId="operations-dashboard" /> : null}
       {tab === 'projects' ? <ProjectsTab canManage={can('erp.operations.project.manage')} /> : null}
       {tab === 'work-orders' ? <WorkOrdersTab canManage={can('erp.operations.work_order.manage')} /> : null}
       {tab === 'tasks' ? <TasksTab canManage={can('erp.operations.task.manage')} /> : null}
@@ -73,37 +87,38 @@ export default function OperationsPage() {
   );
 }
 
-function DashboardTab() {
-  const { t } = useUi();
-  const data = useAsync(() => api.operationsDashboard(), []);
-  if (data.loading) return <div className="p-4"><Skeleton height={160} /></div>;
-  if (data.error) return <ErrorBanner message={data.error} onRetry={data.reload} />;
-  const d = data.data!;
-  return (
-    <Card className="p-4" data-testid="operations-dashboard">
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Kpi label={t('erp.operations.totalProjects')} value={String(d.totalProjects)} />
-        <Kpi label={t('erp.operations.activeProjects')} value={String(d.activeProjects)} />
-        <Kpi label={t('erp.operations.openTasks')} value={String(d.openTasks)} />
-        <Kpi label={t('erp.operations.overdueTasks')} value={String(d.overdueTasks)} />
-        <Kpi label={t('erp.operations.totalWorkOrders')} value={String(d.totalWorkOrders)} />
-        <Kpi label={t('erp.operations.pendingApprovals')} value={String(d.pendingApprovals)} />
-        <Kpi label={t('erp.operations.upcomingEvents')} value={String(d.upcomingEvents)} />
-      </div>
-    </Card>
-  );
-}
 
 function ProjectsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.operationsProjects(), []);
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<ProjectDto | null>(null);
+
+  const setStatus = async (row: ProjectDto, status: string) => {
+    await api.updateOperationsProject(row.id, { status });
+    await list.reload();
+  };
+
+  const removeProject = async (row: ProjectDto) => {
+    if (!window.confirm(t('erp.operations.confirmDeleteProject'))) return;
+    setBusyId(row.id);
+    try {
+      await api.deleteOperationsProject(row.id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.operations.deleteProjectBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.operations.projects')}</p>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-project">
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-project">
             <Icon name="plus" size={16} />
             {t('erp.operations.newProject')}
           </Button>
@@ -120,6 +135,7 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
               <th>{t('common.name')}</th>
               <th>{t('erp.operations.tasksCount')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -129,37 +145,130 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
                 <td className="font-semibold">{p.nameEn}</td>
                 <td className="tabular-nums text-[12.5px]">{p.taskCount ?? 0}</td>
                 <td><StatusBadge status={p.status} label={p.status} /></td>
+                <td>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage ? (
+                      <>
+                        <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${p.code}`} onClick={() => { setEditing(p); setOpen(true); }} data-testid={`project-edit-${p.code}`}>
+                          <Icon name="edit" size={14} />
+                        </Button>
+                        <select
+                          className="oryx-select"
+                          value={p.status}
+                          onChange={(ev) => void setStatus(p, ev.target.value)}
+                          aria-label={`${t('erp.operations.projectStatus')} ${p.code}`}
+                          data-testid={`project-status-${p.code}`}
+                        >
+                          {['PLANNED', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED'].map((s) => (
+                            <option key={s} value={s}>{t(`erp.operations.projectStatusValue.${s}` as const)}</option>
+                          ))}
+                        </select>
+                        <Button size="sm" variant="danger" disabled={busyId === p.id} aria-label={`${t('common.delete')} ${p.code}`} onClick={() => void removeProject(p)} data-testid={`project-delete-${p.code}`}>
+                          <Icon name="trash" size={14} />
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
-      <CreateProjectModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <ProjectModal
+        open={open}
+        project={editing}
+        onClose={() => { setOpen(false); setEditing(null); }}
+        onSaved={list.reload}
+      />
     </Card>
   );
 }
 
-function CreateProjectModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
+function ProjectModal({
+  open,
+  project,
+  onClose,
+  onSaved,
+  onSavedRecord,
+}: {
+  open: boolean;
+  project: ProjectDto | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+  /** Receives the saved project so an inline picker can select it. */
+  onSavedRecord?: (saved: ProjectDto) => void;
+}) {
   const { t } = useUi();
+  const { companyId } = useAuth();
+  const branches = useAsync(() => companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
+  const users = useAsync(() => companyId ? api.listUsers(companyId, { pageSize: 100, status: 'ACTIVE' }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
+  const departments = useAsync(() => companyId ? api.hrDepartments({ companyId }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', startDate: '', endDate: '', description: '', branchId: '', departmentId: '', ownerUserId: '' });
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({
+      code: project?.code ?? '',
+      nameEn: project?.nameEn ?? '',
+      nameAr: project?.nameAr ?? '',
+      startDate: project?.startDate?.slice(0, 10) ?? '',
+      endDate: project?.endDate?.slice(0, 10) ?? '',
+      description: project?.description ?? '',
+      branchId: project?.branchId ?? '',
+      departmentId: project?.departmentId ?? '',
+      ownerUserId: project?.ownerUserId ?? '',
+    });
+  }, [open, project]);
+
   const submit = async () => {
     setBusy(true); setError(null);
     try {
-      await api.createOperationsProject(form);
-      await onCreated();
+      const body = {
+        nameEn: form.nameEn,
+        nameAr: form.nameAr,
+        startDate: form.startDate || undefined,
+        endDate: form.endDate || undefined,
+        description: form.description || undefined,
+        branchId: form.branchId || undefined,
+        departmentId: form.departmentId || undefined,
+        ownerUserId: form.ownerUserId || undefined,
+      };
+      let saved: ProjectDto;
+      if (project) {
+        saved = await api.updateOperationsProject(project.id, body);
+      } else {
+        saved = await api.createOperationsProject({ ...body, code: '' });
+      }
+      await onSaved();
+      onSavedRecord?.(saved);
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
+
   return (
-    <Modal open={open} title={t('erp.operations.newProject')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy} onClick={submit} data-testid="save-project">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+    <Modal open={open} size="document" title={project ? t('erp.operations.editProject') : t('erp.operations.newProject')} onClose={onClose}
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-project">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required><input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="project-code" /></Field>
+        <Field label={t('common.code')} required><input className="oryx-input" value={project?.code ?? ''} readOnly placeholder="Automatic / تلقائي" data-testid="project-code" /></Field>
+        <Field label={t('erp.operations.startDate')}><input type="date" className="oryx-input" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} data-testid="project-start-date" /></Field>
         <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="project-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="project-name-ar" /></Field>
+        <Field label={t('erp.operations.endDate')}><input type="date" className="oryx-input" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} data-testid="project-end-date" /></Field>
+        <Field label={t('context.branch')}>
+          <EntityPicker value={form.branchId || null} options={(branches.data?.items ?? []).map((b) => ({ value: b.id, label: `${b.code} — ${b.nameEn}` }))} onChange={(v) => setForm({ ...form, branchId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="project-branch" />
+        </Field>
+        <Field label={t('erp.hr.departments')}>
+          <EntityPicker value={form.departmentId || null} options={(departments.data?.items ?? []).map((d) => ({ value: d.id, label: `${d.code} — ${d.nameEn}` }))} onChange={(v) => setForm({ ...form, departmentId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="project-department" />
+        </Field>
+        <Field label={t('erp.hr.employee')}>
+          <EntityPicker value={form.ownerUserId || null} options={(users.data?.items ?? []).map((u) => ({ value: u.id, label: u.fullNameEn || u.email }))} onChange={(v) => setForm({ ...form, ownerUserId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="project-owner" />
+        </Field>
+        <Field label={t('erp.operations.description')}><textarea className="oryx-input min-h-28" rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="project-description" /></Field>
       </div>
     </Modal>
   );
@@ -172,6 +281,21 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<string | null>(null);
   const order = useAsync(() => (detail ? api.workOrder(detail) : Promise.resolve(null)), [detail]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeWorkOrder = async (w: WorkOrderDto) => {
+    if (!window.confirm(t('erp.operations.confirmDeleteWorkOrder'))) return;
+    setBusyId(w.id);
+    try {
+      await api.deleteWorkOrder(w.id);
+      if (detail === w.id) setDetail(null);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.operations.deleteWorkOrderBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -218,6 +342,11 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
                         {t('erp.operations.complete')}
                       </Button>
                     ) : null}
+                    {canManage && w.status !== 'COMPLETED' ? (
+                      <Button size="sm" variant="danger" disabled={busyId === w.id} aria-label={`${t('common.delete')} ${w.orderNumber}`} onClick={() => void removeWorkOrder(w)} data-testid={`work-order-delete-${w.orderNumber}`}>
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    ) : null}
                   </div>
                 </td>
               </tr>
@@ -251,7 +380,7 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
         </div>
       ) : null}
 
-      <CreateWorkOrderModal open={open} projects={projects.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateWorkOrderModal open={open} projects={projects.data?.items ?? []} onProjectCreated={projects.reload} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
 }
@@ -259,18 +388,25 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
 function CreateWorkOrderModal({
   open,
   projects,
+  onProjectCreated,
   onClose,
   onCreated,
 }: {
   open: boolean;
   projects: Array<{ id: string; code: string; nameEn: string }>;
+  /** Reload the project list after one is created from the picker. */
+  onProjectCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { companyId } = useAuth();
+  const branches = useAsync(() => companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
+  const users = useAsync(() => companyId ? api.listUsers(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
+  const departments = useAsync(() => companyId ? api.hrDepartments({ companyId }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', projectId: '', priority: 'NORMAL', checklist: '' });
+  const [form, setForm] = useState({ title: '', description: '', projectId: '', type: 'GENERAL', priority: 'NORMAL', checklist: '', branchId: '', departmentId: '', assigneeUserId: '', scheduledStartAt: '', scheduledEndAt: '', dueDate: '' });
   const submit = async () => {
     setBusy(true); setError(null);
     try {
@@ -282,7 +418,14 @@ function CreateWorkOrderModal({
       await api.createWorkOrder({
         title: form.title,
         description: form.description || undefined,
+        type: form.type || 'GENERAL',
         projectId: form.projectId || undefined,
+        branchId: form.branchId || undefined,
+        departmentId: form.departmentId || undefined,
+        assigneeUserId: form.assigneeUserId || undefined,
+        scheduledStartAt: form.scheduledStartAt ? new Date(form.scheduledStartAt).toISOString() : undefined,
+        scheduledEndAt: form.scheduledEndAt ? new Date(form.scheduledEndAt).toISOString() : undefined,
+        dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
         priority: form.priority,
         checklist: checklist.length > 0 ? checklist : undefined,
       });
@@ -291,16 +434,54 @@ function CreateWorkOrderModal({
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
   return (
-    <Modal open={open} title={t('erp.operations.newWorkOrder')} onClose={onClose}
+    <Modal open={open} size="document" title={t('erp.operations.newWorkOrder')} onClose={onClose}
       footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy} onClick={submit} data-testid="save-work-order">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.operations.title')} required><input className="oryx-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="work-order-title" /></Field>
         <Field label={t('erp.operations.project')}>
-          <select className="oryx-select" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} data-testid="work-order-project">
-            <option value="">—</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.projectId || null}
+            options={projects.map((p) => ({ value: p.id, label: `${p.code} — ${p.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, projectId: v ?? '' })}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="work-order-project"
+            createLabel={t('erp.operations.newProject')}
+            reloadOptions={onProjectCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ProjectModal
+                open
+                project={null}
+                onClose={closeCreate}
+                // The picker's own `onSaved` reloads the option list, so the
+                // nested form must not fetch it a second time.
+                onSaved={async () => {}}
+                onSavedRecord={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
+        </Field>
+        <Field label={t('context.branch')}>
+          <EntityPicker value={form.branchId || null} options={(branches.data?.items ?? []).map((b) => ({ value: b.id, label: `${b.code} — ${b.nameEn}` }))} onChange={(v) => setForm({ ...form, branchId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="work-order-branch" />
+        </Field>
+        <Field label={t('erp.hr.departments')}>
+          <EntityPicker value={form.departmentId || null} options={(departments.data?.items ?? []).map((d) => ({ value: d.id, label: `${d.code} — ${d.nameEn}` }))} onChange={(v) => setForm({ ...form, departmentId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="work-order-department" />
+        </Field>
+        <Field label={t('erp.hr.employee')}>
+          <EntityPicker value={form.assigneeUserId || null} options={(users.data?.items ?? []).map((u) => ({ value: u.id, label: u.fullNameEn || u.email }))} onChange={(v) => setForm({ ...form, assigneeUserId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="work-order-assignee" />
+        </Field>
+        <Field label={t('erp.operations.startDate')}>
+          <input type="date" className="oryx-input" value={form.scheduledStartAt} onChange={(e) => setForm({ ...form, scheduledStartAt: e.target.value })} data-testid="work-order-start-date" />
+        </Field>
+        <Field label={t('erp.operations.endDate')}>
+          <input type="date" className="oryx-input" value={form.scheduledEndAt} onChange={(e) => setForm({ ...form, scheduledEndAt: e.target.value })} data-testid="work-order-end-date" />
+        </Field>
+        <Field label={t('common.date')}>
+          <input type="date" className="oryx-input" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} data-testid="work-order-due-date" />
+        </Field>
+        <Field label={t('erp.operations.type')}>
+          <input className="oryx-input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} data-testid="work-order-type" />
         </Field>
         <Field label={t('erp.crm.priority')}>
           <select className="oryx-select" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
@@ -321,6 +502,20 @@ function CreateWorkOrderModal({
 function TasksTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.operationsTasks(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeTask = async (id: string) => {
+    if (!window.confirm(t('erp.operations.confirmDeleteTask'))) return;
+    setBusyId(id);
+    try {
+      await api.deleteOperationsTask(id);
+      await list.reload();
+    } catch {
+      window.alert(t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4">
@@ -348,9 +543,16 @@ function TasksTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{task.dueDate ? task.dueDate.slice(0, 10) : '—'}</td>
                 <td><StatusBadge status={task.status} label={task.status} /></td>
                 <td>
-                  {canManage && task.status !== 'DONE' ? (
-                    <Button size="sm" onClick={async () => { await api.updateOperationsTask(task.id, { status: 'DONE' }); await list.reload(); }}>{t('erp.operations.complete')}</Button>
-                  ) : null}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage && task.status !== 'DONE' ? (
+                      <Button size="sm" onClick={async () => { await api.updateOperationsTask(task.id, { status: 'DONE' }); await list.reload(); }}>{t('erp.operations.complete')}</Button>
+                    ) : null}
+                    {canManage ? (
+                      <Button size="sm" variant="danger" disabled={busyId === task.id} aria-label={`${t('common.delete')} ${task.title}`} onClick={() => void removeTask(task.id)} data-testid={`task-delete-${task.id}`}>
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -364,6 +566,20 @@ function TasksTab({ canManage }: { canManage: boolean }) {
 function ApprovalsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.operationsApprovals(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeApproval = async (id: string) => {
+    if (!window.confirm(t('erp.operations.confirmDeleteApproval'))) return;
+    setBusyId(id);
+    try {
+      await api.deleteApproval(id);
+      await list.reload();
+    } catch {
+      window.alert(t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4">
@@ -387,12 +603,19 @@ function ApprovalsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{String(a.entityType)}</td>
                 <td><StatusBadge status={String(a.status)} label={String(a.status)} /></td>
                 <td>
-                  {canManage && a.status === 'PENDING' ? (
-                    <div className="flex gap-2">
-                      <Button size="sm" data-testid={`approve-${String(a.id)}`} onClick={async () => { await api.decideApproval(String(a.id), 'APPROVED'); await list.reload(); }}>{t('erp.hr.approve')}</Button>
-                      <Button size="sm" variant="danger" onClick={async () => { await api.decideApproval(String(a.id), 'REJECTED'); await list.reload(); }}>{t('erp.hr.reject')}</Button>
-                    </div>
-                  ) : null}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage && a.status === 'PENDING' ? (
+                      <>
+                        <Button size="sm" data-testid={`approve-${String(a.id)}`} onClick={async () => { await api.decideApproval(String(a.id), 'APPROVED'); await list.reload(); }}>{t('erp.hr.approve')}</Button>
+                        <Button size="sm" variant="danger" onClick={async () => { await api.decideApproval(String(a.id), 'REJECTED'); await list.reload(); }}>{t('erp.hr.reject')}</Button>
+                      </>
+                    ) : null}
+                    {canManage ? (
+                      <Button size="sm" variant="danger" disabled={busyId === String(a.id)} aria-label={t('common.delete')} onClick={() => void removeApproval(String(a.id))} data-testid={`approval-delete-${String(a.id)}`}>
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -406,6 +629,20 @@ function ApprovalsTab({ canManage }: { canManage: boolean }) {
 function CalendarTab() {
   const { t } = useUi();
   const list = useAsync(() => api.operationsCalendar(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeEvent = async (id: string) => {
+    if (!window.confirm(t('erp.operations.confirmDeleteEvent'))) return;
+    setBusyId(id);
+    try {
+      await api.deleteCalendarEvent(id);
+      await list.reload();
+    } catch {
+      window.alert(t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4">
@@ -421,6 +658,7 @@ function CalendarTab() {
               <th>{t('erp.operations.title')}</th>
               <th>{t('erp.reports.from')}</th>
               <th>{t('erp.reports.to')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -429,6 +667,11 @@ function CalendarTab() {
                 <td className="text-[12.5px]">{String(e.title)}</td>
                 <td className="text-[12.5px]">{String(e.startAt).slice(0, 16).replace('T', ' ')}</td>
                 <td className="text-[12.5px]">{String(e.endAt).slice(0, 16).replace('T', ' ')}</td>
+                <td>
+                  <Button size="sm" variant="danger" disabled={busyId === String(e.id)} aria-label={t('common.delete')} onClick={() => void removeEvent(String(e.id))} data-testid={`event-delete-${String(e.id)}`}>
+                    <Icon name="trash" size={14} />
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -441,6 +684,19 @@ function CalendarTab() {
 function NotificationsTab() {
   const { t } = useUi();
   const list = useAsync(() => api.operationsNotifications(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeNotification = async (id: string) => {
+    setBusyId(id);
+    try {
+      await api.deleteOperationNotification(id);
+      await list.reload();
+    } catch {
+      window.alert(t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
   return (
     <Card>
       <div className="flex items-center justify-between border-b border-[var(--border)] p-4">
@@ -460,6 +716,7 @@ function NotificationsTab() {
               <th>{t('erp.operations.title')}</th>
               <th>{t('common.date')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -469,6 +726,11 @@ function NotificationsTab() {
                 <td className="text-[12.5px]">{String(n.title)}</td>
                 <td className="text-[12.5px]">{String(n.createdAt).slice(0, 16).replace('T', ' ')}</td>
                 <td>{n.readAt ? <Badge tone="neutral">{t('erp.operations.read')}</Badge> : <Badge tone="warning">{t('erp.operations.unread')}</Badge>}</td>
+                <td>
+                  <Button size="sm" variant="danger" disabled={busyId === String(n.id)} aria-label={t('common.delete')} onClick={() => void removeNotification(String(n.id))} data-testid={`notification-delete-${String(n.id)}`}>
+                    <Icon name="trash" size={14} />
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -478,11 +740,3 @@ function NotificationsTab() {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="oryx-label">{label}</p>
-      <p className="m-0 text-[22px] font-extrabold tabular-nums">{value}</p>
-    </div>
-  );
-}

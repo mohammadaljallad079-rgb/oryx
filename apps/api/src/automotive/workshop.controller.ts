@@ -28,6 +28,8 @@ import {
   CreateWorkshopBayDto,
   InvoiceJobCardDto,
   IssueReservationDto,
+  ReservedStockQueryDto,
+  CompatiblePartsQueryDto,
   ListQueryDto,
   UpdateJobCardDto,
   UpdateMaintenanceBookingDto,
@@ -46,6 +48,14 @@ export class WorkshopController {
   constructor(private readonly workshop: WorkshopService) {}
 
   // -------------------------------------------------------------- bays
+  @Get('workshop/dashboard')
+  @RequireModule('automotive_maintenance')
+  @RequireAnyPermission('erp.maintenance.read', 'erp.maintenance.jobcard.manage', 'erp.maintenance.booking.manage')
+  @ApiOperation({ summary: 'Workshop dashboard: live counts for bays, job cards, bookings and warranties' })
+  dashboard(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.workshop.dashboard(query, p);
+  }
+
   @Get('bays')
   @RequireModule('automotive_maintenance')
   @RequireAnyPermission('erp.maintenance.read', 'erp.maintenance.booking.manage')
@@ -185,6 +195,22 @@ export class WorkshopController {
     return this.workshop.issueReservation(id, dto, p, actorFrom(p, req));
   }
 
+  @Post('reservations/:id/cancel')
+  @RequireModule('spare_parts')
+  @RequirePermissions('erp.parts.reserve')
+  @ApiOperation({ summary: 'Cancel an un-issued parts reservation' })
+  cancelReservation(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.workshop.cancelReservation(id, p, actorFrom(p, req));
+  }
+
+  @Get('reservations/reserved-stock')
+  @RequireModule('spare_parts')
+  @RequireAnyPermission('erp.parts.reserve', 'erp.parts.issue', 'erp.spare_parts.read', 'erp.inventory.read')
+  @ApiOperation({ summary: 'Outstanding reserved quantity per product and warehouse' })
+  reservedStock(@Query() query: ReservedStockQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.workshop.reservedStock(query, p);
+  }
+
   // ------------------------------------------------------------- warranties
   @Get('warranties')
   @RequireModule('automotive_maintenance')
@@ -239,14 +265,8 @@ export class WorkshopController {
   @RequireModule('spare_parts')
   @RequireAnyPermission('erp.spare_parts.read', 'erp.parts.compatibility.manage')
   @ApiOperation({ summary: 'Parts compatible with a given make/model/year' })
-  compatibleParts(
-    @Query('make') make: string,
-    @Query('model') model: string,
-    @Query('year') year: string,
-    @Query('companyId') companyId: string | undefined,
-    @CurrentPrincipal() p: RequestPrincipal,
-  ) {
-    return this.workshop.compatibleParts(make, model, Number(year), p, companyId);
+  compatibleParts(@Query() query: CompatiblePartsQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.workshop.compatibleParts(query.make, query.model, query.year, p, query.companyId);
   }
 
   // ------------------------------------------------------------- marketplace

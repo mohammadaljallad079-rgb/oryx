@@ -1,5 +1,6 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
-import { QUANTITY_SCALE, fromQuantity, lineAmountMinor, sumMinor } from '@oryx/shared';
+import { QUANTITY_SCALE, fromQuantity, lineAmountMinor, resolveEffectivePermissions, sumMinor } from '@oryx/shared';
 import type { StockMovementSource, StockMovementType } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -20,6 +21,7 @@ import type {
   UpdateProductDto,
   UpdateWarehouseDto,
 } from './inventory.dto';
+import type { PosProductDto } from '@oryx/shared';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -141,7 +143,7 @@ export class InventoryService {
       throw forbidden(
         ERROR_CODES.INSUFFICIENT_STOCK,
         `Insufficient stock for ${product.sku}: on hand ${level.quantity / QTY_FACTOR}, requested ${-input.quantity / QTY_FACTOR}.`,
-        { onHand: level.quantity, requested: input.quantity },
+        { onHand: level.quantity, requested: -input.quantity },
       );
     }
 
@@ -231,17 +233,20 @@ export class InventoryService {
   }
 
   async createWarehouse(dto: CreateWarehouseDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'WH');
+    const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
-    const dup = await this.prisma.warehouse.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Warehouse code ${dto.code} already exists.`);
+    const dup = await this.prisma.warehouse.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Warehouse code ${code} already exists.`);
     const warehouse = await this.prisma.warehouse.create({
       data: {
         companyId,
         branchId: dto.branchId ?? null,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...normalizedNames,
         addressLine: dto.addressLine ?? null,
         inventoryAccountId: dto.inventoryAccountId ?? null,
       },
@@ -283,14 +288,217 @@ export class InventoryService {
     return toWarehouseDto(updated);
   }
 
+  /**
+   * Permanently delete a product.
+   *
+   * A product that carries any history — stock movements, an opening level, a
+   * line on a sales/purchase document, a consumer cart entry or a workshop part
+   * reference — must not be erased, because doing so would silently break the
+   * stock ledger and the documents that reference it. In that case the caller is
+   * told to deactivate instead, which keeps the row and its history intact.
+   * Only a product with no references at all is removed, and its own
+   * stock-level rows (which then exist nowhere else) go with it.
+   */
+  async deleteProduct(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const product = await this.prisma.product.findFirst({ where: { id, companyId } });
+    if (!product) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Product not found.');
+
+    const [
+      levels,
+      movements,
+      images,
+      quotationLines,
+      orderLines,
+      invoiceLines,
+      creditLines,
+      posLines,
+      purchaseLines,
+      reservationLines,
+      partRefs,
+      cartItems,
+      favorites,
+      customerOrderLines,
+      returnLines,
+      requisitionLines,
+      receiptLines,
+      supplierInvoiceLines,
+      purchaseReturnLines,
+      transferLines,
+      adjustmentLines,
+    ] = await Promise.all([
+      this.prisma.stockLevel.count({ where: { productId: id } }),
+      this.prisma.stockMovement.count({ where: { productId: id } }),
+      this.prisma.productImage.count({ where: { productId: id } }),
+      this.prisma.quotationLine.count({ where: { productId: id } }),
+      this.prisma.salesOrderLine.count({ where: { productId: id } }),
+      this.prisma.salesInvoiceLine.count({ where: { productId: id } }),
+      this.prisma.creditNoteLine.count({ where: { productId: id } }),
+      this.prisma.posSaleLine.count({ where: { productId: id } }),
+      this.prisma.purchaseOrderLine.count({ where: { productId: id } }),
+      this.prisma.partsReservationLine.count({ where: { productId: id } }),
+      this.prisma.partReference.count({ where: { productId: id } }),
+      this.prisma.cartItem.count({ where: { productId: id } }),
+      this.prisma.favorite.count({ where: { productId: id } }),
+      this.prisma.customerOrderLine.count({ where: { productId: id } }),
+      this.prisma.customerOrderReturnLine.count({ where: { productId: id } }),
+      this.prisma.purchaseRequisitionLine.count({ where: { productId: id } }),
+      this.prisma.goodsReceiptLine.count({ where: { productId: id } }),
+      this.prisma.supplierInvoiceLine.count({ where: { productId: id } }),
+      this.prisma.purchaseReturnLine.count({ where: { productId: id } }),
+      this.prisma.stockTransferLine.count({ where: { productId: id } }),
+      this.prisma.stockAdjustmentLine.count({ where: { productId: id } }),
+    ]);
+
+    const blocking =
+      movements +
+      quotationLines +
+      orderLines +
+      invoiceLines +
+      creditLines +
+      posLines +
+      purchaseLines +
+      reservationLines +
+      partRefs +
+      customerOrderLines +
+      returnLines +
+      requisitionLines +
+      receiptLines +
+      supplierInvoiceLines +
+      purchaseReturnLines +
+      transferLines +
+      adjustmentLines;
+    if (blocking > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This product is referenced by stock movements or documents and cannot be deleted. Deactivate it instead to keep its history.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.productImage.deleteMany({ where: { productId: id } });
+      await tx.cartItem.deleteMany({ where: { productId: id } });
+      await tx.favorite.deleteMany({ where: { productId: id } });
+      await tx.stockLevel.deleteMany({ where: { productId: id } });
+      await tx.product.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'inventory.product_deleted',
+      targetType: 'PRODUCT',
+      targetId: id,
+      summary: `Permanently deleted product ${product.sku} (${levels} stock level rows removed)`,
+    });
+    return { id, deleted: true };
+  }
+
+  /**
+   * Permanently delete a warehouse that holds no stock and no movements.
+   *
+   * Any movement or non-zero level means the warehouse is part of the stock
+   * ledger, so it is only deactivated instead.
+   */
+  async deleteWarehouse(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const warehouse = await this.prisma.warehouse.findFirst({ where: { id, companyId } });
+    if (!warehouse) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Warehouse not found.');
+
+    const [movements, levelsWithStock, transfersFrom, transfersTo, adjustments, purchaseOrders, receipts, returns] = await Promise.all([
+      this.prisma.stockMovement.count({ where: { warehouseId: id } }),
+      this.prisma.stockLevel.count({ where: { warehouseId: id, quantity: { not: 0 } } }),
+      this.prisma.stockTransfer.count({ where: { fromWarehouseId: id } }),
+      this.prisma.stockTransfer.count({ where: { toWarehouseId: id } }),
+      this.prisma.stockAdjustment.count({ where: { companyId, warehouseId: id } }),
+      this.prisma.purchaseOrder.count({ where: { companyId, warehouseId: id } }),
+      this.prisma.goodsReceipt.count({ where: { companyId, warehouseId: id } }),
+      this.prisma.purchaseReturn.count({ where: { companyId, warehouseId: id } }),
+    ]);
+    if (movements + levelsWithStock + transfersFrom + transfersTo + adjustments + purchaseOrders + receipts + returns > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This warehouse holds stock or movement history and cannot be deleted. Deactivate it instead.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.stockLevel.deleteMany({ where: { warehouseId: id } });
+      await tx.warehouse.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'inventory.warehouse_deleted',
+      targetType: 'WAREHOUSE',
+      targetId: id,
+      summary: `Permanently deleted warehouse ${warehouse.code}`,
+    });
+    return { id, deleted: true };
+  }
+
   // ---------------------------------------------------------------- products
 
   async listProducts(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 200, 500);
+
+    // Fetch the live stock-level totals for just the products being returned.
+    // A warehouse filter scopes displayed quantities even when there is no
+    // stock-status filter. Services and unstocked products correctly show zero.
+    const withOnHand = async <T extends { id: string }>(products: T[]) => {
+      if (!products.length) return [] as Array<T & { onHandQuantity: number }>;
+      const levels = await this.prisma.stockLevel.groupBy({
+        by: ['productId'],
+        where: {
+          companyId,
+          productId: { in: products.map((product) => product.id) },
+          ...(query.warehouseId ? { warehouseId: query.warehouseId } : {}),
+        },
+        _sum: { quantity: true },
+      });
+      const amounts = new Map(levels.map((level) => [level.productId, level._sum.quantity ?? 0]));
+      return products.map((product) => ({ ...product, onHandQuantity: amounts.get(product.id) ?? 0 }));
+    };
+
+    // An exact barcode (a scanner emits the whole code) is resolved on its own,
+    // so a code that also looks like a SKU or a name fragment is never widened
+    // into an ambiguous list. The fuzzy `search` keeps its broader meaning.
+    const barcode = query.barcode?.trim();
+    if (barcode) {
+      const rows = await this.prisma.product.findMany({
+        where: { companyId, barcode },
+        orderBy: { sku: 'asc' },
+        take: pageSize,
+      });
+      const items = await withOnHand(rows.map(toProductDto));
+      return { items, total: items.length, page: 1, pageSize };
+    }
+
+    // A stock-level filter needs the per-warehouse levels, so it is applied in
+    // memory after the products (and only the products) have been narrowed by
+    // the other filters. Without it the query stays a plain, paginated find.
+    const stockStatus = query.stockStatus;
     const where = {
       companyId,
+      ...(query.category ? { category: query.category } : {}),
+      ...(query.type ? { type: query.type } : {}),
+      ...(query.isActive !== undefined ? { isActive: query.isActive } : {}),
+      ...(query.hasBarcode === true
+        ? { barcode: { not: null } }
+        : query.hasBarcode === false
+          ? { barcode: null }
+          : {}),
+      ...(query.minPriceMinor !== undefined || query.maxPriceMinor !== undefined
+        ? {
+            salesPriceMinor: {
+              ...(query.minPriceMinor !== undefined ? { gte: query.minPriceMinor } : {}),
+              ...(query.maxPriceMinor !== undefined ? { lte: query.maxPriceMinor } : {}),
+            },
+          }
+        : {}),
       ...(query.search
         ? {
             OR: [
@@ -302,26 +510,156 @@ export class InventoryService {
           }
         : {}),
     };
-    const [rows, total] = await Promise.all([
-      this.prisma.product.findMany({ where, orderBy: { sku: 'asc' }, skip: (page - 1) * pageSize, take: pageSize }),
-      this.prisma.product.count({ where }),
+
+    if (!stockStatus) {
+      const [rows, total] = await Promise.all([
+        this.prisma.product.findMany({ where, orderBy: { sku: 'asc' }, skip: (page - 1) * pageSize, take: pageSize }),
+        this.prisma.product.count({ where }),
+      ]);
+      return { items: await withOnHand(rows.map(toProductDto)), total, page, pageSize };
+    }
+
+    const all = await this.prisma.product.findMany({
+      where,
+      orderBy: { sku: 'asc' },
+      include: {
+        levels: {
+          where: query.warehouseId ? { warehouseId: query.warehouseId } : undefined,
+          select: { quantity: true },
+        },
+      },
+    });
+    const matching = all.filter((p) => {
+      const onHand = sumMinor(p.levels.map((l) => l.quantity));
+      if (stockStatus === 'out') return onHand <= 0;
+      if (stockStatus === 'low') return onHand > 0 && p.reorderLevel > 0 && onHand <= p.reorderLevel;
+      return onHand > 0 && (p.reorderLevel <= 0 || onHand > p.reorderLevel);
+    });
+    const items = await withOnHand(matching.slice((page - 1) * pageSize, page * pageSize).map(toProductDto));
+    return { items, total: matching.length, page, pageSize };
+  }
+
+  /**
+   * The distinct groupings a product can be filtered by.
+   *
+   * Derived from the company's products (active or not) so the filter chips
+   * always reflect what the catalogue actually holds; a category that no longer
+   * has any product is not offered.
+   */
+  async productCategories(principal: RequestPrincipal, companyIdQuery?: string) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, companyIdQuery);
+    const [registered, used] = await Promise.all([
+      this.prisma.stockProductCategory.findMany({ where: { companyId }, orderBy: { name: 'asc' } }),
+      this.prisma.product.findMany({
+        where: { companyId, category: { not: null } },
+        distinct: ['category'],
+        select: { category: true },
+      }),
     ]);
-    return { items: rows.map(toProductDto), total, page, pageSize };
+    // Legacy product category strings continue to be available immediately.
+    const names = new Set<string>(['Spare Parts', ...registered.map((r) => r.name)]);
+    for (const item of used) if (item.category) names.add(item.category);
+    return { items: [...names].sort((a, b) => a.localeCompare(b)) };
+  }
+
+  async createProductCategory(nameInput: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const name = nameInput?.trim();
+    if (!name || name.length > 100) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Category name must be between 1 and 100 characters.');
+    const existing = await this.prisma.stockProductCategory.findUnique({
+      where: { companyId_name: { companyId, name } },
+    });
+    if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Category already exists.');
+    const category = await this.prisma.stockProductCategory.create({ data: { companyId, name } });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId,
+      action: 'inventory.product_category_created',
+      targetType: 'PRODUCT_CATEGORY', targetId: category.id, summary: `Created category ${name}`,
+    });
+    return category;
+  }
+
+  async renameProductCategory(id: string, nameInput: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const name = nameInput?.trim();
+    if (!name || name.length > 100) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Category name must be between 1 and 100 characters.');
+    const category = await this.prisma.stockProductCategory.findFirst({ where: { id, companyId } });
+    if (!category) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Category not found.');
+    if (category.name === name) return category;
+    const collision = await this.prisma.product.count({ where: { companyId, category: name } });
+    const exists = await this.prisma.stockProductCategory.findUnique({ where: { companyId_name: { companyId, name } } });
+    if (collision || exists) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Category name is already in use.');
+    const renamed = await this.prisma.$transaction(async (tx) => {
+      await tx.product.updateMany({ where: { companyId, category: category.name }, data: { category: name } });
+      return tx.stockProductCategory.update({ where: { id }, data: { name } });
+    });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId,
+      action: 'inventory.product_category_renamed',
+      targetType: 'PRODUCT_CATEGORY', targetId: id, summary: `Renamed category ${category.name} to ${name}`,
+    });
+    return renamed;
+  }
+
+  async deleteProductCategory(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const category = await this.prisma.stockProductCategory.findFirst({ where: { id, companyId } });
+    if (!category) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Category not found.');
+    const linked = await this.prisma.product.count({ where: { companyId, category: category.name } });
+    if (linked) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Move linked products to another category before deleting this category.');
+    await this.prisma.stockProductCategory.delete({ where: { id } });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId,
+      action: 'inventory.product_category_deleted',
+      targetType: 'PRODUCT_CATEGORY', targetId: id, summary: `Deleted unused category ${category.name}`,
+    });
+    return { id, deleted: true };
+  }
+
+  async listProductCategoryRecords(principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const [records, used] = await Promise.all([
+      this.prisma.stockProductCategory.findMany({ where: { companyId }, orderBy: { name: 'asc' } }),
+      this.prisma.product.groupBy({ by: ['category'], where: { companyId, category: { not: null } }, _count: { id: true } }),
+    ]);
+    const counts = new Map(used.map((r) => [r.category, r._count.id]));
+    return { items: records.map((r) => ({ ...r, productCount: counts.get(r.name) ?? 0 })) };
   }
 
   async createProduct(dto: CreateProductDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const sku = dto.sku?.trim() || await nextMasterCode(this.prisma, 'SKU');
+    const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.product.findUnique({ where: { companyId_sku: { companyId, sku: dto.sku } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `SKU ${dto.sku} already exists.`);
-    const product = await this.prisma.product.create({
+    const openingQuantity = dto.openingQuantity ?? 0;
+    if (openingQuantity > 0) {
+      if (!dto.openingWarehouseId || dto.trackStock === false || dto.type === 'SERVICE') {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Opening stock requires a tracked product and a warehouse.');
+      }
+      if (!resolveEffectivePermissions(principal).permissions.includes('erp.inventory.movement.manage')) {
+        throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'Opening stock requires inventory movement permission.');
+      }
+      await this.assertWarehouse(companyId, dto.openingWarehouseId);
+    }
+    const dup = await this.prisma.product.findUnique({ where: { companyId_sku: { companyId, sku: sku } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `SKU ${sku} already exists.`);
+    if ((dto.isPublished ?? false) && !dto.partCategoryKey) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'A product needs a spare-parts category before it can be published to the store.',
+      );
+    }
+    const product = await this.posting.withTransaction(async (tx) => {
+      const created = await tx.product.create({
       data: {
         companyId,
-        sku: dto.sku,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        sku: sku,
+        ...normalizedNames,
         type: dto.type ?? 'PRODUCT',
         unit: dto.unit ?? 'unit',
         barcode: dto.barcode ?? null,
+        category: dto.category?.trim() ? dto.category.trim() : null,
         salesPriceMinor: dto.salesPriceMinor ?? 0,
         costPriceMinor: dto.costPriceMinor ?? 0,
         taxRateBp: dto.taxRateBp ?? 0,
@@ -331,7 +669,35 @@ export class InventoryService {
         salesAccountId: dto.salesAccountId ?? null,
         inventoryAccountId: dto.inventoryAccountId ?? null,
         cogsAccountId: dto.cogsAccountId ?? null,
+        partCategoryKey: dto.partCategoryKey ?? null,
+        partCondition: dto.partCondition ?? 'NEW',
+        brand: dto.brand ?? null,
+        descriptionEn: dto.descriptionEn ?? null,
+        descriptionAr: dto.descriptionAr ?? null,
+        warrantyEn: dto.warrantyEn ?? null,
+        warrantyAr: dto.warrantyAr ?? null,
+        engineType: dto.engineType ?? null,
+        isPublished: dto.isPublished ?? false,
+        isFeatured: dto.isFeatured ?? false,
+        compareAtPriceMinor: dto.compareAtPriceMinor ?? null,
+        imageUrl: dto.imageUrl ?? null,
       },
+    });
+      if (openingQuantity > 0 && dto.openingWarehouseId) {
+        await this.recordMovement(tx, {
+          companyId,
+          warehouseId: dto.openingWarehouseId,
+          productId: created.id,
+          movementType: 'RECEIPT',
+          quantity: openingQuantity,
+          unitCostMinor: dto.costPriceMinor ?? 0,
+          source: 'MANUAL',
+          memo: 'Opening stock on product creation',
+          occurredAt: new Date(),
+          actorUserId: actor.userId,
+        });
+      }
+      return created;
     });
     await this.audit.record({
       actorUserId: actor.userId,
@@ -348,6 +714,19 @@ export class InventoryService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const product = await this.prisma.product.findFirst({ where: { id, companyId } });
     if (!product) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Product not found.');
+
+    // Publishing an item without an aisle would list it nowhere: the storefront
+    // only reads rows whose `partCategoryKey` is set. Refuse the contradictory
+    // state rather than silently storing an invisible "published" item.
+    const nextCategory = dto.partCategoryKey !== undefined ? dto.partCategoryKey : product.partCategoryKey;
+    const nextPublished = dto.isPublished !== undefined ? dto.isPublished : product.isPublished;
+    if (nextPublished && !nextCategory) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'A product needs a spare-parts category before it can be published to the store.',
+      );
+    }
+
     const updated = await this.prisma.product.update({
       where: { id },
       data: {
@@ -355,12 +734,27 @@ export class InventoryService {
         ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
         ...(dto.unit !== undefined ? { unit: dto.unit } : {}),
         ...(dto.barcode !== undefined ? { barcode: dto.barcode } : {}),
+        ...(dto.category !== undefined ? { category: dto.category.trim() ? dto.category.trim() : null } : {}),
         ...(dto.salesPriceMinor !== undefined ? { salesPriceMinor: dto.salesPriceMinor } : {}),
         ...(dto.costPriceMinor !== undefined ? { costPriceMinor: dto.costPriceMinor } : {}),
         ...(dto.taxRateBp !== undefined ? { taxRateBp: dto.taxRateBp } : {}),
         ...(dto.reorderLevel !== undefined ? { reorderLevel: dto.reorderLevel } : {}),
         ...(dto.reorderQuantity !== undefined ? { reorderQuantity: dto.reorderQuantity } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.partCategoryKey !== undefined ? { partCategoryKey: dto.partCategoryKey || null } : {}),
+        ...(dto.partCondition !== undefined ? { partCondition: dto.partCondition } : {}),
+        ...(dto.brand !== undefined ? { brand: dto.brand || null } : {}),
+        ...(dto.descriptionEn !== undefined ? { descriptionEn: dto.descriptionEn || null } : {}),
+        ...(dto.descriptionAr !== undefined ? { descriptionAr: dto.descriptionAr || null } : {}),
+        ...(dto.warrantyEn !== undefined ? { warrantyEn: dto.warrantyEn || null } : {}),
+        ...(dto.warrantyAr !== undefined ? { warrantyAr: dto.warrantyAr || null } : {}),
+        ...(dto.engineType !== undefined ? { engineType: dto.engineType || null } : {}),
+        ...(dto.isPublished !== undefined ? { isPublished: dto.isPublished } : {}),
+        ...(dto.isFeatured !== undefined ? { isFeatured: dto.isFeatured } : {}),
+        ...(dto.compareAtPriceMinor !== undefined
+          ? { compareAtPriceMinor: dto.compareAtPriceMinor || null }
+          : {}),
+        ...(dto.imageUrl !== undefined ? { imageUrl: dto.imageUrl || null } : {}),
       },
     });
     await this.audit.record({
@@ -659,6 +1053,14 @@ export class InventoryService {
         warehouse: { select: { code: true, nameEn: true, nameAr: true } },
       },
     });
+    // StockLevel is created only after a movement. Products entered in the
+    // catalogue without any stock activity must still appear in the valuation
+    // report, with zero on-hand and zero monetary value. Never manufacture stock.
+    const productsWithoutLevels = await this.prisma.product.findMany({
+      where: { companyId, levels: { none: {} } },
+      select: { id: true, sku: true, nameEn: true, nameAr: true, reorderLevel: true },
+      orderBy: { sku: 'asc' },
+    });
     const rows = levels.map((l) => {
       const averageCostMinor = wholeAverageCost(l.averageCostMinor);
       return {
@@ -674,6 +1076,21 @@ export class InventoryService {
         reorderLevel: l.product.reorderLevel,
       };
     });
+    for (const product of productsWithoutLevels) {
+      rows.push({
+        warehouseId: '',
+        warehouseCode: '—',
+        productId: product.id,
+        sku: product.sku,
+        nameEn: product.nameEn,
+        nameAr: product.nameAr,
+        quantity: 0,
+        averageCostMinor: 0,
+        valueMinor: 0,
+        reorderLevel: product.reorderLevel,
+      });
+    }
+    rows.sort((a, b) => a.sku.localeCompare(b.sku) || a.warehouseCode.localeCompare(b.warehouseCode));
     return {
       rows,
       totalValueMinor: sumMinor(rows.map((r) => r.valueMinor)),
@@ -681,12 +1098,22 @@ export class InventoryService {
     };
   }
 
-  async reorderAlerts(principal: RequestPrincipal, companyIdInput?: string) {
+  async reorderAlerts(principal: RequestPrincipal, companyIdInput?: string, warehouseId?: string) {
     const { companyId } = await this.context.resolveCompanyScope(principal, companyIdInput);
+    if (warehouseId) {
+      await this.assertWarehouse(companyId, warehouseId);
+    }
     const products = await this.prisma.product.findMany({
       where: { companyId, isActive: true, trackStock: true, reorderLevel: { gt: 0 } },
-      include: { levels: true },
+      include: {
+        levels: {
+          where: warehouseId ? { warehouseId } : undefined,
+        },
+      },
     });
+    // A product with no StockLevel records has zero on hand and must also
+    // alert when its configured reorder threshold is positive. This is true
+    // for the selected warehouse as well as the all-warehouses view.
     const alerts = products
       .map((p) => {
         const onHand = sumMinor(p.levels.map((l) => l.quantity));
@@ -703,6 +1130,97 @@ export class InventoryService {
       })
       .filter((a) => a.belowReorderLevel);
     return { items: alerts, total: alerts.length };
+  }
+
+  /**
+   * The product grid the point-of-sale renders.
+   *
+   * One query per table rather than per product: the products, their stock
+   * levels and their primary images are fetched together and stitched in
+   * memory, so a till with a few hundred SKUs is a constant number of round
+   * trips. Only active products are returned — a deactivated item must not be
+   * sellable — and the stock status is derived here so the till and the reorder
+   * alerts agree on what "low" means.
+   */
+  async posCatalog(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const where = {
+      companyId,
+      isActive: true,
+      ...(query.category ? { category: query.category } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { sku: { contains: query.search, mode: 'insensitive' as const } },
+              { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+              { nameAr: { contains: query.search } },
+              { barcode: { contains: query.search } },
+            ],
+          }
+        : {}),
+    };
+    const products = await this.prisma.product.findMany({
+      where,
+      orderBy: { sku: 'asc' },
+      include: {
+        levels: { select: { quantity: true } },
+        images: {
+          orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+          take: 1,
+          select: { mediaAssetId: true, url: true },
+        },
+      },
+    });
+    const items: PosProductDto[] = products.map((p) => {
+      const onHand = sumMinor(p.levels.map((l) => l.quantity));
+      const lead = p.images[0];
+      const imageUrl = lead?.mediaAssetId
+        ? `/api/v1/cms/media/${lead.mediaAssetId}/file?variant=card`
+        : lead?.url ?? null;
+      const stockStatus: PosProductDto['stockStatus'] = !p.trackStock
+        ? 'IN_STOCK'
+        : onHand <= 0
+          ? 'OUT'
+          : p.reorderLevel > 0 && onHand <= p.reorderLevel
+            ? 'LOW'
+            : 'IN_STOCK';
+      return {
+        id: p.id,
+        sku: p.sku,
+        nameEn: p.nameEn,
+        nameAr: p.nameAr,
+        barcode: p.barcode,
+        unit: p.unit,
+        category: p.category,
+        salesPriceMinor: p.salesPriceMinor,
+        taxRateBp: p.taxRateBp,
+        trackStock: p.trackStock,
+        isActive: p.isActive,
+        imageUrl,
+        onHand,
+        reorderLevel: p.reorderLevel,
+        stockStatus,
+      };
+    });
+    return { items, total: items.length };
+  }
+
+  /**
+   * The distinct merchandise groupings the till offers as chips.
+   *
+   * Derived from the company's active products so the chips always match what
+   * the grid can actually show; a category with no active product is not a
+   * useful filter.
+   */
+  async posCategories(principal: RequestPrincipal, companyIdQuery?: string) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, companyIdQuery);
+    const rows = await this.prisma.product.findMany({
+      where: { companyId, isActive: true, category: { not: null } },
+      distinct: ['category'],
+      select: { category: true },
+      orderBy: { category: 'asc' },
+    });
+    return { items: rows.map((r) => r.category).filter((c): c is string => Boolean(c)) };
   }
 
   private async assertWarehouse(companyId: string, warehouseId: string) {
@@ -746,6 +1264,7 @@ function toProductDto(p: {
   type: string;
   unit: string;
   barcode: string | null;
+  category: string | null;
   salesPriceMinor: number;
   costPriceMinor: number;
   taxRateBp: number;
@@ -756,6 +1275,18 @@ function toProductDto(p: {
   inventoryAccountId: string | null;
   cogsAccountId: string | null;
   isActive: boolean;
+  partCategoryKey: string | null;
+  partCondition: string;
+  brand: string | null;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  warrantyEn: string | null;
+  warrantyAr: string | null;
+  engineType: string | null;
+  isPublished: boolean;
+  isFeatured: boolean;
+  compareAtPriceMinor: number | null;
+  imageUrl: string | null;
 }) {
   return {
     id: p.id,
@@ -765,6 +1296,7 @@ function toProductDto(p: {
     type: p.type,
     unit: p.unit,
     barcode: p.barcode,
+    category: p.category,
     salesPriceMinor: p.salesPriceMinor,
     costPriceMinor: p.costPriceMinor,
     taxRateBp: p.taxRateBp,
@@ -775,6 +1307,18 @@ function toProductDto(p: {
     inventoryAccountId: p.inventoryAccountId,
     cogsAccountId: p.cogsAccountId,
     isActive: p.isActive,
+    partCategoryKey: p.partCategoryKey,
+    partCondition: p.partCondition,
+    brand: p.brand,
+    descriptionEn: p.descriptionEn,
+    descriptionAr: p.descriptionAr,
+    warrantyEn: p.warrantyEn,
+    warrantyAr: p.warrantyAr,
+    engineType: p.engineType,
+    isPublished: p.isPublished,
+    isFeatured: p.isFeatured,
+    compareAtPriceMinor: p.compareAtPriceMinor,
+    imageUrl: p.imageUrl,
   };
 }
 

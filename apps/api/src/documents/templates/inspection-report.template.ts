@@ -1,0 +1,1072 @@
+import {
+  CHASSIS_REGIONS,
+  PAINT_CONDITIONS,
+} from '@oryx/shared';
+import {
+  BODY_SCHEME_DATA_URI,
+  CHASSIS_DIAGRAM_DATA_URI,
+} from './inspection-artwork.assets';
+import { signatureBlock, type DocumentChrome } from './chrome';
+import { docStamp, esc, escMultiline, grouped, orDash } from './html.util';
+import { oryxLogoMark } from './oryx-logo.asset';
+import type {
+  InspectionReportPayload,
+  InspectionReportSection,
+  DocumentIssuer,
+  DocumentVerification,
+} from '../document-payload';
+
+/**
+ * The ORYX Vehicle Inspection Report.
+ *
+ * The document is the approved five-page form: an identification cover, a paint
+ * and body page, a chassis page, an interior/exterior/engine/road-test page and
+ * a computer-unit page. The page plan is not computed here — it comes from
+ * `planInspectionReport`, so the printed pagination is the same rule the tests
+ * assert; this module only draws the pages it is handed.
+ */
+
+export interface InspectionReportInput {
+  issuer: DocumentIssuer;
+  payload: InspectionReportPayload;
+  documentNumber: string;
+  issuedAt: Date;
+  version: number;
+  verification: DocumentVerification | null;
+}
+
+/**
+ * A pass/fail mark, drawn as a vector rather than a text glyph.
+ *
+ * The bundled faces carry no U+2713 / U+2715 / U+2717, so Chromium synthesises a
+ * Type3 bitmap font from whatever host face has the glyph. That breaks the PDF
+ * text layer and makes the output depend on the host. A vector mark has no font
+ * dependency.
+ */
+type MarkKind = 'check' | 'cross' | 'x';
+function markGlyph(kind: MarkKind, sizePt: number): string {
+  const stroke =
+    `stroke="currentColor" stroke-width="1.7" stroke-linecap="round" ` +
+    `stroke-linejoin="round" fill="none"`;
+  const body: Record<MarkKind, string> = {
+    check: `<path d="M3 8.2 6.3 11.4 12.2 3.2" ${stroke}/>`,
+    cross: `<path d="M3.2 3.2 11.8 11.8 M11.8 3.2 3.2 11.8" ${stroke}/>`,
+    x: `<path d="M4 4 11 11 M11 4 4 11" ${stroke}/>`,
+  };
+  return (
+    `<svg class="mark mark-${kind}" width="${sizePt}" height="${sizePt}" ` +
+    `viewBox="0 0 15 15" aria-hidden="true">${body[kind]}</svg>`
+  );
+}
+
+/** A pass/fail/NA cell mark, matching the approved form's tick / cross / N-A. */
+function resultMark(result: string): string {
+  switch (result) {
+    case 'PASS':
+      return `<span class="rm rm-pass">${markGlyph('check', 11)}</span>`;
+    case 'FAIL':
+      return `<span class="rm rm-fail">${markGlyph('cross', 11)}</span>`;
+    case 'NA':
+      return '<span class="rm rm-na">N/A</span>';
+    default:
+      return '<span class="rm rm-unset">·</span>';
+  }
+}
+
+/**
+ * The bilingual title band that heads the reference page.
+ *
+ * The approved sheet does not set every page title at one size: the cover is
+ * 10.3pt, the paint and chassis pages 10pt, and the longer interior/exterior and
+ * computer-unit headings drop to 8.7pt (measured from the reference). The size
+ * is passed per page rather than derived, because a character-count rule cannot
+ * reproduce the reference — `COMPUTER UNIT INSPECTION` is shorter than
+ * `VEHICLE PAINT & BODY CHECK` yet prints smaller.
+ */
+function pageTitleBar(titleAr: string, titleEn: string, sizePt = 10.3, trackEm = 0): string {
+  return `
+  <div class="p-title" style="--p-title-size:${sizePt}pt;--p-title-track:${trackEm}em">
+    <span class="p-title-ar">${esc(titleAr)}</span>
+    <span class="p-title-en">${esc(titleEn)}</span>
+  </div>`;
+}
+/**
+ * The compact brand band the reference prints at the head of every page: the
+ * mark on one side, the company name and the inspection tagline on the other.
+ *
+ * Drawn from the configured issuer so the same band appears on the report and
+ * the financial documents; with no configured logo it falls back to the official
+ * ORYX logotype drawn as vector art.
+ */
+function reportHeader(issuer: DocumentIssuer): string {
+  // The approved header is the ORYX wordmark on the left and the tagline on the
+  // right — the wordmark already spells the Arabic name and "AUTO SERVICES", so
+  // repeating the company name beside it (as the fallback does) is not on the
+  // approved sheet. With no uploaded logo the official logotype is drawn as
+  // vector art (traced from the approved sheet) rather than a monogram.
+  const left = issuer.logoDataUri
+    ? `<img class="rh-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
+    : `<div class="rh-lockup">
+         ${oryxLogoMark('44.5pt', 'rh-logo-mark')}
+       </div>`;
+  return `
+  <header class="report-head">
+    <div class="rh-left">
+      ${left}
+    </div>
+    <div class="rh-right">
+      <span class="rh-tag-ar">خبراء فحص المركبات</span>
+      <span class="rh-tag-en">VEHICLE INSPECTION EXPERTS</span>
+    </div>
+    <span class="doc-quality-badge rh-badge"><svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">
+        <g fill="#0a4175">
+          <path d="M12.48,12.16 C13.53,10.02 14.74,8.06 16.30,6.35 C17.49,5.05 18.85,3.99 20.48,3.29 C21.59,2.81 22.80,2.64 23.67,2.82 C23.66,2.84 23.66,2.87 23.65,2.88 C21.52,3.74 19.92,5.26 18.61,7.08 C17.62,8.46 16.74,9.92 15.83,11.36 C14.52,13.41 13.55,15.63 12.60,17.86 C12.58,17.91 12.56,17.95 12.52,18.01 C11.99,17.21 11.48,16.42 10.95,15.64 C10.08,14.35 9.19,13.06 8.32,11.77 C7.80,10.99 7.28,10.22 6.79,9.43 C6.64,9.19 6.53,8.89 6.51,8.61 C6.49,8.33 6.54,7.99 6.68,7.75 C7.01,7.20 7.57,6.90 8.17,6.72 C8.53,6.61 8.86,6.78 9.07,7.06 C9.70,7.84 10.33,8.62 10.89,9.44 C11.38,10.14 11.78,10.89 12.21,11.62 C12.30,11.78 12.38,11.95 12.48,12.16 Z"/>
+          <path d="M21.70,6.62 L19.98,8.34 C20.48,9.44 20.75,10.66 20.75,11.94 C20.75,16.78 16.84,20.69 12.00,20.69 C7.17,20.69 3.25,16.78 3.25,11.94 C3.25,7.11 7.17,3.19 12.00,3.19 C13.21,3.19 14.36,3.44 15.41,3.88 L17.14,2.14 C15.61,1.34 13.86,0.88 12.00,0.88 C5.89,0.88 0.94,5.83 0.94,11.94 C0.94,18.05 5.89,23.00 12.00,23.00 C18.11,23.00 23.06,18.05 23.06,11.94 C23.06,10.01 22.57,8.20 21.70,6.62 Z"/>
+        </g>
+      </svg></span>
+  </header>`;
+}
+
+/**
+ * The faint "AUTO SERVICES" wordmark the approved sheet lays behind its cover.
+ *
+ * The reference prints the identity wordmark in the brand display face (Codec
+ * Pro Bold) at 51.75pt with a 6.72pt tracking, centred on the sheet (measured
+ * x 57.5-533.6, y 374.4-426.1 of a 595x842pt page) at ~9.8% opacity, so the
+ * printed data stays fully legible on top of it. It appears on the cover only;
+ * the section pages carry no watermark.
+ */
+export function reportWatermark(): string {
+  return '<div class="rp-watermark" aria-hidden="true">AUTO SERVICES</div>';
+}
+
+/**
+ * The faint "Auto Park" logo watermark laid behind the printed data on *every*
+ * page of the inspection report, including the cover.
+ *
+ * This is a second, independent layer: the approved `reportWatermark` above is
+ * the ORYX identity wordmark the reference prints on the cover only, and this
+ * one repeats the customer's brand mark (the configured logo, or the official
+ * ORYX logotype when none is uploaded) with its name so the whole sheet carries
+ * the Auto Park identity. It sits behind the content (z-index 0) so every
+ * printed value stays fully legible on top of it.
+ */
+export function parkWatermark(issuer: DocumentIssuer): string {
+  // Use exactly the company's configured watermark, never a hardcoded
+  // third-party name or an additional unconfigured mark.
+  if (issuer.documentWatermarkEnabled === false || !issuer.logoDataUri) return '';
+  const size = Math.max(80, Math.min(500, issuer.documentWatermarkSizePt ?? 310));
+  const opacity = Math.max(0, Math.min(1, issuer.documentWatermarkOpacity ?? 0.10));
+  return `<div class="rp-park-wm" aria-hidden="true" style="opacity:${opacity}">
+    <img class="rp-park-wm-logo" src="${esc(issuer.logoDataUri)}" alt="" style="max-width:${size}pt;max-height:${size}pt">
+  </div>`;
+}
+
+/** A legend chip with a vector mark and its bilingual label. */
+function legendChip(kind: MarkKind, ar: string, en: string): string {
+  return `<span class="lg-chip">${markGlyph(kind, 10)}${esc(ar)} / ${esc(en)}</span>`;
+}
+
+/**
+ * The job and vehicle strip repeated under the title on every section page.
+ *
+ * Reproduces the reference: the job number and timestamp on one line, then a
+ * band carrying the VIN, plate, car and odometer. The values are the session
+ * snapshot, so a later edit to the vehicle record cannot rewrite a printed page.
+ */
+function jobStrip(p: InspectionReportPayload): string {
+  const v = p.vehicle;
+  const stamp = docStamp(p.inspectedAt);
+  const car = `${v.make} ${v.model} (${v.modelYear})`;
+  return `
+  <div class="job-head">
+    <span class="job-date num">${esc(stamp)}</span>
+    <span class="job-no num">JOB #${esc(p.jobNumber)}</span>
+  </div>
+  <div class="vstrip">
+    <div class="vcell"><span class="vcell-lab"><span class="ltr">Car</span> السيارة</span><span class="vcell-val">${esc(car)}</span></div>
+    <div class="vcell"><span class="vcell-lab"><span class="ltr">Plate No.</span> رقم اللوحة</span><span class="vcell-val num">${esc(orDash(v.plateNumber))}</span></div>
+    <div class="vcell"><span class="vcell-lab"><span class="ltr">VIN Number</span> رقم القاعدة (الشاصي)</span><span class="vcell-val num">${esc(v.vin)}</span></div>
+    <div class="vcell"><span class="vcell-lab"><span class="ltr">ODO Meter</span> عداد المسافات</span><span class="vcell-val num">${esc(grouped(v.odometer))} km</span></div>
+  </div>`;
+}
+
+/** The fixed legal texts, taken verbatim from the approved reference. */
+const LIABILITY_AR =
+  'اوريكس لخدمات السيارات ليست مصنّعة للمركبات ولا بائعة لها، ولن تتحمل اي مسؤولية عن عيوب تصنيعية أو أضرار غير مُفصح عنها أو غير مُبلغ عنها. يقتصر دور اوريكس لخدمات السيارات على إجراء فحص بصري وفحص بأجهزة تقنية لتحديد الإصلاحات والأضرار السابقة والظاهرة التي لحقت بالمكونات الميكانيكية والهيكلية، ودون تقديم أي ضمان للسلامة الهيكلية أو الصلاحية العامة للسير على الطرق. أنت توافق على انحصار مسؤولية اوريكس لخدمات السيارات في فحص المركبة داخله وبالأدوات المعتمدة في المركز ووفق حدود الباقة المختارة فقط، دون أدنى مسؤولية عن أي خدمات غير مشمولة بالباقة أو عن حالة المركبة قبل دخولها وبعد خروجها منه. وبناءً عليه يُصدر التقرير الفني ليعكس نتيجة الفحص ضمن نطاق الباقة المحددة حصرا.';
+
+const LIABILITY_EN =
+  'Oryx Auto Services is neither a vehicle manufacturer nor a seller and assumes no liability for manufacturing defects or undisclosed or unreported damage. The role of Oryx Auto Services is limited to conducting visual and technical inspections to identify existing or prior damage and necessary repairs regarding mechanical and structural components; it provides no guarantee regarding structural integrity or general roadworthiness. You acknowledge that the liability of Oryx Auto Services is strictly limited to the inspection performed on site using the center\u2019s approved tools and within the scope of the selected service package; the company bears no responsibility for services not included in the package or for the vehicle\u2019s condition prior to its arrival at or after its departure from the center. Accordingly, the technical report is issued to reflect inspection results exclusively within the scope of the specified package.';
+
+const IMPORTANT_REMARKS_AR = [
+  'يتم إصدار التقرير بواسطة أجهزة الفحص الإلكتروني المعتمدة.',
+  'أي كشط أو حذف أو تغيير في محتويات التقرير يجعله لاغياً وغير معتمد.',
+  'يصف التقرير حالة السيارة أثناء وجودها داخل المركز فقط.',
+  'المركز غير مسؤول عن المتعلقات الشخصية المتروكة داخل السيارة.',
+  'تتطلب بعض الحالات اختبار قيادة إضافي للتحقق من أداء ناقل الحركة والأجزاء الميكانيكية.',
+];
+
+const IMPORTANT_REMARKS_EN = [
+  'The report is issued by approved electronic inspection devices.',
+  'Any erasure, deletion or change in the contents of the report renders it invalid and unsupported.',
+  'The report describes the condition of the vehicle while it is inside the center only.',
+  'The center is not responsible for personal belongings left inside the car.',
+  'Some cases require an additional test drive to check the performance of the transmission and mechanical parts.',
+];
+
+/** The numbered Important Remarks block. */
+function importantRemarks(): string {
+  return `
+  <div class="remarks-block avoid-break">
+    <div class="remarks-title">ملاحظات هامة<span class="ltr">Important Remarks</span></div>
+    <div class="remarks-cols">
+      <ol class="remarks-list">
+        ${IMPORTANT_REMARKS_AR.map((t) => `<li>${esc(t)}</li>`).join('')}
+      </ol>
+      <ol class="remarks-list ltr">
+        ${IMPORTANT_REMARKS_EN.map((t) => `<li>${esc(t)}</li>`).join('')}
+      </ol>
+    </div>
+  </div>`;
+}
+
+/** The Limitation of Liability block. */
+function liabilityBlock(): string {
+  // The approved sheet prints the heading as a full-width navy banner carrying
+  // the English title on the physical left and the Arabic title on the physical
+  // right (both white), over two bordered columns: the Arabic column on the
+  // right and the English column on the left.
+  return `
+  <div class="terms avoid-break">
+    <div class="terms-banner">
+      <span class="terms-banner-en ltr">Terms, Conditions &amp; Liability Disclaimer</span>
+      <span class="terms-banner-ar">الشروط والأحكام ومسؤولية الفحص</span>
+    </div>
+    <div class="terms-cols">
+      <div class="terms-col">
+        <div class="terms-col-head terms-col-head--ar">تحديد المسؤولية القانونية</div>
+        <p class="terms-ar">${esc(LIABILITY_AR)}</p>
+      </div>
+      <div class="terms-col">
+        <div class="terms-col-head terms-col-head--en ltr">Limitation of Liability</div>
+        <p class="terms-en ltr">${esc(LIABILITY_EN)}</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
+ * The vehicle photo band on the identification cover.
+ *
+ * The approved report prints the vehicle photograph as a wide band across the
+ * middle of the cover, bleeding past the side margins. The frame keeps that
+ * proportion (a wide band, not a thumbnail) so the printed sheet reads the same
+ * as the reference. A session with no attached photograph prints an empty band
+ * (carrying only the verification QR when the report is verifiable) — never a
+ * default vehicle illustration, so the cover shows exactly the photo that was
+ * actually attached, or none.
+ */
+function vehiclePhoto(
+  p: InspectionReportPayload,
+  verification: DocumentVerification | null | undefined,
+  issuer: DocumentIssuer,
+): string {
+  // The approved cover prints the verification QR inside the photograph band,
+  // anchored to its lower right. A white quiet zone is kept around the modules
+  // so a scanner can still resolve it against the picture.
+  const qr = verification?.qrDataUri
+    ? `<div class="cover-qr">
+        <span class="cover-qr-cap">للتأكد من صحة التقرير</span>
+        <img src="${esc(verification.qrDataUri)}" alt="Document verification QR code">
+      </div>`
+    : '';
+  // The approved cover lays the ORYX wordmark over the photograph band as a
+  // translucent watermark, so the vehicle is still legible through it. With no
+  // configured logo there is nothing to print and the band keeps only the photo.
+  const mark = issuer.logoDataUri
+    ? `<img class="vphoto-mark" src="${esc(issuer.logoDataUri)}" alt="" aria-hidden="true">`
+    : '';
+  if (p.vehiclePhotoDataUri) {
+    return `
+    <figure class="vphoto vphoto--bleed">
+      <img class="vphoto-img" src="${esc(p.vehiclePhotoDataUri)}" alt="${esc(`${p.vehicle.make} ${p.vehicle.model}`)}">
+      ${mark}
+      ${qr}
+    </figure>`;
+  }
+  // No photograph attached: the cover keeps the reference's blank band
+  // (y184-549 of the 842pt sheet) between the vehicle information and the terms
+  // block, with no illustration and no placeholder text. The band is painted as
+  // a plain block so it bleeds past the side margins without contributing to
+  // layout (an overflowing <img> makes Chromium shrink the whole sheet), and the
+  // verification QR floats over it when the report is verifiable.
+  return `
+    <div class="vphoto-art">
+      ${qr}
+    </div>`;
+}
+
+/** The identification cover (page 1). */
+export function identificationPage(input: InspectionReportInput, chrome: DocumentChrome): string {
+  const p = input.payload;
+  const v = p.vehicle;
+  const stamp = docStamp(p.inspectedAt);
+  return `
+  <section class="doc-page">
+    ${parkWatermark(input.issuer)}
+    ${reportHeader(chrome.issuer)}
+    ${pageTitleBar('تقرير فحص المركبة', 'VEHICLE INSPECTION REPORT')}
+    <div class="cover-info">
+      <div class="cover-sec-title">معلومات المركبة<span class="ltr">Vehicle Information</span></div>
+      <table class="vinfo">
+        <tr>
+          <td><span class="vlab"><span class="ltr">Customer Name</span><span class="var">اسم العميل</span></span><span class="vval">${esc(p.customerName)}</span></td>
+          <td><span class="vlab"><span class="ltr">Contact No.</span><span class="var">رقم التواصل</span></span><span class="vval num">${esc(orDash(p.contactNumber))}</span></td>
+          <td><span class="vlab"><span class="ltr">Date &amp; Time</span><span class="var">التاريخ والوقت</span></span><span class="vval num">${esc(stamp)}</span></td>
+          <td><span class="vlab"><span class="ltr">Job No.</span><span class="var">رقم العمل</span></span><span class="vval num">${esc(p.jobNumber)}</span></td>
+        </tr>
+        <tr>
+          <td><span class="vlab"><span class="ltr">Plate No.</span><span class="var">رقم اللوحة</span></span><span class="vval num">${esc(orDash(v.plateNumber))}</span></td>
+          <td><span class="vlab"><span class="ltr">Car Make</span><span class="var">نوع السيارة</span></span><span class="vval">${esc(v.make)}</span></td>
+          <td><span class="vlab"><span class="ltr">Car Model</span><span class="var">طراز السيارة</span></span><span class="vval">${esc(v.model)}</span></td>
+          <td><span class="vlab"><span class="ltr">Car Year</span><span class="var">سنة الصنع</span></span><span class="vval num">${esc(v.modelYear)}</span></td>
+        </tr>
+        <tr>
+          <td><span class="vlab"><span class="ltr">ODO Meter</span><span class="var">عداد المسافات</span></span><span class="vval num">${esc(grouped(v.odometer))} km</span></td>
+          <td><span class="vlab"><span class="ltr">Car Color</span><span class="var">لون السيارة</span></span><span class="vval">${esc(orDash(v.color))}</span></td>
+          <td colspan="2"><span class="vlab"><span class="ltr">VIN Number</span><span class="var">رقم القاعدة (الشاصي)</span></span><span class="vval num">${esc(v.vin)}</span></td>
+        </tr>
+      </table>
+    </div>
+    ${vehiclePhoto(p, input.verification, input.issuer)}
+    ${liabilityBlock()}
+    ${importantRemarks()}
+  </section>`;
+}
+
+/** The paint and body page (page 2). */
+export function paintSectionPage(
+  input: InspectionReportInput,
+  section: InspectionReportSection | undefined,
+): string {
+  if (!section) return '';
+  return `
+  <section class="doc-page">
+    ${parkWatermark(input.issuer)}
+    ${reportHeader(input.issuer)}
+    ${pageTitleBar('فحص الصبغ وبدن المركبة', 'VEHICLE PAINT & BODY CHECK', 10, -0.052)}
+    ${jobStrip(input.payload)}
+    ${paintDiagram(section)}
+  </section>`;
+}
+
+/** The chassis page (page 3). */
+export function chassisSectionPage(
+  input: InspectionReportInput,
+  section: InspectionReportSection | undefined,
+): string {
+  if (!section) return '';
+  return `
+  <section class="doc-page">
+    ${parkWatermark(input.issuer)}
+    ${reportHeader(input.issuer)}
+    ${pageTitleBar('فحص الشاصي وأسفل المركبة', 'CHASSIS & UNDERCARRIAGE CONDITION', 10, -0.052)}
+    ${jobStrip(input.payload)}
+    ${chassisDiagram(section)}
+  </section>`;
+}
+
+/** The interior/exterior/engine/road-test page (page 4). */
+export function inspectionGroupPage(
+  input: InspectionReportInput,
+  sections: InspectionReportSection[],
+): string {
+  const byArea = new Map(sections.map((s) => [s.area, s]));
+  const interior = byArea.get('INTERIOR');
+  const exterior = byArea.get('EXTERIOR');
+  const engine = byArea.get('ENGINE_COMPARTMENT');
+  const road = byArea.get('ROAD_TEST');
+
+  // The approved form packs the four checklists into a 2x2 grid on one sheet:
+  // road test and engine compartment on the upper row, exterior and interior on
+  // the lower row, with the interior reference drawing and the general remarks
+  // beneath. Each checklist heading is the navy header row of its own table, so
+  // no separate title bar is printed above it. A layout *table* (not flexbox) is
+  // used because Chromium cannot fragment a flex row across pages, so a flex
+  // grid that does not fit jumps wholesale to the next sheet; a table keeps the
+  // four tables on one page.
+  const cell = (
+    section: InspectionReportSection | undefined,
+    titleAr: string,
+    titleEn: string,
+    withNa: boolean,
+  ): string =>
+    section ? `<div class="grp">${itemsTable(section, titleAr, titleEn, withNa)}</div>` : '';
+
+  const pair = (right: string, left: string): string =>
+    `<table class="grid"><tr><td>${right || '&nbsp;'}</td><td>${left || '&nbsp;'}</td></tr></table>`;
+
+  // The approved form paints the interior fittings drawing as a faint,
+  // absolutely-positioned background behind the lower-left (exterior)
+  // checklist, not as an in-flow figure. An in-flow copy would add its full
+  // height to a page that is already complete and push the last checklist onto
+  // a sixth sheet.
+  // The interior illustration must not overlap the Exterior Car checklist.
+  // It is omitted from this dense data page rather than painted behind text.
+  const interiorArt = '';
+
+  // The approved sheet prints a single remarks box in the left column beneath
+  // the exterior checklist. It carries the inspection's one optional notes
+  // field; the former "additional exterior remarks" and "final assessment"
+  // blocks were duplicate surfaces for the same note and are no longer offered
+  // on screen, so they are no longer printed either.
+  const remarkBlock = (titleAr: string, titleEn: string, body: string | null): string =>
+    body
+      ? `<div class="grp remark-block">
+        <div class="grp-title">${titleAr}<span class="ltr">${titleEn}</span></div>
+        <div class="general-remarks">${escMultiline(body)}</div>
+      </div>`
+      : '';
+
+  const remarks = remarkBlock(
+    'الملاحظات والتعليقات العامة',
+    'General Inspection Remarks',
+    input.payload.generalRemarks,
+  );
+
+  const cabin = `
+  <div class="grp cabin">
+    ${interiorArt}
+    <div class="grp-title">فحص التجهيزات الداخلية والملحقات الخارجية<span class="ltr">Cabin Electronics &amp; Exterior Accessories Checks</span></div>
+    ${pair(cell(engine, 'مقصورة المحرك', 'Engine Compartment', false), cell(road, 'تجربة القيادة', 'Road Test', false))}
+    <table class="grid"><tr>
+      <td>${cell(interior, 'داخلية السيارة', 'Interior Car', true)}</td>
+      <td class="exterior-column">${cell(exterior, 'خارجية السيارة', 'Exterior Car', true)}${remarks}</td>
+    </tr></table>
+  </div>`;
+
+  return `
+  <section class="doc-page">
+    ${parkWatermark(input.issuer)}
+    ${reportHeader(input.issuer)}
+    ${pageTitleBar('الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة', 'INTERIOR & EXTERIOR INSPECTION / ENGINE COMPARTMENT / ROAD TEST', 8.7, -0.047)}
+    ${jobStrip(input.payload)}
+    ${cabin}
+  </section>`;
+}
+
+/** The computer-unit page (page 5). */
+export function computerSectionPage(
+  input: InspectionReportInput,
+  section: InspectionReportSection | undefined,
+): string {
+  return `
+  <section class="doc-page p5-page">
+    ${parkWatermark(input.issuer)}
+    ${reportHeader(input.issuer)}
+    ${pageTitleBar('فحص وحدة الكمبيوتر', 'COMPUTER UNIT INSPECTION', 8.7, -0.047)}
+    ${jobStrip(input.payload)}
+    ${diagnosticSection(section)}
+  </section>`;
+}
+
+/**
+ * One pass/fail checklist as the approved table.
+ *
+ * The reference draws the checklist heading as a navy header row that carries
+ * the bilingual title in the item column and the Pass / Fail / N-A labels over
+ * the result columns (measured y161-186 of page 4). There is therefore no
+ * separate title bar above the table — the header row *is* the title bar.
+ * `withNa` is false for the engine and road tables, which are strictly
+ * pass/fail on the approved form.
+ */
+function itemsTable(
+  section: InspectionReportSection,
+  titleAr: string,
+  titleEn: string,
+  withNa: boolean,
+): string {
+  const results = withNa ? (['PASS', 'FAIL', 'NA'] as const) : (['PASS', 'FAIL'] as const);
+  const head = (r: (typeof results)[number]): string =>
+    r === 'PASS'
+      ? 'اجتياز<span class="ltr">Pass</span>'
+      : r === 'FAIL'
+        ? 'فشل<span class="ltr">Fail</span>'
+        : 'غير متوفر<span class="ltr">N/A</span>';
+  return `
+  <div class="itable avoid-break">
+    <table class="items ${withNa ? 'items--three-results' : 'items--two-results'}">
+      <thead>
+        <tr>
+          <th class="c-item">${esc(titleAr)}<span class="ltr">${esc(titleEn)}</span></th>
+          ${results.map((r) => `<th class="c-res">${head(r)}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${section.items
+          .map(
+            (item) => `
+        <tr>
+          <td class="c-item"><span class="item-ar">${esc(item.labelAr)}</span><span class="item-en ltr">${esc(item.labelEn)}</span></td>
+          ${results.map((r) => `<td class="c-res">${item.result === r ? resultMark(r) : ''}</td>`).join('')}
+        </tr>`,
+          )
+          .join('')}
+      </tbody>
+    </table>
+    ${noFindingsNote(section.noFindings)}
+    ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
+  </div>`;
+}
+
+/**
+ * The "nothing to report" marker a section prints when the inspector ticked the
+ * matching checkbox.
+ *
+ * The approved form offers the option on every check, so the printed report
+ * carries the same statement on the section it belongs to instead of leaving the
+ * reader to infer "no remarks" from an empty remarks box. It prints on the
+ * item checklists, both diagrams and the computer-unit fault list.
+ */
+function noFindingsNote(noFindings: boolean): string {
+  if (!noFindings) return '';
+  return `<div class="no-findings"><span class="no-findings-ar" dir="rtl">لا يوجد ما يستدعي الملاحظة</span><span class="no-findings-en" dir="ltr">Nothing to report</span></div>`;
+}
+
+/**
+ * The body-panel diagnostic diagram (top view).
+ *
+ * Markers carry normalised coordinates, so the diagram is drawn from the same
+ * numbers the inspector placed on screen and a marker lands on the same panel at
+ * any page size. The drawing comes from `@oryx/shared/inspection-diagram` — the
+ * exact geometry the admin editor renders — so the printed report and the form
+ * can never show two different vehicles.
+ */
+function paintDiagram(section: InspectionReportSection): string {
+  // The approved sheet prints the key as four navy chips across one row —
+  // sectioned, Change, Filler, Paint left to right (the reverse of the
+  // catalogue's declaration order) — each carrying its label in white and the
+  // condition's own colour swatch (green/orange/red, with a cross on
+  // sectioned) on the trailing edge. That is the approved design, so the printed
+  // key reproduces it rather than the plain ink-on-white list.
+  const legend = [...PAINT_CONDITIONS]
+    .reverse()
+    .map(
+      (c) =>
+        `<span class="legend-chip"><span class="legend-chip-label">${esc(c.labelAr)} / ${esc(c.labelEn)}</span><span class="legend-chip-mark lm-${c.color}">${c.cross ? markGlyph('x', 8) : ''}</span></span>`,
+    )
+    .join('');
+
+  const markers = section.markers
+    .map((m) => {
+      const spec = PAINT_CONDITIONS.find((c) => c.key === m.condition);
+      const color = spec?.color ?? 'green';
+      return `<span class="marker m-${color}" style="left:${(m.x * 100).toFixed(2)}%;top:${(m.y * 100).toFixed(2)}%" title="${esc(m.note ?? '')}">${spec?.cross ? markGlyph('x', 7) : ''}</span>`;
+    })
+    .join('');
+
+  return `
+  <div class="diagram-block avoid-break">
+    <div class="diagram-title">مخطط الفحص السطحي لهيكل السيارة<span class="ltr">Body Panels Diagnostic Scheme</span></div>
+    <div class="diagram diagram--art">
+      <img class="artplan" src="${BODY_SCHEME_DATA_URI}" alt="">
+      ${markers}
+    </div>
+    <div class="legend legend--row">${legend}</div>
+    ${noFindingsNote(section.noFindings)}
+    ${
+      section.remarks
+        ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}</b><span class="ltr">${esc(section.remarksLabelEn)}</span>${escMultiline(section.remarks)}</div>`
+        : ''
+    }
+  </div>`;
+}
+
+/**
+ * The eight-region chassis safety diagram.
+ *
+ * The approved sheet centres the drawing and places the eight region boxes
+ * *around* it — Front above, Rear below, and the three left/right pairs down
+ * each side — each joined to the drawing by a leader line. A side list of
+ * boxes is not the approved arrangement, so the boxes are laid out on a
+ * three-column board with the drawing in the centre cell.
+ */
+function chassisDiagram(section: InspectionReportSection): string {
+  const byKey = new Map(section.chassisRegions.map((r) => [r.regionKey, r]));
+
+  const card = (key: string): string => {
+    const region = CHASSIS_REGIONS.find((r) => r.key === key);
+    if (!region) return '';
+    const row = byKey.get(key);
+    const state = row?.condition ?? 'UNSET';
+    const cls = state === 'OK' ? 'ch-ok' : state === 'DAMAGE' ? 'ch-bad' : 'ch-unset';
+    const glyph =
+      state === 'OK' ? markGlyph('check', 9) : state === 'DAMAGE' ? markGlyph('cross', 9) : '';
+    const tag =
+      state === 'OK' ? '[OK / سليم]' : state === 'DAMAGE' ? '[Damage / متضرر]' : '[— / —]';
+    return `
+    <div class="ch-card ${cls}">
+      <span class="ch-card-ar">${esc(region.labelAr)}</span>
+      <span class="ch-card-en ltr">${esc(region.labelEn)}</span>
+      <span class="ch-card-state">${glyph}${tag}</span>
+      ${row?.note ? `<span class="ch-card-note">${esc(row.note)}</span>` : ''}
+    </div>`;
+  };
+
+  return `
+  <div class="chassis-block avoid-break">
+    <div class="diagram-title">مخطط سلامة الشاصي<span class="ltr">Chassis safety diagram</span></div>
+    <div class="ch-board">
+      <div class="ch-row ch-row-edge">${card('FRONT')}</div>
+      <div class="ch-row ch-row-mid">
+        <div class="ch-side">${card('FRONT_LEFT')}${card('MIDDLE_LEFT')}${card('REAR_LEFT')}</div>
+        <div class="ch-art">
+          <img class="artchassis" src="${CHASSIS_DIAGRAM_DATA_URI}" alt="">
+          ${chassisMarkers(section)}
+        </div>
+        <div class="ch-side">${card('FRONT_RIGHT')}${card('MIDDLE_RIGHT')}${card('REAR_RIGHT')}</div>
+      </div>
+      <div class="ch-row ch-row-edge">${card('REAR')}</div>
+    </div>
+    <div class="legend-row">
+      <span class="lg-chip">${markGlyph('check', 10)}سليم / OK</span>
+      <span class="lg-chip">${markGlyph('cross', 10)}متضرر / Damage</span>
+    </div>
+    ${noFindingsNote(section.noFindings)}
+    ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
+  </div>`;
+}
+
+/**
+ * The region condition dots drawn on the approved chassis artwork.
+ *
+ * Each region has a fixed normalised position (`CHASSIS_REGIONS`), so a region
+ * marked sound prints a green dot and a damaged one a red dot at the same spot
+ * on the drawing every time. An unassessed region prints no dot rather than a
+ * misleading green one.
+ */
+function chassisMarkers(section: InspectionReportSection): string {
+  const byKey = new Map(section.chassisRegions.map((r) => [r.regionKey, r]));
+  return CHASSIS_REGIONS.map((region) => {
+    const state = byKey.get(region.key)?.condition ?? 'UNSET';
+    if (state === 'UNSET') return '';
+    const color = state === 'OK' ? 'green' : 'red';
+    const glyph = state === 'OK' ? markGlyph('check', 7) : markGlyph('cross', 7);
+    return `<span class="chmark m-${color}" style="left:${(region.x * 100).toFixed(2)}%;top:${(region.y * 100).toFixed(2)}%" title="${esc(region.labelEn)}">${glyph}</span>`;
+  }).join('');
+}
+
+/** The free-form computer-unit fault table. */
+function diagnosticSection(section: InspectionReportSection | undefined): string {
+  // The section prints the "nothing to report" statement when the inspector
+  // ticked the matching checkbox, and the "no faults recorded" line when the
+  // fault list is empty. The checkbox wins when both apply, so the sheet never
+  // prints two different statements about the same check.
+  const nothingToReport = section?.noFindings ? noFindingsNote(true) : '';
+  if (!section || section.diagnostics.length === 0) {
+    return `
+    <div class="diag-block avoid-break">
+      <div class="diagram-title">أعطال وحدة الكمبيوتر<span class="ltr">Computer Module Faults</span></div>
+      ${section?.remarks ? `<div class="sec-remarks"><b>ملاحظات فحص وحدة الكمبيوتر / Computer unit notes:</b> ${escMultiline(section.remarks)}</div>` : nothingToReport || '<div class="no-findings">لم يتم تسجيل ملاحظات · No computer-unit notes recorded</div>'}
+    </div>`;
+  }
+  return `
+  <div class="diag-block">
+    <div class="diagram-title">أعطال وحدة الكمبيوتر<span class="ltr">Computer Module Faults</span></div>
+    <table class="diag-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>الوصف / Description</th><th>الملاحظة / Observation</th><th>الأهمية / Severity</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${section.diagnostics
+          .map(
+            (d, i) => `
+        <tr>
+          <td class="num">${i + 1}</td>
+          <td>${esc(d.description)}</td>
+          <td>${esc(orDash(d.observation))}</td>
+          <td><span class="sev sev-${d.severity.toLowerCase()}">${esc(d.severity)}</span></td>
+        </tr>`,
+          )
+          .join('')}
+      </tbody>
+    </table>
+    ${nothingToReport}
+    ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
+  </div>`;
+}
+
+
+export const INSPECTION_REPORT_CSS = `
+  /* ---- page watermark (approved: cover only) ---- */
+  /* The approved sheet prints the identity wordmark on the *cover only* (the
+   * section pages carry no watermark), so the layer is scoped to the first
+   * page rather than the document body. */
+  /* The mark is the brand display face (Codec Pro Bold), 51.75pt, with a
+   * 6.9pt tracking so the run measures the reference's 476pt ink width, set in
+   * the identity navy at ~9.6% opacity (measured from the approved PDF). */
+  .rp-watermark{ position:absolute; left:0; right:0; top:349.8pt;
+    text-align:center; white-space:pre;
+    font-size:51.747pt; font-weight:700; letter-spacing:6.72pt;
+    color:#0a1f44; opacity:0.101; pointer-events:none; z-index:0;
+    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif; }
+  /* ---- Auto Park brand watermark (every page) ---- */
+  /* A second, independent layer: the customer's logo plus the "AUTO PARK" name,
+   * repeated on every page including the cover, set low enough that all printed
+   * data stays legible on top of it. Positioned in the lower-middle of the sheet
+   * so it clears the approved wordmark band (top ~350pt, cover only) and never
+   * stacks on top of it. */
+  .rp-park-wm{ position:absolute; left:0; right:0; top:42%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8pt; white-space:nowrap; color:#0a1f44; opacity:0.08;
+    pointer-events:none; z-index:0; }
+  .rp-park-wm-logo{ display:block; width:auto; max-width:310pt; max-height:310pt;
+    object-fit:contain; }
+  .rp-park-wm svg{ display:block; width:56pt; height:auto; }
+  .rp-park-wm-text{ font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif;
+    font-size:36pt; font-weight:700; letter-spacing:2.5pt; }
+  .doc-page > :not(.rp-watermark):not(.rp-park-wm){ position:relative; z-index:1; }
+  /* ---- brand band ---- */
+  /* The approved form prints the brand lockup on the visual left and the
+   * "inspection experts" tagline on the visual right. The document is RTL, so
+   * the band itself is forced LTR to keep that arrangement. */
+  .report-head{ display:flex; direction:ltr; justify-content:space-between; align-items:center;
+    padding-bottom:4px; margin-bottom:2px; position:relative; }
+  /* The reference prints a 22pt circled tick at the top-right of every page
+   * header (measured x557-579, y29-51), the identity "quality assured" mark. */
+  /* Reuse the exact financial-document certification badge markup and sizing. */
+  .report-head .doc-quality-badge.rh-badge{
+    position:absolute; right:0; top:13pt;
+    display:inline-flex; align-items:center; justify-content:center;
+    width:24pt; height:24pt; flex:0 0 auto;
+  }
+  .report-head .doc-quality-badge.rh-badge svg{
+    display:block; width:24pt; height:24pt;
+  }
+  .rh-left{ display:flex; align-items:center; gap:9px; }
+  /* The approved lockup prints the mark across x16-213pt (41.8pt tall). The
+   * bundled logo is a full mark+wordmark lockup, so its printed height is set
+   * to the reference mark's height rather than the previous 38px, which left it
+   * noticeably smaller than the approved header. */
+  .rh-logo{ height:44.5pt; width:auto; }
+  /* The official logotype lockup: the vector mark beside the three-line Arabic
+     wordmark and the Latin AUTO SERVICES line, as the approved header prints it. */
+  .rh-lockup{ display:flex; align-items:center; gap:6px; }
+  .rh-logo-mark{ display:block; width:auto; }
+  .rh-wordmark{ display:flex; flex-direction:column; line-height:1.0; }
+  .rh-wordmark-ar{ font-size:14.5pt; font-weight:700; color:var(--navy); }
+  .rh-wordmark-en{ font-size:14.2pt; font-weight:700; color:var(--navy); letter-spacing:.5px;
+    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif; }
+  .rh-monogram{ width:38px; height:38px; border-radius:8px; background:var(--navy); color:var(--gold);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14pt; letter-spacing:.5px; }
+  .rh-name{ display:flex; flex-direction:column; line-height:1.12; }
+  .rh-name-ar{ font-size:14pt; font-weight:700; color:var(--navy); }
+  .rh-name-en{ font-size:8.5pt; font-weight:700; color:var(--muted); letter-spacing:.6px; text-transform:uppercase; }
+  /* The tagline sits to the left of the badge, which is anchored to the paper's
+   * right edge, so the tagline is inset to clear the disc. */
+  .rh-right{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.2;
+    text-align:right; padding-inline-end:28pt; }
+  .rh-tag-ar{ font-size:11.8pt; font-weight:700; color:var(--navy); }
+  .rh-tag-en{ font-size:7.9pt; font-weight:700; color:var(--gold); letter-spacing:0;
+    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif; }
+  /* ---- shared page furniture ---- */
+  /* The approved section title prints at 10pt navy over an 8.7pt navy strapline,
+   * both centred, with the strap in small caps. Measured from the reference
+   * (y78 ar / y90 en on the section sheets). */
+  .p-title{ display:flex; flex-direction:column; align-items:center; margin:15.9pt 0 3px; }
+  .p-title-ar{ font-size:var(--p-title-size,10.3pt); font-weight:700; color:var(--navy); line-height:1.15; }
+  .p-title-en{ font-size:var(--p-title-size,10.3pt); font-weight:700; color:var(--navy); letter-spacing:var(--p-title-track,0); line-height:1.0;
+    font-family:'ORYX Display','ORYX Latin',Verdana,Arial,Helvetica,sans-serif; }
+  .job-head{ display:flex; direction:ltr; justify-content:space-between; align-items:baseline;
+    font-size:8pt; font-weight:700; color:var(--navy); padding:0 2px 2px; }
+  /* The vehicle strip: four cells over a light rule, labels in slate at 6.8pt and
+   * values in navy at 8.2pt, matching the reference band (y104-132). */
+  .vstrip{ display:flex; direction:ltr; border:1px solid #e2e8f0; border-radius:4px; overflow:hidden; background:#f8fafc; }
+  .vcell{ flex:1 1 0; padding:3px 8px; border-inline-end:1px solid #e2e8f0; }
+  .vcell:last-child{ border-inline-end:none; }
+  .vcell-lab{ display:block; font-size:6.8pt; color:#64748b; line-height:1.15; }
+  .vcell-lab .ltr{ font-weight:700; color:#64748b; }
+  .vcell-val{ display:block; font-size:8.2pt; font-weight:700; color:#0f2b48; }
+  .ltr{ direction:ltr; unicode-bidi:isolate; }
+  .lg-chip{ display:inline-flex; align-items:center; gap:4px; font-size:8pt; color:var(--ink); margin-inline-start:10px; }
+  .legend-row{ display:flex; gap:6px; margin-top:6px; }
+  /* ---- cover ---- */
+  /* The approved cover insets the vehicle-information card ~9.5pt inside the
+     page content box (its banner spans x25-570 of a 595pt sheet, while the
+     header and footer run to x15) and drops it ~7.4pt below the section title
+     (banner top y111.1 of the reference). */
+  .cover-info{ width:100%; padding:0 9.5pt; margin-top:7.4pt; }
+  .cover-sec-title{ display:flex; align-items:baseline; justify-content:space-between; background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:2.2px 10px; border-radius:5px 5px 0 0; }
+  .cover-sec-title .ltr{ margin-inline-start:8px; color:var(--gold-soft); font-size:8pt; font-weight:400; }
+  .vinfo{ width:100%; border:1px solid var(--line); border-top:none; border-collapse:collapse; direction:ltr; table-layout:fixed; }
+  /* The approved cover gives the first column the extra width its longest value
+     ("Ahmed mohamad Alhaddad", 135pt) needs; the remaining three columns share
+     the rest equally (measured rules at x174.4 / 305.4 / 437.0). The values are
+     printed on one line and are allowed to sit slightly past the cell padding
+     rather than wrap, which is what keeps every row at the reference's 28pt. */
+  .vinfo td{ border:1px solid var(--line); padding:3px 8px; vertical-align:top; width:24.4%; text-align:center; }
+  .vinfo td:first-child{ width:26.8%; }
+  .vlab{ display:flex; align-items:baseline; justify-content:space-between; gap:6px; font-size:7.3pt; color:var(--muted); line-height:1.2; }
+  .vlab .ltr{ font-weight:700; color:var(--navy-soft); }
+  .vlab .var{ direction:rtl; color:var(--muted); }
+  .vval{ display:block; margin-top:1px; font-size:8.8pt; font-weight:700; color:var(--ink); white-space:nowrap; }
+  /* The approved cover prints the verification QR inside the photograph band,
+   * bottom-right, over a white card so the modules stay scannable. Physical
+   * right/bottom is used because the page is RTL and the reference anchors the
+   * code to the visual right regardless of direction. */
+  .cover-qr{ position:absolute; bottom:8px; right:10px; z-index:2;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    background:#fff; border:1px solid var(--line); border-radius:5px; padding:5px 6px; }
+  /* Measured from the approved cover: a 47pt code (bbox 522,461-569,508) with a
+   * single Arabic caption above it (7pt). */
+  .cover-qr img{ width:62px; height:62px; display:block; }
+  .cover-qr-cap{ font-size:7pt; font-weight:700; color:var(--navy); line-height:1.15; text-align:center; direction:rtl; unicode-bidi:embed; }
+  /* The approved cover prints the vehicle photograph as a wide band across the
+   * middle of the page, bleeding past the side margins. Measured from the
+   * reference: the band spans y184-549 of an 842pt sheet, i.e. 365pt tall. */
+  .vphoto{ --vphoto-h:275px; position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
+  /* The approved cover bleeds the photograph to the paper edges. A negative
+   * margin, or a wider in-flow box, enlarges the printable area and shifts every
+   * other element on the sheet sideways. The band is therefore painted with an
+   * absolutely positioned image that overflows its (in-flow, margin-width)
+   * figure: absolute overflow is clipped by the paper edge, it does not resize
+   * the page. */
+  .vphoto--bleed{ margin-inline:0; border-radius:0; border-inline:none; height:var(--vphoto-h); }
+  .vphoto--bleed .vphoto-img{ position:absolute; top:0; inset-inline:-12mm;
+    width:calc(100% + 24mm); height:var(--vphoto-h); object-fit:contain; }
+  .vphoto-img{ width:100%; height:var(--vphoto-h); object-fit:contain; display:block; }
+  /* With no attached photograph the cover keeps the reference's blank band
+   * (y184-549) empty: no illustration, no placeholder text. The band is drawn at
+   * the reference's height so the vehicle information and the terms block land
+   * where the approved sheet puts them, and the verification QR floats over it,
+   * anchored bottom-right. */
+  .vphoto-art{ position:relative; width:595.5pt; margin-left:-15.87pt;
+    height:330pt; margin-top:-29pt; }
+  .vphoto-empty .vphoto-ph{ position:absolute; top:0; inset-inline:-12mm;
+    width:calc(100% + 24mm); height:var(--vphoto-h);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:var(--muted); font-size:8pt; }
+  .vphoto-ph .ltr{ font-size:7.5pt; color:var(--line-strong); }
+  /* The approved cover lays the ORYX wordmark across the photograph band as a
+   * translucent watermark, centred, so the vehicle is still readable through
+   * it. */
+  .vphoto-mark{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:62%; height:auto; opacity:0.18; z-index:1; pointer-events:none; }
+  /* The approved sheet prints the disclaimer heading as a full-width navy
+   * banner, white text, with the English title on the physical left and the
+   * Arabic on the physical right. The two body columns sit below it in bordered
+   * cards: the Arabic column on the right at 8pt and the English column on the
+   * left at 6pt (measured y524-660 of page 1). The banner is forced LTR so the
+   * English always leads on the left regardless of the document direction. */
+  .terms{ margin-top:28px; }
+  .terms-banner{ display:flex; direction:ltr; align-items:center; justify-content:space-between;
+    background:#0f2b48; color:#fff; padding:3px 10px; font-size:10pt; font-weight:700; }
+  .terms-banner-en{ text-align:left; }
+  .terms-banner-ar{ text-align:right; direction:rtl; unicode-bidi:embed; }
+  .terms-cols{ display:flex; gap:0; border:1px solid var(--line); border-top:none; }
+  .terms-col{ flex:1 1 0; min-width:0; padding:6px 10px; }
+  .terms-col + .terms-col{ border-inline-start:1px solid var(--line); }
+  .terms-col-head{ font-size:10pt; font-weight:700; color:var(--navy); padding-bottom:3px;
+    margin-bottom:4px; border-bottom:1px solid var(--line); }
+  .terms-ar{ margin:0; font-size:8pt; line-height:1.2; color:var(--ink); }
+  .terms-en{ margin:0; font-size:6pt; line-height:1.2; color:var(--muted); text-align:left; }
+  .remarks-block{ margin-top:9px; border:1px solid var(--line); border-radius:6px; padding:5px 10px; }
+  .remarks-title{ display:flex; align-items:baseline; justify-content:space-between; font-size:10pt; font-weight:700; color:var(--navy); margin-bottom:4px; }
+  .remarks-title .ltr{ margin-inline-start:8px; font-size:8.3pt; color:var(--muted); font-weight:400; }
+  .remarks-cols{ display:flex; gap:14px; }
+  .remarks-list{ flex:1 1 0; margin:0; padding-inline-start:15px; font-size:6.6pt; line-height:1.22; color:var(--ink); }
+  .remarks-list.ltr{ text-align:left; }
+  /* ---- section groups ---- */
+  .grp{ margin-top:5px; }
+  /* The reference paints each checklist heading as a flat bar in the softer
+   * identity navy (#1b375a) with white text, no radius, and a hairline underline
+   * (measured y161-186 on page 4). */
+  /* The approved bar prints the Arabic title flush to the visual right and the
+   * English title flush to the visual left of the same full-width navy band, so
+   * the two are pushed apart rather than packed together. */
+  .grp-title{ display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap;
+    background:#1b375a; color:#fff; font-size:9pt; font-weight:700; padding:3px 9px; border-radius:0; }
+  .grp-title .ltr{ margin-inline-start:7px; font-size:7.6pt; color:#cbd5e1; font-weight:400; }
+  .grp-legend{ margin-inline-start:auto; display:flex; gap:2px; }
+  .grp-legend .lg-chip{ color:#fff; font-size:7pt; }
+  .two-col{ display:flex; gap:10px; align-items:flex-start; }
+  .two-col > *{ flex:1 1 0; min-width:0; }
+  .cabin .two-col{ margin-top:5px; }
+  .grid{ width:100%; direction:rtl; table-layout:fixed; border-collapse:separate; border-spacing:4px 2px; }
+  .grid > tbody > tr > td{ box-sizing:border-box; width:50%; max-width:50%; vertical-align:top; padding:0; overflow:visible; }
+  .cabin .grid{ border-collapse:separate; page-break-inside:auto; }
+  .cabin .grid > tbody > tr{ page-break-inside:avoid; break-inside:avoid; }
+  .cabin .grid > tbody > tr > td{ width:50%; max-width:50%; overflow:visible; }
+  /* Keep the exterior checklist and its optional remarks in a separate, bounded
+   * table column. The illustrated lower sheet must not clip bilingual rows or
+   * let long notes paint over the neighbouring interior checklist. */
+  .cabin .exterior-column{ position:relative; isolation:isolate; }
+  .cabin .exterior-column .itable{ width:100%; max-width:100%; }
+  .cabin .exterior-column .items{ table-layout:fixed; }
+  .cabin .exterior-column .item-ar,
+  .cabin .exterior-column .item-en{ max-width:100%; overflow-wrap:break-word; word-break:normal; }
+  .cabin .exterior-column .remark-block{ position:relative; z-index:1; overflow-wrap:anywhere; }
+
+  /* The approved form paints the interior fittings drawing as a faint
+   * background behind the lower-left (exterior) checklist, at 250x163pt (333px
+   * at Chromium's 96dpi/72pt ratio). It is out of flow, so it neither adds page
+   * height nor competes with the printed rows. The anchor is the physical left
+   * (left, not inset-inline-start, which resolves to the right in this RTL
+   * report) and the bottom of the cabin block, so the drawing sits under the
+   * exterior checklist exactly as the reference does. */
+  .cabin{ position:relative; }
+  /* Four fully populated checklists and their saved technical remarks must
+   * share ONE physical A4 page. Scope density changes to the group sheet so
+   * paint/chassis and other document layouts retain their approved sizes. */
+  .cabin .grp{ margin-top:2px; }
+  .cabin .grid{ border-spacing:3px 1px; }
+  .cabin .items td{ padding:2px 4px; line-height:1.22; }
+  .cabin .items thead th{ padding:2px 4px; line-height:1.05; }
+  .cabin .item-ar{ font-size:6.6pt; line-height:1.15; }
+  .cabin .item-en{ font-size:5.5pt; line-height:1.16; }
+  .cabin .items .sec-remarks{ margin-top:2px; }
+  .cabin .itable > .sec-remarks{
+    margin-top:2px; padding:2px 5px; font-size:6.5pt; line-height:1.1;
+    overflow-wrap:anywhere; white-space:pre-line;
+  }
+  .interior-art{ position:absolute; left:0; bottom:0; margin:0; z-index:0; }
+  .interior-art img{ width:333px; height:auto; display:block; opacity:.28; }
+  .itable{ border:1px solid #334e68; border-top:none; }
+  .itable-head{ background:#1b375a; color:#fff; font-size:9pt; font-weight:700; padding:3px 9px; border-bottom:1px solid #334e68; }
+  .itable-head .ltr{ margin-inline-start:7px; font-size:7.6pt; color:#cbd5e1; font-weight:400; }
+  /* Bilingual checklists must own their columns. Without fixed layout the three
+   * result columns squeeze the Arabic/English labels into overlapping cells. */
+  .items{ width:100%; table-layout:fixed; border-collapse:collapse; direction:rtl; background:#fff; }
+  .items tbody tr{ break-inside:avoid; page-break-inside:avoid; }
+  .items tbody td{ height:auto; min-height:20px; }
+  .items--three-results .c-item{ width:64%; }
+  .items--three-results .c-res{ width:12%; }
+  .items--two-results .c-item{ width:64%; }
+  .items--two-results .c-res{ width:18%; }
+  .items th,.items td{ box-sizing:border-box; overflow-wrap:anywhere; }
+  .items .item-ar,.items .item-en{ white-space:normal; overflow-wrap:anywhere; unicode-bidi:isolate; }
+  .items .item-ar{ direction:rtl; text-align:right; }
+  .items .item-en{ direction:ltr; text-align:left; }
+  .items .c-res{ text-align:center; vertical-align:middle; white-space:nowrap; }
+  .items .c-res .mark{ vertical-align:middle; }
+  .cabin .itable{ position:relative; z-index:1; background:#fff; }
+  .cabin .grp{ min-width:0; overflow:visible; }
+  .cabin .items{ width:100%; max-width:100%; table-layout:fixed; }
+  .cabin .items th,.cabin .items td{ word-break:normal; overflow-wrap:anywhere; }
+  .cabin .items thead{ display:table-header-group; }
+  .cabin .items tbody{ display:table-row-group; }
+  .cabin .items tbody td{ background:#fff; }
+  .cabin .no-findings{ position:relative; z-index:2; clear:both; background:#fff; padding:5px 6px; font-size:7pt; line-height:1.35; min-height:26px; text-align:center; }
+  .no-findings-ar,.no-findings-en{ display:block; width:100%; white-space:normal; overflow-wrap:anywhere; unicode-bidi:isolate; }
+  .no-findings-ar{ direction:rtl; }
+  .no-findings-en{ direction:ltr; margin-top:2px; }
+  .items th,.items td{ border-bottom:1px solid var(--line); border-inline-end:1px solid var(--line); padding:3px 5px; font-size:7.2pt; line-height:1.28; vertical-align:middle; }
+  /* The checklist heading is the table's own header row: navy bar, white text,
+   * the bilingual title in the item column and the Pass/Fail/N-A labels over the
+   * result columns (measured y161-186 of the reference page 4). */
+  .items thead th{ background:#1b375a; color:#fff; font-size:7.2pt; font-weight:700; text-align:center;
+    border-bottom:1px solid #334e68; padding:3px 5px; }
+  .items thead th .ltr{ display:block; font-size:6.2pt; font-weight:400; color:#cbd5e1; }
+  .items thead th.c-item{ text-align:start; }
+  .items thead th.c-item .ltr{ display:block; margin:2px 0 0; text-align:left; direction:ltr; unicode-bidi:isolate; }
+  .items th:last-child,.items td:last-child{ border-inline-end:none; }
+  .items tr:last-child td{ border-bottom:none; }
+  .c-item{ width:64%; }
+  .c-res{ text-align:center; }
+  .item-ar{ display:block; font-size:7.1pt; line-height:1.18; color:var(--ink); unicode-bidi:isolate; }
+  .item-en{ display:block; font-size:5.9pt; line-height:1.2; margin-top:2px; color:var(--muted); unicode-bidi:isolate; }
+  .rm{ display:inline-flex; align-items:center; justify-content:center; font-size:7pt; font-weight:700; }
+  .rm-pass{ color:var(--ok); } .rm-fail{ color:var(--bad); } .rm-na{ color:var(--muted); } .rm-unset{ color:#c3c9d2; }
+  .mark{ display:inline-block; vertical-align:-2px; }
+  .general-remarks{ border:1px solid var(--line); border-top:none; border-radius:0 0 5px 5px; padding:5px 9px;
+    font-size:7.8pt; line-height:1.3; color:var(--ink); min-height:22px; white-space:pre-line; }
+  /* The three remark blocks sit in the lower-left cell beside the interior
+   * checklist, so they take the cabin's compact type scale and hug the table. */
+  .cabin .remark-block{ margin-top:0; }
+  .cabin .remark-block .grp-title{ font-size:6.7pt; padding:0 5px; }
+  .cabin .remark-block .general-remarks{ font-size:7.2pt; line-height:1.14; padding:2px 6px; min-height:0; }
+  .sec-remarks{ margin-top:6px; border:1px solid var(--line); border-radius:5px; padding:6px 9px; font-size:7.6pt; line-height:1.3; color:var(--ink); background:#fbfcfe; }
+  .no-findings{ border:1px solid var(--line); border-top:none; padding:8px; font-size:8.5pt; color:var(--muted); background:#f7f9fc; text-align:center; }
+  /* ---- diagrams ---- */
+  .diagram-block,.chassis-block,.diag-block{ margin-top:8px; }
+  /* The reference paints each diagram heading as a full-width bar in the softer
+   * identity navy with white text (measured y144-160 of page 2). */
+  .diagram-title{ display:flex; align-items:baseline; justify-content:space-between; background:#1b375a; color:#fff;
+    font-size:9pt; font-weight:700; padding:3px 9px; margin-bottom:6px; }
+  .diagram-title .ltr{ margin-inline-start:7px; font-size:7.6pt; color:#cbd5e1; font-weight:400; }
+  /* The approved form prints the body-panel scheme at its full size, centred,
+   * with the condition legend on one row beneath it and the remarks box last.
+   * The drawing is the approved artwork itself, so its printed size is fixed to
+   * the reference: the car occupies 321x439pt, which is 428px at Chromium's
+   * 96dpi/72pt ratio. */
+  .diagram{ position:relative; width:230px; }
+  .diagram--art{ width:446px; margin:0 auto; }
+  .artplan{ width:100%; height:auto; display:block; }
+  .marker{ position:absolute; width:14px; height:14px; border-radius:50%; transform:translate(-50%,-50%);
+    display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
+    border:1.5px solid #fff; box-shadow:0 0 0 .5px rgba(0,0,0,.4); }
+  .m-green{ background:#1f9d55; } .m-orange{ background:#e08a1e; } .m-red{ background:#d92d20; }
+  .legend{ display:flex; flex-wrap:wrap; gap:8px 16px; align-content:flex-start; }
+  /* The reference prints the four condition keys on a single row, centred under
+   * the drawing, in the physical order sectioned, Change, Filler, Paint. The
+   * order is physical, so the row is forced LTR rather than inheriting the
+   * document's RTL flow. */
+  /* The approved key: four equal navy chips across one row, each with a thin
+     black hairline, the bilingual label in white, and the condition's own
+     colour swatch (green/orange/red, cross on sectioned) right-aligned at the
+     trailing edge. Measured from the reference: chip 107.9x20.3pt with a 0.5pt
+     black border, swatch 13.7pt square inset ~7pt from the right, row gap
+     ~12pt (chip pitch ~119.5pt). */
+  .legend--row{ justify-content:center; gap:12pt; margin-top:10px; direction:ltr; }
+  .legend-chip{ display:inline-flex; align-items:center; justify-content:space-between;
+    box-sizing:border-box; width:107.9pt; background:var(--navy); border:0.5pt solid #000;
+    color:#fff; font-size:8.5pt; line-height:1; padding:3pt 7pt; }
+  .legend-chip-label{ white-space:nowrap; }
+  .legend-chip-mark{ width:13.7pt; height:13.7pt; display:inline-flex; align-items:center;
+    justify-content:center; color:#fff; flex:0 0 auto; }
+  .lm-green{ background:#16a34a; } .lm-orange{ background:#f59e0b; } .lm-red{ background:#dc2626; }
+  /* The approved chassis page centres the drawing and distributes the eight
+   * region boxes around it — Front above, Rear below, three pairs down the
+   * sides. The board is a three-column grid with the drawing in the centre.
+   * The arrangement is physical (left cards on the left), so it is forced LTR
+   * rather than following the document's RTL flow. */
+  .ch-board{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:4px; direction:ltr; }
+  .ch-row{ display:flex; justify-content:center; width:100%; }
+  .ch-row-mid{ align-items:flex-start; gap:10px; }
+  .ch-row-edge .ch-card{ min-width:150px; text-align:center; }
+  /* The approved sheet spreads the three left/right cards down the drawing
+   * band instead of stacking them at the top; min-height (not height) so a
+   * card carrying a note can still grow without overflowing the column. */
+  .ch-side{ display:flex; flex-direction:column; justify-content:space-between; gap:8px; width:149px; min-height:270px; margin-top:20px; }
+  .ch-side .ch-card{ width:149px; box-sizing:border-box; }
+  .ch-side:first-child{ align-items:flex-start; text-align:left; }
+  .ch-side:last-child{ align-items:flex-end; text-align:right; }
+  /* The reference draws the chassis at ~270x374pt, i.e. 360px wide at
+   * Chromium's 96dpi/72pt ratio, with the side cards narrower than the
+   * drawing. */
+  .ch-art{ position:relative; width:352px; flex:0 0 352px; }
+  .artchassis{ width:100%; height:auto; display:block; }
+  .chmark{ position:absolute; width:15px; height:15px; border-radius:50%; transform:translate(-50%,-50%);
+    display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
+    border:1.5px solid #fff; box-shadow:0 0 0 .5px rgba(0,0,0,.4); }
+  .ch-card{ border:1px solid var(--line); border-radius:5px; padding:4px 7px; background:#f7f9fc;
+    display:flex; flex-direction:column; gap:1px; }
+  .ch-card-ar{ font-size:8.5pt; font-weight:700; color:var(--navy); }
+  .ch-card-en{ font-size:6.6pt; color:var(--muted); }
+  .ch-card-state{ font-size:6.6pt; font-weight:700; }
+  .ch-card-note{ font-size:6.4pt; color:var(--ink); }
+  .ch-ok{ background:#f0fdf4; border-color:#86efac; } .ch-ok .ch-card-state{ color:var(--ok); }
+  .ch-bad{ background:#fef2f2; border-color:#fca5a5; } .ch-bad .ch-card-state{ color:var(--bad); }
+  .ch-unset .ch-card-state{ color:#9aa4b2; }
+  .diag-table{ border:1px solid var(--line); }
+  .diag-table th,.diag-table td{ border-bottom:1px solid var(--line); padding:4px 7px; font-size:8pt; text-align:start; }
+  .diag-table thead th{ background:#eef2f8; color:var(--navy); }
+  .sev{ padding:1px 6px; border-radius:3px; font-size:7.5pt; font-weight:700; }
+  .sev-info{ background:#eef2f8; color:var(--muted); }
+  .sev-low{ background:#ecfdf5; color:var(--ok); }
+  .sev-medium{ background:#fffbeb; color:var(--warn); }
+  .sev-high,.sev-critical{ background:#fef2f2; color:var(--bad); }
+`;

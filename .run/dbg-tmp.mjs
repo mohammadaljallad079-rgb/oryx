@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const p = await b.newPage();
+p.on('console', (m) => console.log('CONSOLE', m.type(), m.text().slice(0, 300)));
+p.on('pageerror', (e) => console.log('PAGEERROR', String(e).slice(0, 300)));
+const r = await p.goto('http://127.0.0.1:12001/login', { waitUntil: 'domcontentloaded' });
+console.log('status', r && r.status(), 'url', p.url());
+await p.waitForTimeout(3000);
+console.log('inputs', await p.locator('input').count());
+console.log('email inputs', await p.locator('input[type="email"]').count());
+console.log('html', (await p.content()).slice(0, 400));
+await b.close();

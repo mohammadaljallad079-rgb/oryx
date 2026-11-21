@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
   RequireAnyPermission,
@@ -9,6 +10,7 @@ import {
 } from '../auth/auth.decorators';
 import { actorFrom } from '../common/erp-context.service';
 import { InventoryService } from './inventory.service';
+import { ProductImageService } from './product-image.service';
 import {
   CreateAdjustmentDto,
   CreateProductDto,
@@ -17,7 +19,9 @@ import {
   ListQueryDto,
   RecordMovementDto,
   UpdateProductDto,
+  UpdateProductImageDto,
   UpdateWarehouseDto,
+  UploadProductImageDto,
 } from './inventory.dto';
 
 interface RequestLike {
@@ -30,7 +34,10 @@ interface RequestLike {
 @RequireModule('warehouses_inventory')
 @Controller('inventory')
 export class InventoryController {
-  constructor(private readonly inventory: InventoryService) {}
+  constructor(
+    private readonly inventory: InventoryService,
+    private readonly productImages: ProductImageService,
+  ) {}
 
   // -------------------------------------------------------------- warehouses
   @Get('warehouses')
@@ -59,12 +66,54 @@ export class InventoryController {
     return this.inventory.updateWarehouse(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('warehouses/:id')
+  @RequirePermissions('erp.inventory.warehouse.manage')
+  @ApiOperation({ summary: 'Delete a warehouse that holds no stock or history' })
+  deleteWarehouse(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inventory.deleteWarehouse(id, p, actorFrom(p, req));
+  }
+
   // ---------------------------------------------------------------- products
   @Get('products')
   @RequireAnyPermission('erp.inventory.read', 'erp.inventory.item.manage', 'erp.sales.catalog.manage')
   @ApiOperation({ summary: 'List stock items / products' })
   products(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
     return this.inventory.listProducts(query, p);
+  }
+
+  @Get('product-categories')
+  @RequireAnyPermission('erp.inventory.read', 'erp.inventory.item.manage', 'erp.sales.catalog.manage')
+  @ApiOperation({ summary: 'Distinct product categories for the catalogue filters' })
+  productCategories(@Query('companyId') companyId: string | undefined, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.inventory.productCategories(p, companyId);
+  }
+
+  @Get('product-categories/manage')
+  @RequireAnyPermission('erp.inventory.read', 'erp.inventory.item.manage')
+  @ApiOperation({ summary: 'List managed product categories and their product counts' })
+  managedProductCategories(@CurrentPrincipal() p: RequestPrincipal) {
+    return this.inventory.listProductCategoryRecords(p);
+  }
+
+  @Post('product-categories')
+  @RequirePermissions('erp.inventory.item.manage')
+  @ApiOperation({ summary: 'Create a reusable product category' })
+  createProductCategory(@Body() body: { name: string }, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inventory.createProductCategory(body.name, p, actorFrom(p, req));
+  }
+
+  @Patch('product-categories/:id')
+  @RequirePermissions('erp.inventory.item.manage')
+  @ApiOperation({ summary: 'Rename category and all linked products' })
+  renameProductCategory(@Param('id') id: string, @Body() body: { name: string }, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inventory.renameProductCategory(id, body.name, p, actorFrom(p, req));
+  }
+
+  @Delete('product-categories/:id')
+  @RequirePermissions('erp.inventory.item.manage')
+  @ApiOperation({ summary: 'Delete unused product category' })
+  deleteProductCategory(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inventory.deleteProductCategory(id, p, actorFrom(p, req));
   }
 
   @Post('products')
@@ -84,6 +133,13 @@ export class InventoryController {
     @Req() req: RequestLike,
   ) {
     return this.inventory.updateProduct(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('products/:id')
+  @RequireAnyPermission('erp.inventory.item.manage', 'erp.sales.catalog.manage')
+  @ApiOperation({ summary: 'Delete a product that carries no history' })
+  deleteProduct(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inventory.deleteProduct(id, p, actorFrom(p, req));
   }
 
   // --------------------------------------------------------- stock movements
@@ -156,7 +212,98 @@ export class InventoryController {
   @Get('reorder-alerts')
   @RequireAnyPermission('erp.inventory.read', 'erp.inventory.valuation.read')
   @ApiOperation({ summary: 'Products at or below their reorder level' })
-  reorderAlerts(@Query('companyId') companyId: string | undefined, @CurrentPrincipal() p: RequestPrincipal) {
-    return this.inventory.reorderAlerts(p, companyId);
+  reorderAlerts(
+    @Query('companyId') companyId: string | undefined,
+    @Query('warehouseId') warehouseId: string | undefined,
+    @CurrentPrincipal() p: RequestPrincipal,
+  ) {
+    return this.inventory.reorderAlerts(p, companyId, warehouseId);
+  }
+
+  /**
+   * The point-of-sale product grid: active products with their lead image and
+   * on-hand position, so the till renders a card and a stock badge without a
+   * request per tile. Gated by the POS operate permission, since it exists for
+   * the till and exposes on-hand figures the catalogue list does not.
+   */
+  @Get('pos-catalog')
+  @RequireAnyPermission('erp.sales.pos.operate', 'erp.sales.pos.manage', 'erp.inventory.read')
+  @ApiOperation({ summary: 'Point-of-sale product grid with stock status and image' })
+  posCatalog(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.inventory.posCatalog(query, p);
+  }
+
+  @Get('pos-categories')
+  @RequireAnyPermission('erp.sales.pos.operate', 'erp.sales.pos.manage', 'erp.inventory.read')
+  @ApiOperation({ summary: 'Distinct merchandise categories for the POS chips' })
+  posCategories(@Query('companyId') companyId: string | undefined, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.inventory.posCategories(p, companyId);
+  }
+
+  // ---------------------------------------------------------- product images
+  /**
+   * Product photography.
+   *
+   * A product image is catalogue data a company administrator manages, so the
+   * routes take `erp.inventory.item.manage`. The bytes are validated and
+   * re-encoded by the shared media storage service; the client only supplies the
+   * file and its alt text.
+   */
+  @Get('products/:productId/images')
+  @RequireAnyPermission('erp.inventory.read', 'erp.inventory.item.manage')
+  @ApiOperation({ summary: 'List a product\'s images' })
+  listProductImages(@Param('productId') productId: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.productImages.list(productId, p);
+  }
+
+  @Post('products/:productId/images')
+  @RequirePermissions('erp.inventory.item.manage')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload a product image' })
+  uploadProductImage(
+    @Param('productId') productId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: UploadProductImageDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    ProductImageService.assertFile(file);
+    return this.productImages.upload(
+      productId,
+      file,
+      {
+        altEn: dto.altEn,
+        altAr: dto.altAr,
+        isPrimary: dto.isPrimary === 'true',
+      },
+      p,
+      actorFrom(p, req),
+    );
+  }
+
+  @Patch('products/:productId/images/:imageId')
+  @RequirePermissions('erp.inventory.item.manage')
+  @ApiOperation({ summary: 'Update a product image' })
+  updateProductImage(
+    @Param('productId') productId: string,
+    @Param('imageId') imageId: string,
+    @Body() dto: UpdateProductImageDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.productImages.update(productId, imageId, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('products/:productId/images/:imageId')
+  @RequirePermissions('erp.inventory.item.manage')
+  @ApiOperation({ summary: 'Remove a product image' })
+  removeProductImage(
+    @Param('productId') productId: string,
+    @Param('imageId') imageId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.productImages.remove(productId, imageId, p, actorFrom(p, req));
   }
 }

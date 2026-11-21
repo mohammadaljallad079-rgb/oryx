@@ -1,12 +1,19 @@
 'use client';
 
-import { useState } from 'react';
-import { api } from '@/lib/api';
+import { Suspense, useState } from 'react';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { EntityPicker } from '@/components/inline-create';
+import { LeadModal } from '@/components/entity-modals';
+import { PipelineModal } from '@/components/pipeline-modal';
+import { CustomerModal } from '@/components/customer-modal';
+import { CustomersTab } from '@/components/customers-tab';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -22,9 +29,19 @@ import {
 } from '@/components/ui';
 import type { LeadDto, OpportunityDto, SupportTicketDto } from '@oryx/shared';
 
-type Tab = 'dashboard' | 'leads' | 'opportunities' | 'tickets' | 'activities';
+type Tab = 'dashboard' | 'leads' | 'opportunities' | 'tickets' | 'activities' | 'customers';
+
+const TAB_KEYS = ['dashboard', 'leads', 'opportunities', 'tickets', 'activities', 'customers'] as const;
 
 export default function CrmPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <CrmInner />
+    </Suspense>
+  );
+}
+
+function CrmInner() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -35,10 +52,12 @@ export default function CrmPage() {
     { key: 'opportunities', label: t('erp.crm.opportunities') },
     { key: 'tickets', label: t('erp.crm.tickets') },
     { key: 'activities', label: t('erp.crm.activities') },
+    { key: 'customers', label: t('erp.sales.customers') },
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="crm-page">
+    <div className="flex flex-col gap-4" data-testid="crm-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.crm')}
         subtitle={t('erp.crm.subtitle')}
@@ -61,41 +80,42 @@ export default function CrmPage() {
         ))}
       </div>
 
-      {tab === 'dashboard' ? <DashboardTab /> : null}
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="crm" testId="crm-dashboard" /> : null}
       {tab === 'leads' ? <LeadsTab canManage={can('erp.crm.lead.manage')} /> : null}
       {tab === 'opportunities' ? <OpportunitiesTab canManage={can('erp.crm.opportunity.manage')} canConvert={can('erp.crm.opportunity.convert')} /> : null}
       {tab === 'tickets' ? <TicketsTab canManage={can('erp.crm.ticket.manage')} /> : null}
       {tab === 'activities' ? <ActivitiesTab canManage={can('erp.crm.activity.manage')} /> : null}
+      {tab === 'customers' ? <CustomersTab canManage={can('erp.sales.customer.manage')} /> : null}
     </div>
   );
 }
 
-function DashboardTab() {
-  const { t } = useUi();
-  const data = useAsync(() => api.crmDashboard(), []);
-  if (data.loading) return <div className="p-4"><Skeleton height={160} /></div>;
-  if (data.error) return <ErrorBanner message={data.error} onRetry={data.reload} />;
-  const d = data.data!;
-  return (
-    <Card className="p-4" data-testid="crm-dashboard">
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Kpi label={t('erp.crm.totalLeads')} value={String(d.totalLeads)} />
-        <Kpi label={t('erp.crm.openOpportunities')} value={String(d.openOpportunities)} />
-        <Kpi label={t('erp.crm.pipelineValue')} value={money(d.pipelineValueMinor)} />
-        <Kpi label={t('erp.crm.openTickets')} value={String(d.openTickets)} />
-        <Kpi label={t('erp.crm.wonOpportunities')} value={String(d.wonOpportunities)} />
-        <Kpi label={t('erp.crm.overdueActivities')} value={String(d.overdueActivities)} />
-        <Kpi label={t('erp.crm.satisfaction')} value={d.averageSatisfaction ? d.averageSatisfaction.toFixed(1) : '—'} />
-      </div>
-    </Card>
-  );
-}
 
 function LeadsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<LeadDto | null>(null);
   const list = useAsync(() => api.crmLeads({ search: search || undefined }), [search]);
+
+  const setStatus = async (row: LeadDto, status: string) => {
+    await api.updateLead(row.id, { status });
+    await list.reload();
+  };
+
+  const removeLead = async (row: LeadDto) => {
+    if (!window.confirm(t('erp.crm.confirmDeleteLead'))) return;
+    setBusyId(row.id);
+    try {
+      await api.deleteLead(row.id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.crm.deleteLeadBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -105,7 +125,7 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
           <input className="oryx-input" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="lead-search" />
         </label>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-lead">
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-lead">
             <Icon name="plus" size={16} />
             {t('erp.crm.newLead')}
           </Button>
@@ -125,6 +145,7 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.crm.contact')}</th>
               <th>{t('erp.crm.estimatedValue')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -138,80 +159,53 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{l.contactName ?? l.email ?? l.phone ?? '—'}</td>
                 <td className="tabular-nums text-[12.5px]">{money(l.estimatedValueMinor, l.currency)}</td>
                 <td><StatusBadge status={l.status} label={l.status} /></td>
+                <td>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage ? (
+                      <>
+                        <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${l.code}`} onClick={() => { setEditing(l); setOpen(true); }} data-testid={`lead-edit-${l.code}`}>
+                          <Icon name="edit" size={14} />
+                        </Button>
+                        <select
+                          className="oryx-select"
+                          value={l.status}
+                          onChange={(ev) => void setStatus(l, ev.target.value)}
+                          aria-label={`${t('erp.crm.leadStatus')} ${l.code}`}
+                          data-testid={`lead-status-${l.code}`}
+                        >
+                          {['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST'].map((s) => (
+                            <option key={s} value={s}>{t(`erp.crm.leadStatusValue.${s}` as const)}</option>
+                          ))}
+                        </select>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={busyId === l.id}
+                          aria-label={`${t('common.delete')} ${l.code}`}
+                          onClick={() => void removeLead(l)}
+                          data-testid={`lead-delete-${l.code}`}
+                        >
+                          <Icon name="trash" size={14} />
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
-      <CreateLeadModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <LeadModal
+        open={open}
+        lead={editing}
+        onClose={() => { setOpen(false); setEditing(null); }}
+        onCreated={list.reload}
+      />
     </Card>
   );
 }
 
-function CreateLeadModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', contactName: '', email: '', phone: '', estimatedValue: '0.00' });
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.createLead({
-        code: form.code,
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
-        contactName: form.contactName || undefined,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
-        estimatedValueMinor: toMinorInput(form.estimatedValue),
-      });
-      await onCreated();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={t('erp.crm.newLead')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-lead">{busy ? t('common.loading') : t('common.save')}</Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="lead-code" />
-        </Field>
-        <Field label={t('erp.crm.contact')}>
-          <input className="oryx-input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="lead-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="lead-name-ar" />
-        </Field>
-        <Field label={t('erp.crm.estimatedValue')}>
-          <input className="oryx-input" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} />
-        </Field>
-        <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-        </Field>
-      </div>
-    </Modal>
-  );
-}
 
 function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canConvert: boolean }) {
   const { t } = useUi();
@@ -219,6 +213,20 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
   const pipelines = useAsync(() => api.crmPipelines(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeOpportunity = async (o: OpportunityDto) => {
+    if (!window.confirm(t('erp.crm.confirmDeleteOpportunity'))) return;
+    setBusyId(o.id);
+    try {
+      await api.deleteOpportunity(o.id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.crm.deleteOpportunityBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -258,13 +266,27 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(o.amountMinor, o.currency)}</td>
                 <td><StatusBadge status={o.status} label={o.status} /></td>
                 <td>
-                  {canConvert && o.status === 'WON' && !o.quotationId ? (
-                    <Button size="sm" data-testid={`convert-opportunity-${o.code}`} onClick={async () => { await api.convertOpportunity(o.id); await list.reload(); }}>
-                      {t('erp.crm.convert')}
-                    </Button>
-                  ) : o.quotationId ? (
-                    <span className="oryx-faint text-[11.5px]">{t('erp.crm.converted')}</span>
-                  ) : null}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canConvert && o.status === 'WON' && !o.quotationId ? (
+                      <Button size="sm" data-testid={`convert-opportunity-${o.code}`} onClick={async () => { await api.convertOpportunity(o.id); await list.reload(); }}>
+                        {t('erp.crm.convert')}
+                      </Button>
+                    ) : o.quotationId ? (
+                      <span className="oryx-faint text-[11.5px]">{t('erp.crm.converted')}</span>
+                    ) : null}
+                    {canManage && !o.quotationId ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busyId === o.id}
+                        aria-label={`${t('common.delete')} ${o.code}`}
+                        onClick={() => void removeOpportunity(o)}
+                        data-testid={`opportunity-delete-${o.code}`}
+                      >
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -275,6 +297,8 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
         open={open}
         pipelines={pipelines.data?.items ?? []}
         customers={customers.data?.items ?? []}
+        onPipelinesReload={pipelines.reload}
+        onCustomersReload={customers.reload}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
@@ -286,12 +310,16 @@ function CreateOpportunityModal({
   open,
   pipelines,
   customers,
+  onPipelinesReload,
+  onCustomersReload,
   onClose,
   onCreated,
 }: {
   open: boolean;
   pipelines: Array<{ id: string; nameEn: string; stages: Array<{ id: string; nameEn: string }> }>;
   customers: Array<{ id: string; code: string; nameEn: string }>;
+  onPipelinesReload: () => Promise<void> | void;
+  onCustomersReload: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -338,16 +366,29 @@ function CreateOpportunityModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="opportunity-code" />
+          <input className="oryx-input" value="" readOnly placeholder="Automatic / تلقائي" data-testid="opportunity-code" />
         </Field>
         <Field label={t('erp.crm.title')} required>
           <input className="oryx-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="opportunity-title" />
         </Field>
         <Field label={t('erp.crm.pipeline')} required>
-          <select className="oryx-select" value={form.pipelineId} onChange={(e) => setForm({ ...form, pipelineId: e.target.value, stageId: '' })} data-testid="opportunity-pipeline">
-            <option value="">—</option>
-            {pipelines.map((p) => <option key={p.id} value={p.id}>{p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.pipelineId || null}
+            options={pipelines.map((p) => ({ value: p.id, label: p.nameEn }))}
+            onChange={(v) => setForm({ ...form, pipelineId: v ?? '', stageId: '' })}
+            placeholder={t('common.select')}
+            testId="opportunity-pipeline"
+            createLabel={t('erp.crm.newPipeline')}
+            reloadOptions={onPipelinesReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <PipelineModal
+                open
+                onClose={closeCreate}
+                onCreated={onPipelinesReload}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.crm.stage')}>
           <select className="oryx-select" value={form.stageId} onChange={(e) => setForm({ ...form, stageId: e.target.value })}>
@@ -356,10 +397,24 @@ function CreateOpportunityModal({
           </select>
         </Field>
         <Field label={t('erp.sales.customer')}>
-          <select className="oryx-select" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} data-testid="opportunity-customer">
-            <option value="">—</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.customerId || null}
+            options={customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, customerId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="opportunity-customer"
+            createLabel={t('erp.sales.newCustomer')}
+            reloadOptions={onCustomersReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <CustomerModal
+                open
+                customer={null}
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.crm.amount')} required>
           <input className="oryx-input" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} data-testid="opportunity-amount" />
@@ -373,7 +428,21 @@ function TicketsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const list = useAsync(() => api.crmTickets({ search: search || undefined }), [search]);
+
+  const removeTicket = async (k: SupportTicketDto) => {
+    if (!window.confirm(t('erp.crm.confirmDeleteTicket'))) return;
+    setBusyId(k.id);
+    try {
+      await api.deleteTicket(k.id);
+      await list.reload();
+    } catch {
+      window.alert(t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -415,11 +484,25 @@ function TicketsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{k.resolutionDueAt ? k.resolutionDueAt.slice(0, 16).replace('T', ' ') : '—'}</td>
                 <td><StatusBadge status={k.status} label={k.status} /></td>
                 <td>
-                  {canManage && k.status !== 'RESOLVED' && k.status !== 'CLOSED' ? (
-                    <Button size="sm" data-testid={`resolve-ticket-${k.ticketNumber}`} onClick={async () => { await api.updateTicket(k.id, { status: 'RESOLVED' }); await list.reload(); }}>
-                      {t('erp.crm.resolve')}
-                    </Button>
-                  ) : null}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage && k.status !== 'RESOLVED' && k.status !== 'CLOSED' ? (
+                      <Button size="sm" data-testid={`resolve-ticket-${k.ticketNumber}`} onClick={async () => { await api.updateTicket(k.id, { status: 'RESOLVED' }); await list.reload(); }}>
+                        {t('erp.crm.resolve')}
+                      </Button>
+                    ) : null}
+                    {canManage ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busyId === k.id}
+                        aria-label={`${t('common.delete')} ${k.ticketNumber}`}
+                        onClick={() => void removeTicket(k)}
+                        data-testid={`ticket-delete-${k.ticketNumber}`}
+                      >
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -484,6 +567,20 @@ function CreateTicketModal({ open, onClose, onCreated }: { open: boolean; onClos
 function ActivitiesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.crmActivities(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeActivity = async (id: string) => {
+    if (!window.confirm(t('erp.crm.confirmDeleteActivity'))) return;
+    setBusyId(id);
+    try {
+      await api.deleteActivity(id);
+      await list.reload();
+    } catch {
+      window.alert(t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4">
@@ -511,9 +608,23 @@ function ActivitiesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{a.dueAt ? a.dueAt.slice(0, 16).replace('T', ' ') : '—'}</td>
                 <td><StatusBadge status={a.status} label={a.status} /></td>
                 <td>
-                  {canManage && a.status === 'OPEN' ? (
-                    <Button size="sm" onClick={async () => { await api.completeActivity(a.id); await list.reload(); }}>{t('erp.crm.complete')}</Button>
-                  ) : null}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage && a.status === 'OPEN' ? (
+                      <Button size="sm" onClick={async () => { await api.completeActivity(a.id); await list.reload(); }}>{t('erp.crm.complete')}</Button>
+                    ) : null}
+                    {canManage ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busyId === a.id}
+                        aria-label={`${t('common.delete')} ${a.subject}`}
+                        onClick={() => void removeActivity(a.id)}
+                        data-testid={`activity-delete-${a.id}`}
+                      >
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -524,11 +635,3 @@ function ActivitiesTab({ canManage }: { canManage: boolean }) {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="oryx-label">{label}</p>
-      <p className="m-0 text-[22px] font-extrabold tabular-nums">{value}</p>
-    </div>
-  );
-}

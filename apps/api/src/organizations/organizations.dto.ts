@@ -1,30 +1,35 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class CreateCompanyDto {
+  @Transform(({ value }) => value === '' ? undefined : value)
+  @IsOptional()
   @IsString()
   @Matches(/^[A-Z0-9][A-Z0-9-]{1,30}$/, { message: 'code must be uppercase letters, digits or dashes' })
-  code!: string;
+  code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
@@ -62,6 +67,11 @@ export class CreateCompanyDto {
   @IsString()
   planId?: string;
 
+  /** Existing database user to add as the company's first administrator. */
+  @IsOptional()
+  @IsString()
+  adminUserId?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -79,6 +89,11 @@ export class CreateCompanyDto {
 }
 
 export class UpdateCompanyDto {
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z0-9][A-Z0-9-]{1,30}$/, { message: 'code must be uppercase letters, digits or dashes' })
+  code?: string;
+
   @IsOptional()
   @IsString()
   @MinLength(2)
@@ -113,8 +128,52 @@ export class UpdateCompanyDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(3)
+  functionalCurrency?: string;
+
+  /**
+   * Default tax rate in basis points (1500 = 15%). Bounded to 0–10000 so a
+   * mistyped percentage cannot be stored as 150000 basis points.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  defaultTaxRateBp?: number;
+
+  /**
+   * Optional whole-amount cash rounding for issued documents. `NONE` keeps the
+   * exact total; the other modes snap it to the nearest whole or half unit and
+   * post the small difference to the rounding account.
+   */
+  @IsOptional()
+  @IsIn(['NONE', 'NEAREST_WHOLE', 'NEAREST_HALF'])
+  roundingMode?: 'NONE' | 'NEAREST_WHOLE' | 'NEAREST_HALF';
+
+  /**
+   * The language an issued document is written in, which sets its reading
+   * direction: `ar` prints right-to-left, `en` left-to-right. Both languages'
+   * labels are always printed; this only chooses the flow.
+   */
+  @IsOptional()
+  @IsIn(['ar', 'en'])
+  documentLocale?: 'ar' | 'en';
+
+  @IsOptional()
+  @IsString()
   @MaxLength(40)
   taxNumber?: string;
+
+  /**
+   * The commercial-registration number printed on issued documents' footer
+   * (the reference invoice prints "CR 146375-2"). Stored on the company so a
+   * document reprint carries the same registration the approved sheet does.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  crNumber?: string;
 
   @IsOptional()
   @IsString()
@@ -136,20 +195,31 @@ export class SetCompanyStatusDto {
   reason?: string;
 }
 
+/**
+ * Body for the irreversible company delete. The confirmation flag is required
+ * and must be `true`, so an accidental `DELETE` cannot erase a tenant.
+ */
+export class DeleteCompanyDto {
+  @IsBoolean()
+  confirm!: boolean;
+}
+
 export class CreateBranchDto {
+  @Transform(({ value }) => value === '' ? undefined : value)
+  @IsOptional()
   @IsString()
   @Matches(/^[A-Z0-9][A-Z0-9-]{0,20}$/, { message: 'code must be uppercase letters, digits or dashes' })
-  code!: string;
+  code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
@@ -172,12 +242,38 @@ export class CreateBranchDto {
   phone?: string;
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  phoneNumbers?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  specialty?: string;
+
+  @IsOptional()
+  @IsString()
+  responsibleUserId?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(60)
   timezone?: string;
 }
 
 export class UpdateBranchDto {
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z0-9][A-Z0-9-]{0,20}$/, { message: 'code must be uppercase letters, digits or dashes' })
+  code?: string;
+
   @IsOptional()
   @IsString()
   @MinLength(2)
@@ -197,6 +293,11 @@ export class UpdateBranchDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2)
+  countryCode?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(300)
   addressLine?: string;
 
@@ -204,6 +305,32 @@ export class UpdateBranchDto {
   @IsString()
   @MaxLength(40)
   phone?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  phoneNumbers?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  specialty?: string;
+
+  @IsOptional()
+  @IsString()
+  responsibleUserId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  timezone?: string;
 
   @IsOptional()
   @IsBoolean()

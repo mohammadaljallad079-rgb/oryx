@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
@@ -70,6 +70,13 @@ export class CrmController {
     return this.crm.createLeadSource(dto, p, actorFrom(p, req));
   }
 
+  @Delete('lead-sources/:id')
+  @RequirePermissions('erp.crm.lead.manage')
+  @ApiOperation({ summary: 'Delete a lead source that nothing references' })
+  deleteLeadSource(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.crm.deleteLeadSource(id, p, actorFrom(p, req));
+  }
+
   // ------------------------------------------------------------------ leads
   @Get('leads')
   @RequireAnyPermission('erp.crm.read', 'erp.crm.lead.manage')
@@ -92,6 +99,13 @@ export class CrmController {
     return this.crm.updateLead(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('leads/:id')
+  @RequirePermissions('erp.crm.lead.manage')
+  @ApiOperation({ summary: 'Delete an unconverted lead' })
+  deleteLead(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.crm.deleteLead(id, p, actorFrom(p, req));
+  }
+
   // -------------------------------------------------------------- pipelines
   @Get('pipelines')
   @RequireAnyPermission('erp.crm.read', 'erp.crm.opportunity.manage')
@@ -112,6 +126,13 @@ export class CrmController {
   @ApiOperation({ summary: 'Replace the stages of a pipeline' })
   setStages(@Param('id') id: string, @Body() dto: CreateStagesDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.crm.setStages(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('pipelines/:id')
+  @RequirePermissions('erp.crm.opportunity.manage')
+  @ApiOperation({ summary: 'Delete a pipeline that holds no opportunities' })
+  deletePipeline(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.crm.deletePipeline(id, p, actorFrom(p, req));
   }
 
   // ---------------------------------------------------------- opportunities
@@ -141,6 +162,13 @@ export class CrmController {
   @ApiOperation({ summary: 'Convert a won opportunity into a sales quotation' })
   convertOpportunity(@Param('id') id: string, @Body() dto: ConvertOpportunityDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.crm.convertOpportunity(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('opportunities/:id')
+  @RequirePermissions('erp.crm.opportunity.manage')
+  @ApiOperation({ summary: 'Delete an unconverted opportunity' })
+  deleteOpportunity(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.crm.deleteOpportunity(id, p, actorFrom(p, req));
   }
 
   // ---------------------------------------------------------------- customers
@@ -187,6 +215,13 @@ export class CrmController {
     return this.crm.completeActivity(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('activities/:id')
+  @RequirePermissions('erp.crm.activity.manage')
+  @ApiOperation({ summary: 'Delete an activity or follow-up' })
+  deleteActivity(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.crm.deleteActivity(id, p, actorFrom(p, req));
+  }
+
   // ------------------------------------------------------------------ tickets
   @Get('sla-policies')
   @RequireAnyPermission('erp.crm.read', 'erp.crm.sla.manage')
@@ -200,6 +235,13 @@ export class CrmController {
   @ApiOperation({ summary: 'Set the SLA policy for a priority' })
   setSlaPolicy(@Body() dto: CreateSlaDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.crm.setSlaPolicy(dto, p, actorFrom(p, req));
+  }
+
+  @Delete('sla-policies/:id')
+  @RequirePermissions('erp.crm.sla.manage')
+  @ApiOperation({ summary: 'Delete an SLA policy' })
+  deleteSlaPolicy(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.crm.deleteSlaPolicy(id, p, actorFrom(p, req));
   }
 
   @Get('tickets')
@@ -237,6 +279,13 @@ export class CrmController {
     return this.crm.updateTicket(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('tickets/:id')
+  @RequirePermissions('erp.crm.ticket.manage')
+  @ApiOperation({ summary: 'Delete a support ticket' })
+  deleteTicket(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.crm.deleteTicket(id, p, actorFrom(p, req));
+  }
+
   // ----------------------------------------------------------------- segments
   @Get('segments')
   @RequireAnyPermission('erp.crm.read', 'erp.crm.segment.manage')
@@ -257,6 +306,13 @@ export class CrmController {
   @ApiOperation({ summary: 'Add a customer to a segment' })
   addMember(@Param('id') id: string, @Body() dto: SegmentMemberDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.crm.addSegmentMember(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('segments/:id')
+  @RequirePermissions('erp.crm.segment.manage')
+  @ApiOperation({ summary: 'Delete a customer segment' })
+  deleteSegment(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.crm.deleteSegment(id, p, actorFrom(p, req));
   }
 
   // ---------------------------------------------------------------- reporting

@@ -1,0 +1,243 @@
+{
+  "checkedAt": "2026-10-17T19:35:14.778Z",
+  "results": [
+    {
+      "surface": "Super Admin login",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/login",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "API health",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/api/health",
+      "status": 200,
+      "note": "short body (109b)"
+    },
+    {
+      "surface": "Customer website",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Customer services",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/services",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Customer provider directory",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/providers",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Customer login",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/login",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Provider application",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/providers/apply",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Mobile web login",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/mobile/login",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Mobile web home",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/mobile/",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Super Admin sign-in",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/dashboard",
+      "status": 200,
+      "note": "session established"
+    },
+    {
+      "surface": "Select Enterprise tenant",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/dashboard",
+      "status": 200,
+      "note": "ORYX Auto Services selected"
+    },
+    {
+      "surface": "Super Admin dashboard",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/dashboard",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Company ERP dashboard",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/dashboard",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Accounting",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/accounting",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Sales / POS",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/sales",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Inventory",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/inventory",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Procurement",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/purchasing",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "HR / payroll",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/hr",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "CRM",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/crm",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Automotive operations",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/operations",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Inspections",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/automotive/inspections",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Workshop",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/automotive/maintenance",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Spare parts",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/automotive/spare-parts",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Provider portal",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/providers",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Bookings",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/bookings",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Payments",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/payments",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "External Integrations Center",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/integrations",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Reports",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/reports",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Customer platform admin",
+      "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/customer",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Customer sign-in",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/dashboard",
+      "status": 200,
+      "note": "session established"
+    },
+    {
+      "surface": "Customer dashboard",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/dashboard",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Customer garage",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/garage",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Customer bookings",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/bookings",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Customer invoices",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/invoices",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Customer support",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/support",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Mobile garage",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/mobile/garage",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Mobile bookings",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/mobile/bookings",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Mobile services",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/mobile/services",
+      "status": 200,
+      "note": ""
+    },
+    {
+      "surface": "Mobile account",
+      "url": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/mobile/account",
+      "status": 200,
+      "note": ""
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 ()",
+    "Failed to load resource: the server responded with a status of 404 ()"
+  ]
+}

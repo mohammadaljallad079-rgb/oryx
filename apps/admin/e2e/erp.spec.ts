@@ -52,6 +52,8 @@ test.describe('Execution 02 — ERP core interfaces', () => {
   test('1. accounting chart of accounts loads real seeded accounts', async ({ page }) => {
     await page.goto('/accounting');
     await expect(page.getByTestId('accounting-page')).toBeVisible();
+    // The module opens on its dashboard; the chart of accounts is its own tab.
+    await page.getByTestId('accounting-tab-accounts').click();
     await expect(page.getByTestId('accounting-tab-accounts')).toBeVisible();
     // The seeded chart contains the AR control account.
     await expect(page.getByTestId('account-row-1100')).toBeVisible({ timeout: 20_000 });
@@ -67,12 +69,20 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     await expect(page.getByTestId('journal-balanced')).toBeVisible();
 
     // Fill two lines with unequal sides: the indicator must read "not balanced"
-    // and the post button must stay disabled.
-    const accountOptions = await page.getByTestId('journal-line-account-0').locator('option').all();
-    const firstValue = await accountOptions[1].getAttribute('value');
-    const secondValue = await accountOptions[2].getAttribute('value');
-    await page.getByTestId('journal-line-account-0').selectOption(firstValue!);
-    await page.getByTestId('journal-line-account-1').selectOption(secondValue!);
+    // and the post button must stay disabled. Each account row is a searchable
+    // picker (with an inline create action), not a native select; the chart of
+    // accounts loads asynchronously, so wait for the options to appear before
+    // picking them — reading a still-empty list is a race that passes against a
+    // warm API and fails against a cold one.
+    const lineAccount = (i: number) => page.getByTestId(`journal-line-account-${i}`);
+    const pickAccount = async (i: number, index: number) => {
+      await lineAccount(i).locator('button').click();
+      const options = page.getByRole('listbox').locator('[role="option"]');
+      await expect.poll(async () => options.count(), { timeout: 20_000 }).toBeGreaterThan(index);
+      await options.nth(index).click();
+    };
+    await pickAccount(0, 0);
+    await pickAccount(1, 1);
     await page.getByTestId('journal-line-debit-0').fill('100.00');
     await page.getByTestId('journal-line-credit-1').fill('99.00');
 
@@ -95,6 +105,8 @@ test.describe('Execution 02 — ERP core interfaces', () => {
   test('4. inventory valuation shows seeded stock', async ({ page }) => {
     await page.goto('/inventory');
     await expect(page.getByTestId('inventory-page')).toBeVisible();
+    // The module opens on its dashboard; valuation is its own tab.
+    await page.getByTestId('inventory-tab-valuation').click();
     await expect(page.getByTestId('valuation-row-OIL-5W30')).toBeVisible({ timeout: 20_000 });
 
     const valuation = await apiCall<{ totalValueMinor: number; rows: unknown[] }>(page, '/inventory/valuation');
@@ -102,13 +114,80 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     expect(valuation.body.totalValueMinor).toBeGreaterThan(0);
   });
 
+  test('4b. reorder alerts filter by warehouse and never exceed configured threshold', async ({ page }) => {
+    await page.goto('/inventory');
+    await page.getByTestId('inventory-tab-reorder').click();
+    const filter = page.getByTestId('reorder-warehouse-filter');
+    await expect(filter).toBeVisible();
+    await expect.poll(async () => filter.locator('option').count()).toBeGreaterThan(1);
+
+    const warehouseId = await filter.locator('option').nth(1).getAttribute('value');
+    expect(warehouseId).toBeTruthy();
+    await filter.selectOption(warehouseId!);
+
+    const scoped = await apiCall<{
+      items: Array<{ productId: string; onHand: number; reorderLevel: number }>;
+    }>(page, `/inventory/reorder-alerts?warehouseId=${encodeURIComponent(warehouseId!)}`);
+    expect(scoped.status).toBe(200);
+    for (const alert of scoped.body.items) {
+      expect(alert.onHand).toBeLessThanOrEqual(alert.reorderLevel);
+      expect(alert.reorderLevel).toBeGreaterThan(0);
+    }
+
+    // Resetting to all warehouses must remain usable without requiring a reload.
+    await filter.selectOption('');
+    await expect(filter).toHaveValue('');
+  });
+
+  test('4c. opening quantity is posted once as a warehouse stock movement', async ({ page }) => {
+    await page.goto('/inventory');
+    await page.getByTestId('inventory-tab-products').click();
+    await page.getByTestId('new-product').click();
+    await expect(page.getByTestId('product-opening-stock')).toBeVisible();
+
+    const unique = Date.now().toString().slice(-8);
+    await page.getByTestId('product-name-en').fill(`Opening Stock ${unique}`);
+    await page.getByTestId('product-opening-quantity').fill('3');
+    const warehouses = page.getByTestId('product-opening-warehouse');
+    await expect.poll(async () => warehouses.locator('option').count()).toBeGreaterThan(1);
+    const warehouseId = await warehouses.locator('option').nth(1).getAttribute('value');
+    expect(warehouseId).toBeTruthy();
+    await warehouses.selectOption(warehouseId!);
+    await page.getByTestId('save-product').click();
+
+    await expect(page.getByTestId('new-product')).toBeVisible({ timeout: 20_000 });
+    const rows = await apiCall<{ items: Array<{ id: string; sku: string; nameEn: string }> }>(
+      page, `/inventory/products?search=${encodeURIComponent(`Opening Stock ${unique}`)}`,
+    );
+    expect(rows.status).toBe(200);
+    const product = rows.body.items.find((item) => item.nameEn === `Opening Stock ${unique}`);
+    expect(product).toBeTruthy();
+
+    // StockMovementDto exposes the product SKU, not productId. Match the public
+    // contract and include the warehouse to avoid a false-negative assertion.
+    const movements = await apiCall<{ items: Array<{ sku: string; warehouseCode: string; quantity: number; memo: string | null }> }>(
+      page, '/inventory/movements?page=1&pageSize=100',
+    );
+    expect(movements.status).toBe(200);
+    const opening = movements.body.items.filter((movement) =>
+      movement.sku === product!.sku && movement.memo === 'Opening stock on product creation',
+    );
+    expect(opening).toHaveLength(1);
+    expect(opening[0].quantity).toBe(30_000);
+  });
+
   test('5. sales invoice list renders the seeded tenant data', async ({ page }) => {
     await page.goto('/sales');
     await expect(page.getByTestId('sales-page')).toBeVisible();
     await expect(page.getByTestId('sales-tab-invoices')).toBeVisible();
-    // The tab strip and the invoice list are both real.
-    await page.getByTestId('sales-tab-customers').click();
-    await expect(page.getByTestId('customer-row-CUST-001')).toBeVisible({ timeout: 20_000 });
+    // The invoice list is real. Customer master data now lives in CRM, so the
+    // sales surface no longer offers a customers tab.
+    await expect(page.getByTestId('sales-tab-customers')).toHaveCount(0);
+    const list = await apiCall<{ items: Array<{ invoiceNumber: string }> }>(page, '/sales/invoices');
+    expect(list.status).toBe(200);
+    if (list.body.items.length > 0) {
+      await expect(page.getByTestId(`invoice-row-${list.body.items[0].invoiceNumber}`)).toBeVisible({ timeout: 20_000 });
+    }
   });
 
   test('6. purchasing suppliers and orders load', async ({ page }) => {
@@ -136,5 +215,31 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     expect(accounting).toBeTruthy();
     // Licensed here because the demo tenant is on the Enterprise plan.
     expect(accounting!.licensed).toBe(true);
+  });
+
+  test('9. whole-amount rounding is a persisted company setting', async ({ page }) => {
+    const me = await apiCall<{ context: { companyId: string | null } }>(page, '/auth/me');
+    const companyId = me.body.context.companyId!;
+    const before = await apiCall<{ roundingMode: string }>(page, `/companies/${companyId}`);
+    const original = before.body.roundingMode;
+
+    try {
+      await page.goto('/settings');
+      await expect(page.getByTestId('company-settings')).toBeVisible();
+      const select = page.getByTestId('company-rounding-mode');
+      await expect(select).toBeVisible({ timeout: 20_000 });
+      await select.selectOption('NEAREST_HALF');
+      await page.getByTestId('company-settings-save').click();
+      await expect(page.getByTestId('company-settings-saved')).toBeVisible({ timeout: 20_000 });
+
+      // The change is persisted, not just shown.
+      const after = await apiCall<{ roundingMode: string }>(page, `/companies/${companyId}`);
+      expect(after.body.roundingMode).toBe('NEAREST_HALF');
+    } finally {
+      await apiCall(page, `/companies/${companyId}`, {
+        method: 'PATCH',
+        body: { roundingMode: original },
+      });
+    }
   });
 });

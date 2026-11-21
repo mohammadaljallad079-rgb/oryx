@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
@@ -58,6 +58,13 @@ export class PurchasingController {
     @Req() req: RequestLike,
   ) {
     return this.purchasing.updateSupplier(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('suppliers/:id')
+  @RequirePermissions('erp.purchasing.supplier.manage')
+  @ApiOperation({ summary: 'Delete a supplier that carries no purchase history' })
+  deleteSupplier(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.purchasing.deleteSupplier(id, p, actorFrom(p, req));
   }
 
   // ------------------------------------------------------------ requisitions

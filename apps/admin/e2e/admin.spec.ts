@@ -4,6 +4,8 @@ import {
   SUPER_ADMIN,
   apiToken,
   expectNoServerError,
+  pickOption,
+  searchableOptionCount,
   setLocale,
   setTheme,
   signIn,
@@ -42,7 +44,7 @@ test.describe('themes and locales', () => {
     await signIn(page);
     await setTheme(page, 'light');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-    await expect(page.getByTestId('kpi-row')).toBeVisible();
+    await expect(page.getByTestId('dashboard-hero')).toBeVisible();
     await setTheme(page, 'dark');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await expect(page.getByTestId('module-tiles')).toBeVisible();
@@ -56,6 +58,50 @@ test.describe('themes and locales', () => {
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
     await expect(page.getByTestId('module-tiles')).toBeVisible();
   });
+
+  test('the stored theme is applied before the first paint and is not reverted', async ({ page }) => {
+    // The layout ships a blocking bootstrap script that reads the stored theme
+    // and sets `data-theme` before paint. This guards the regression where the
+    // hydration pass wrote the server default back over the stored value and a
+    // light-theme user briefly saw dark.
+    await page.addInitScript(() => {
+      (window as unknown as { __firstTheme: string | null }).__firstTheme = null;
+      const record = () => {
+        const el = document.documentElement;
+        const holder = window as unknown as { __firstTheme: string | null };
+        if (holder.__firstTheme === null && el.getAttribute('data-theme')) {
+          holder.__firstTheme = el.getAttribute('data-theme');
+        }
+      };
+      const start = () => {
+        record();
+        new MutationObserver(record).observe(document, {
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['data-theme'],
+        });
+      };
+      if (document.documentElement) start();
+      else document.addEventListener('readystatechange', start, { once: true });
+    });
+
+    await signIn(page);
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((value) => window.localStorage.setItem('oryx.theme', value), theme);
+      await page.reload();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      // The stored preference must survive the reload; the mount write used to
+      // clobber it with the server default.
+      expect(await page.evaluate(() => window.localStorage.getItem('oryx.theme'))).toBe(theme);
+      // The attribute must already be correct at the first observation, not
+      // only after hydration.
+      expect(
+        await page.evaluate(
+          () => (window as unknown as { __firstTheme: string | null }).__firstTheme,
+        ),
+      ).toBe(theme);
+    }
+  });
 });
 
 test.describe('company and branch management', () => {
@@ -68,31 +114,120 @@ test.describe('company and branch management', () => {
     await expect(page.getByTestId('company-row-DEMO-ALNOOR')).toBeVisible();
   });
 
-  test('super admin can provision a company with a plan and an admin invitation', async ({ page }) => {
+  test('super admin can provision a company and choose an existing registered manager', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');
     await page.goto('/companies');
     await page.getByTestId('new-company').click();
 
     const suffix = Date.now().toString().slice(-6);
-    const code = `E2E-${suffix}`;
-    await page.getByTestId('company-code').fill(code);
-    await page.getByTestId('company-name-en').fill(`E2E Tenant ${suffix}`);
+    const name = `E2E Tenant ${suffix}`;
+    await expect(page.getByTestId('company-code')).toHaveAttribute('readonly', '');
+    await page.getByTestId('company-name-en').fill(name);
     await page.getByTestId('company-name-ar').fill(`شركة اختبار ${suffix}`);
-    await page.getByTestId('company-admin-email').fill(`admin-${suffix}@e2e.local`);
+    // Company manager is selected from registered users, not entered or invited
+    // through a separate form. Use the real searchable picker.
+    await expect(page.getByTestId('company-manager-existing-select')).toBeVisible();
+    await expect(page.getByTestId('company-manager-add')).toHaveCount(0);
+    await pickOption(page, 'company-manager-existing-select');
 
-    // Pick the first real plan so the tenant gets entitlements.
-    const planSelect = page.getByTestId('company-plan');
-    const planValue = await planSelect.locator('option').nth(1).getAttribute('value');
-    if (planValue) await planSelect.selectOption(planValue);
+    // Pick the first real plan so the tenant gets entitlements. The plan
+    // picker is a searchable combobox, so its options are read from the opened
+    // listbox rather than from `<option>` elements.
+    await pickOption(page, 'company-plan');
 
     await page.getByTestId('create-company-submit').click();
     await expect(page.getByTestId('new-company')).toBeVisible({ timeout: 20_000 });
 
     // The list is paginated, so search for the newly provisioned tenant rather
     // than assuming it lands on the first page.
+    await page.getByTestId('company-search').fill(name);
+    const createdRow = page.locator('[data-testid^="company-row-"]').filter({ hasText: name });
+    await expect(createdRow).toBeVisible({ timeout: 20_000 });
+    expect((await createdRow.getAttribute('data-testid'))?.replace('company-row-', '')).toMatch(/^CO\d+$/);
+  });
+
+  test('super admin can edit, archive and restore a company', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+
+    // Provision a dedicated tenant so the assertions are independent of other
+    // data and safe to re-run.
+    const suffix = Date.now().toString().slice(-6);
+    const name = `E2E Edit ${suffix}`;
+    let code = '';
+    await page.goto('/companies');
+    await page.getByTestId('new-company').click();
+    await expect(page.getByTestId('company-code')).toHaveAttribute('readonly', '');
+    await page.getByTestId('company-name-en').fill(name);
+    await page.getByTestId('company-name-ar').fill(`شركة تعديل ${suffix}`);
+    await page.getByTestId('create-company-submit').click();
+    await expect(page.getByTestId('new-company')).toBeVisible({ timeout: 20_000 });
+
+    await page.getByTestId('company-search').fill(name);
+    const row = page.locator('[data-testid^="company-row-"]').filter({ hasText: name });
+    await expect(row).toBeVisible({ timeout: 20_000 });
+    code = (await row.getAttribute('data-testid'))?.replace('company-row-', '') ?? '';
+    expect(code).toMatch(/^CO\d+$/);
+
+    // --- Edit: change the Arabic name and the default tax, then re-open and
+    // confirm the values were persisted and reloaded from the API.
+    await page.getByTestId(`company-edit-${code}`).click();
+    await expect(page.getByTestId('edit-company-name-ar')).toBeVisible();
+    await page.getByTestId('edit-company-name-ar').fill(`شركة تعديل محدّثة ${suffix}`);
+    await page.getByTestId('edit-company-tax-percent').fill('7.5');
+    await page.getByTestId('edit-company-submit').click();
+    await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
+
+    await page.getByTestId(`company-edit-${code}`).click();
+    await expect(page.getByTestId('edit-company-name-ar')).toHaveValue(`شركة تعديل محدّثة ${suffix}`);
+    await expect(page.getByTestId('edit-company-tax-percent')).toHaveValue('7.5');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
+
+    // --- Archive (safe delete): confirm dialog, then the row shows Archived and
+    // offers Restore instead of Delete.
+    page.once('dialog', (d) => void d.accept());
+    await page.getByTestId(`company-archive-${code}`).click();
+    await expect(page.getByTestId(`company-restore-${code}`)).toBeVisible({ timeout: 20_000 });
+
+    // --- Restore: back to Active.
+    page.once('dialog', (d) => void d.accept());
+    await page.getByTestId(`company-restore-${code}`).click();
+    await expect(page.getByTestId(`company-archive-${code}`)).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('company status filter narrows the list to archived tenants', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+    await page.goto('/companies');
+
+    // Archive a dedicated tenant through the API so the filter has a known row.
+    const suffix = Date.now().toString().slice(-6);
+    const code = `E2EF-${suffix}`;
+    const bearer = await apiToken(page);
+    await page.evaluate(
+      async ({ sfx, token }) => {
+        const base = 'http://localhost:3001/api/v1';
+        const res = await fetch(`${base}/companies`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: sfx, nameEn: `E2E Filter ${sfx}`, nameAr: `شركة تصفية ${sfx}`, type: 'SAAS_TENANT' }),
+        });
+        const body = (await res.json()) as { company: { id: string } };
+        await fetch(`${base}/companies/${body.company.id}/status`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'ARCHIVED' }),
+        });
+      },
+      { sfx: code, token: bearer },
+    );
+
+    await page.getByTestId('company-status-filter').selectOption('ARCHIVED');
     await page.getByTestId('company-search').fill(code);
     await expect(page.getByTestId(`company-row-${code}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId(`company-restore-${code}`)).toBeVisible();
   });
 
   test('branch creation is enforced by plan limits and persists', async ({ page }) => {
@@ -128,25 +263,25 @@ test.describe('company and branch management', () => {
 
     const code = `B${suffix}`;
     await page.getByTestId('new-branch').click();
-    await page.getByTestId('branch-code').fill(code);
+    await expect(page.getByTestId('branch-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('branch-name-en').fill(`E2E Branch ${code}`);
     await page.getByTestId('branch-name-ar').fill(`فرع اختبار ${code}`);
     await page.getByTestId('create-branch-submit').click();
-    await expect(page.getByTestId(`branch-row-${code}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid^="branch-row-"]').filter({ hasText: `E2E Branch ${code}` })).toBeVisible({ timeout: 20_000 });
 
     // The second branch fills the Starter plan limit.
     const code2 = `C${suffix}`;
     await page.getByTestId('new-branch').click();
-    await page.getByTestId('branch-code').fill(code2);
+    await expect(page.getByTestId('branch-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('branch-name-en').fill(`E2E Branch ${code2}`);
     await page.getByTestId('branch-name-ar').fill(`فرع اختبار ${code2}`);
     await page.getByTestId('create-branch-submit').click();
-    await expect(page.getByTestId(`branch-row-${code2}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid^="branch-row-"]').filter({ hasText: `E2E Branch ${code2}` })).toBeVisible({ timeout: 20_000 });
 
     // The third must be rejected by the backend plan limit, and the UI must
     // surface the localized error rather than pretending success.
     await page.getByTestId('new-branch').click();
-    await page.getByTestId('branch-code').fill(`D${suffix}`);
+    await expect(page.getByTestId('branch-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('branch-name-en').fill('Over the limit');
     await page.getByTestId('branch-name-ar').fill('تجاوز الحد');
     await page.getByTestId('create-branch-submit').click();
@@ -172,7 +307,7 @@ test.describe('subscription packages', () => {
     await page.getByTestId('new-plan').click();
 
     const suffix = Date.now().toString().slice(-6);
-    await page.getByTestId('plan-code').fill(`e2e${suffix}`);
+    await expect(page.getByTestId('plan-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('plan-name-en').fill(`E2E Plan ${suffix}`);
     await page.getByTestId('plan-name-ar').fill(`باقة اختبار ${suffix}`);
     await page.getByTestId('plan-desc-en').fill('E2E plan for automated verification');
@@ -184,7 +319,7 @@ test.describe('subscription packages', () => {
     await page.getByTestId('plan-module-branch_management').check();
 
     await page.getByTestId('save-plan').click();
-    await expect(page.getByTestId(`plan-card-e2e${suffix}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid^="plan-card-"]').filter({ hasText: `E2E Plan ${suffix}` })).toBeVisible({ timeout: 20_000 });
   });
 });
 
@@ -202,7 +337,7 @@ test.describe('roles and permissions', () => {
     // System roles cannot be edited; the UI says so instead of offering edit.
     await page.getByTestId('new-role').click();
     const suffix = Date.now().toString().slice(-5);
-    await page.getByTestId('role-code').fill(`e2e_role_${suffix}`);
+    await expect(page.getByTestId('role-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('role-name-en').fill(`E2E Role ${suffix}`);
     await page.getByTestId('role-name-ar').fill(`دور اختبار ${suffix}`);
 
@@ -215,7 +350,7 @@ test.describe('roles and permissions', () => {
     await expect(page.getByTestId('perm-platform.plan.manage')).toHaveCount(0);
 
     await page.getByTestId('save-role').click();
-    await expect(page.getByTestId(`role-card-e2e_role_${suffix}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid^="role-card-"]').filter({ hasText: `E2E Role ${suffix}` })).toBeVisible({ timeout: 20_000 });
   });
 });
 
@@ -240,8 +375,12 @@ test.describe('company administrator delegation', () => {
     await expect(page.getByTestId('users-page')).toBeVisible();
     await page.getByTestId('invite-user').click();
     await expect(page.getByTestId('invite-role')).toBeVisible();
+    // The role picker is a searchable combobox; its options live in the opened
+    // listbox, so open it and count what it offers. The list loads
+    // asynchronously, so poll until it is populated rather than reading the
+    // count the instant the trigger appears.
     await expect
-      .poll(async () => page.getByTestId('invite-role').locator('option').count(), { timeout: 20_000 })
+      .poll(async () => searchableOptionCount(page, 'invite-role'), { timeout: 20_000 })
       .toBeGreaterThan(1);
   });
 
@@ -261,6 +400,55 @@ test.describe('company administrator delegation', () => {
 
     await page.goto('/api-management');
     await expect(page.getByTestId('permission-denied')).toBeVisible();
+  });
+});
+
+test.describe('user management', () => {
+  test('the add-user modal captures identity and contact fields', async ({ page }) => {
+    await signIn(page, COMPANY_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/users');
+    await expect(page.getByTestId('users-page')).toBeVisible();
+
+    await page.getByTestId('add-user').click();
+    await expect(page.getByTestId('add-user-email')).toBeVisible();
+
+    // Identity and contact inputs that the direct-creation flow stores on the
+    // user record are all present, so an administrator can capture them without
+    // a separate edit round-trip.
+    await expect(page.getByTestId('add-user-name-en')).toBeVisible();
+    await expect(page.getByTestId('add-user-name-ar')).toBeVisible();
+    await expect(page.getByTestId('add-user-password')).toBeVisible();
+    await expect(page.getByTestId('add-user-national-id')).toBeVisible();
+    await expect(page.getByTestId('add-user-nationality')).toBeVisible();
+    await expect(page.getByTestId('add-user-address')).toBeVisible();
+
+    // Submit stays disabled until the required fields (email, role, password)
+    // are supplied.
+    const submit = page.getByTestId('add-user-submit');
+    await expect(submit).toBeDisabled();
+    await page.getByTestId('add-user-email').fill('new.staff@oryx.test');
+    await expect(submit).toBeDisabled();
+    await page.getByTestId('add-user-password').fill('A-strong-password-2026');
+    await expect(submit).toBeDisabled();
+    await pickOption(page, 'add-user-role');
+    await expect(submit).toBeEnabled();
+
+    // Closing without submitting leaves no stray row behind.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.oryx-modal')).toHaveCount(0);
+  });
+
+  test('the user table lists identity columns and a profile editor', async ({ page }) => {
+    await signIn(page, COMPANY_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/users');
+    await expect(page.getByTestId('users-page')).toBeVisible();
+
+    // The register exposes the identity columns added with the profile fields.
+    await expect(page.getByTestId('user-search')).toBeVisible();
+    await expect(page.getByTestId('user-role-filter')).toBeVisible();
+    await expect(page.getByTestId('user-status-filter')).toBeVisible();
   });
 });
 
@@ -295,6 +483,8 @@ test.describe('dashboard integrity', () => {
   test('dashboard metrics come from the API and support company scoping', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');
+    // Statistics live on لوحة المعلومات, not on the homepage.
+    await page.goto('/dashboard/overview');
     await expect(page.getByTestId('kpi-row')).toBeVisible();
     await expect(page.getByTestId('chart-branches')).toBeVisible();
 

@@ -9,10 +9,12 @@ import { MfaService, SecretCipher } from './mfa.service';
 import { CsrfGuard } from './csrf.guard';
 import { PrincipalGuard } from './principal.guard';
 import { ModuleEntitlementGuard, PermissionsGuard } from './permissions.guard';
+import { AttendanceAutoModule } from '../hr/attendance-auto.module';
 
 @Module({
   imports: [
     ConfigModule,
+    AttendanceAutoModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

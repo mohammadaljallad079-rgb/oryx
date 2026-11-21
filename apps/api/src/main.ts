@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { PrismaExceptionFilter } from './common/prisma-exception.filter';
 
 export async function createApp(): Promise<INestApplication> {
   // `rawBody` is retained so a payment webhook can verify its HMAC over the
@@ -12,6 +13,8 @@ export async function createApp(): Promise<INestApplication> {
 
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cookieParser());
+  // A Prisma validation error is a malformed request, not a server fault.
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   const origins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
     .split(',')
@@ -28,6 +31,10 @@ export async function createApp(): Promise<INestApplication> {
       'x-oryx-branch-id',
       'x-oryx-support-session',
       'x-oryx-csrf',
+      // Present on every native-client request. Without it here, the browser's
+      // preflight refuses the call and a web-hosted build of the app cannot
+      // reach the API at all.
+      'x-oryx-client',
     ],
   });
 
