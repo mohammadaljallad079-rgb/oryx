@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
 import { useSiteContent } from '@/lib/site-content-context';
@@ -9,8 +10,10 @@ import {
   categoryImage,
   mediaAlt,
   resolveImage,
-  SERVICE_CATEGORIES,
-  type WebsiteCategory,
+  IS_STATIC_PREVIEW,
+  publicApi,
+  type CatalogProduct,
+  type StorefrontProduct,
 } from '@/lib/api';
 import { useWebsiteContent } from '@/lib/use-website-content';
 import { Card, HeroSlider, TrustStrip, type HeroSlide } from '@/components/ui';
@@ -31,7 +34,39 @@ import { Icon } from '@/components/icons';
 export default function HomePage() {
   const { t, locale } = useUi();
   const { isAuthenticated } = useCustomerAuth();
-  const { content } = useWebsiteContent(locale);
+  const { content, loaded } = useWebsiteContent(locale);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState(false);
+  const [stockProducts, setStockProducts] = useState<StorefrontProduct[]>([]);
+  const [stockLoading, setStockLoading] = useState(true);
+  const [stockError, setStockError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setStockLoading(true);
+    setStockError(false);
+    publicApi.storefrontProducts({ page: 1, pageSize: 12 })
+      .then((data) => { if (active) setStockProducts(data.items); })
+      .catch(() => {
+        if (active) { setStockProducts([]); setStockError(true); }
+      })
+      .finally(() => { if (active) setStockLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+
+  useEffect(() => {
+    let active = true;
+    setProductsLoading(true);
+    setProductsError(false);
+    publicApi.products({ locale, pageSize: 12 }).then((response) => {
+      if (active) setProducts(response.items);
+    }).catch(() => {
+      if (active) { setProducts([]); setProductsError(true); }
+    }).finally(() => { if (active) setProductsLoading(false); });
+    return () => { active = false; };
+  }, [locale]);
   const { content: site, pick } = useSiteContent();
 
   // Hero slider slides: every slide carries its own photograph, headline,
@@ -53,27 +88,14 @@ export default function HomePage() {
     subtitle: pick(item.subtitleEn, item.subtitleAr),
   }));
 
-  // Category cards prefer the administrator's photograph, then their copy,
-  // then the bundled catalogue entry.
-  const categories: Array<{
-    key: string;
-    name: string;
-    desc: string;
-    art: string;
-    alt: string;
-  }> = SERVICE_CATEGORIES.map((fallback) => {
-    const managed: WebsiteCategory | undefined = content.categories.find((c) => c.key === fallback.key);
-    const desc = locale === 'ar' ? managed?.descriptionAr : managed?.descriptionEn;
-    return {
-      key: fallback.key,
-      name: locale === 'ar' ? fallback.nameAr : fallback.nameEn,
-      desc: desc || (locale === 'ar' ? fallback.descAr : fallback.descEn),
-      // A photograph rather than the old shared gradient, so the five
-      // categories are visually distinct.
-      art: categoryImage(managed?.media ?? null, fallback.key, 'card'),
-      alt: mediaAlt(managed?.media ?? null, locale, fallback.nameEn),
-    };
-  });
+  // Only published CMS categories appear in production; never generate demo categories.
+  const categories = content.categories.map((category) => ({
+    key: category.key,
+    name: (locale === 'ar' ? category.nameAr : category.nameEn) || category.nameEn || category.nameAr,
+    desc: (locale === 'ar' ? category.descriptionAr : category.descriptionEn) || '',
+    art: categoryImage(category.media, category.key, 'card'),
+    alt: mediaAlt(category.media, locale, category.nameEn || category.nameAr),
+  }));
 
   const values = [
     { icon: 'shield', title: t('home.value1Title'), body: t('home.value1Body') },
@@ -128,6 +150,78 @@ export default function HomePage() {
               </span>
             </Link>
           ))}
+        </div>
+        {loaded && categories.length === 0 && !IS_STATIC_PREVIEW && (
+          <p className="oryx-muted" role="status">{locale === 'ar' ? 'لا توجد خدمات منشورة حالياً في لوحة التحكم.' : 'No published services are available yet.'}</p>
+        )}
+      </section>
+
+      {/* Live products and spare parts from the same ERP-backed public catalogue. */}
+      <section className="oryx-section" id="products">
+        <header className="oryx-section-head">
+          <h2 className="oryx-section-title">{locale === 'ar' ? 'المنتجات وقطع الغيار' : 'Products & spare parts'}</h2>
+          <p className="oryx-muted">{locale === 'ar' ? 'المنتجات المتاحة والمنشورة من لوحة التحكم' : 'Available products published from the control panel'}</p>
+        </header>
+        {productsLoading ? (
+          <p className="oryx-muted" role="status">{locale === 'ar' ? 'جارٍ تحميل المنتجات…' : 'Loading products…'}</p>
+        ) : productsError ? (
+          <p className="oryx-muted" role="alert">{locale === 'ar' ? 'تعذّر تحميل المنتجات. يرجى المحاولة لاحقاً.' : 'Products could not be loaded. Please try again later.'}</p>
+        ) : products.length === 0 ? (
+          <p className="oryx-muted">{locale === 'ar' ? 'لا توجد منتجات منشورة حالياً.' : 'No published products yet.'}</p>
+        ) : (
+          <div className="oryx-grid oryx-grid--cards">
+            {products.map((product) => (
+              <Link href={`/products/${encodeURIComponent(product.id)}`} key={product.id} className="oryx-cat-card">
+                {product.imageUrl ? (
+                  <span className="oryx-cat-card__art" role="img" aria-label={product.name}
+                    style={{ backgroundImage: `url("${resolveImage(product.imageUrl) ?? ''}")` }} />
+                ) : null}
+                <span className="oryx-cat-card__body">
+                  <strong>{(locale === 'ar' ? product.nameAr : product.nameEn) || product.name}</strong>
+                  <span className="oryx-muted">{product.sku}</span>
+                  <span className="oryx-cat-card__link">{locale === 'ar' ? 'عرض المنتج' : 'View product'} <Icon name="arrow" size={14} /></span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+        <div className="oryx-section-cta">
+          <Link href="/products" className="oryx-btn oryx-btn-primary">{locale === 'ar' ? 'عرض جميع المنتجات وقطع الغيار' : 'Browse all products & spare parts'}</Link>
+        </div>
+      </section>
+
+      {/* ORYX stock: published directly from inventory, distinct from marketplace stores. */}
+      <section className="oryx-section" id="spare-parts">
+        <header className="oryx-section-head">
+          <h2 className="oryx-section-title">{locale === 'ar' ? 'قطع الغيار من مخزون ORYX' : 'ORYX spare parts & stock'}</h2>
+          <p className="oryx-muted">{locale === 'ar' ? 'الأصناف المنشورة من لوحة المخزون، بأسعارها وتوافرها الحالي' : 'Inventory items published by the admin, with live prices and availability'}</p>
+        </header>
+        {stockLoading ? (
+          <p className="oryx-muted" role="status">{locale === 'ar' ? 'جارٍ تحميل قطع الغيار…' : 'Loading spare parts…'}</p>
+        ) : stockError ? (
+          <p className="oryx-muted" role="alert">{locale === 'ar' ? 'تعذّر تحميل المخزون حالياً.' : 'Inventory is temporarily unavailable.'}</p>
+        ) : stockProducts.length === 0 ? (
+          <p className="oryx-muted">{locale === 'ar' ? 'لا توجد قطع غيار منشورة حالياً.' : 'No spare parts are published yet.'}</p>
+        ) : (
+          <div className="oryx-grid oryx-grid--cards">
+            {stockProducts.map((product) => (
+              <Link key={product.id} href={`/spare-parts/${encodeURIComponent(product.id)}`} className="oryx-cat-card">
+                {product.image ? (
+                  <span className="oryx-cat-card__art" role="img"
+                    aria-label={(locale === 'ar' ? product.nameAr : product.nameEn) || product.sku}
+                    style={{ backgroundImage: `url("${resolveImage(product.image) ?? ''}")` }} />
+                ) : null}
+                <span className="oryx-cat-card__body">
+                  <strong>{(locale === 'ar' ? product.nameAr : product.nameEn) || product.sku}</strong>
+                  <span className="oryx-muted">{product.sku} · {product.inStock ? (locale === 'ar' ? 'متوفر' : 'In stock') : (locale === 'ar' ? 'غير متوفر' : 'Out of stock')}</span>
+                  <span className="oryx-cat-card__link">{locale === 'ar' ? 'عرض التفاصيل' : 'View details'} <Icon name="arrow" size={14} /></span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+        <div className="oryx-section-cta">
+          <Link href="/spare-parts" className="oryx-btn oryx-btn-primary">{locale === 'ar' ? 'عرض جميع قطع الغيار' : 'Browse all spare parts'}</Link>
         </div>
       </section>
 

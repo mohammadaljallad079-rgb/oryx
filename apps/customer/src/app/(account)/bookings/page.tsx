@@ -43,13 +43,16 @@ function BookingsContent() {
   const bookings = useAsync(() => customerApi.bookings(), []);
   const vehicles = useAsync(() => customerApi.vehicles(), []);
 
-  const initialCategory = params.get('category') ?? SERVICE_CATEGORIES[0].key;
+  const initialCategory = params.get('category') ?? (IS_STATIC_PREVIEW ? SERVICE_CATEGORIES[0].key : '');
   const [categoryKey, setCategoryKey] = useState<string>(initialCategory);
   const [liveCategories, setLiveCategories] = useState<WebsiteCategory[]>([]);
   useEffect(() => {
     let active = true;
     publicApi.website(locale).then((response) => {
-      if (active) setLiveCategories(response.categories);
+      if (active) {
+        setLiveCategories(response.categories);
+        setCategoryKey((current) => response.categories.some((item) => item.key === current) ? current : (response.categories[0]?.key ?? ''));
+      }
     }).catch(() => {
       if (active) setLiveCategories([]);
     });
@@ -337,14 +340,17 @@ function BookingsContent() {
                   <Icon name="check" size={16} />
                   {busy ? t('common.saving') : t('bookings.confirm')}
                 </Button>
-                {whatsapp && (
-                  <a className="oryx-btn" target="_blank" rel="noopener noreferrer"
-                    href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(whatsappMessage)}`}>
-                    <Icon name="phone" size={16} /> WhatsApp
-                  </a>
-                )}
+
               </div>
             </>
+          )}
+          {whatsapp && (
+            <div style={{ marginTop: 16 }}>
+              <a className="oryx-btn" target="_blank" rel="noopener noreferrer"
+                href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(whatsappMessage)}`}>
+                <Icon name="phone" size={16} /> {locale === 'ar' ? 'استفسار وحجز عبر واتساب' : 'Enquire or book via WhatsApp'}
+              </a>
+            </div>
           )}
         </Card>
       </div>

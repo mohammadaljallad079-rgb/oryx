@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CustomerModule } from '../customer/customer.module';
-import { StorefrontController, CustomerStorefrontController } from './storefront.controller';
+import { ErpCommonModule } from '../common/erp-common.module';
+import { StorefrontController, CustomerStorefrontController, StorefrontAdminController } from './storefront.controller';
 import { StorefrontService } from './storefront.service';
 
 /**
@@ -12,8 +13,8 @@ import { StorefrontService } from './storefront.service';
  * global.
  */
 @Module({
-  imports: [CustomerModule],
-  controllers: [StorefrontController, CustomerStorefrontController],
+  imports: [CustomerModule, ErpCommonModule],
+  controllers: [StorefrontController, CustomerStorefrontController, StorefrontAdminController],
   providers: [StorefrontService],
   exports: [StorefrontService],
 })

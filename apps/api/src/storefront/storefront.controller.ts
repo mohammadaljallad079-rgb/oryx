@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/auth.decorators';
+import { CurrentPrincipal, RequireModule, RequirePermissions, type RequestPrincipal } from '../auth/auth.decorators';
+import { ErpContextService } from '../common/erp-context.service';
 import { CustomerPlane } from '../auth/auth.decorators';
 import { BookingService } from '../customer/booking.service';
 import {
@@ -355,5 +357,30 @@ export class CustomerStorefrontController {
       Number(page) || 1,
       Number(pageSize) || 20,
     );
+  }
+}
+
+
+/** Staff-only website orders, scoped to the selected ERP company. */
+@ApiTags('storefront-admin')
+@ApiBearerAuth()
+@RequireModule('sales_pos')
+@Controller('storefront/admin')
+export class StorefrontAdminController {
+  constructor(
+    private readonly storefront: StorefrontService,
+    private readonly context: ErpContextService,
+  ) {}
+
+  @Get('orders')
+  @RequirePermissions('erp.sales.read')
+  @ApiOperation({ summary: 'Website orders with customer and delivery details (company scoped)' })
+  async orders(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Query('page') page = '1',
+    @Query('pageSize') pageSize = '20',
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    return this.storefront.listStaffOrders(companyId, Number(page) || 1, Number(pageSize) || 20);
   }
 }

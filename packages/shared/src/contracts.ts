@@ -787,6 +787,15 @@ export interface ProductDto {
   inventoryAccountId: string | null;
   cogsAccountId: string | null;
   isActive: boolean;
+  /** Website publication is explicit and independent of ERP active status. */
+  isPublished?: boolean;
+  isFeatured?: boolean;
+  partCategoryKey?: string | null;
+  partCondition?: 'NEW' | 'REFURBISHED';
+  brand?: string | null;
+  descriptionEn?: string | null;
+  descriptionAr?: string | null;
+  imageUrl?: string | null;
 }
 
 /**

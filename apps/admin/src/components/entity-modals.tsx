@@ -11,6 +11,7 @@ import { EntityPicker } from '@/components/inline-create';
 import { PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
 import { CustomerModal } from '@/components/customer-modal';
 import type { EmployeeDto, ErpAccountDto, LeadDto, MarketplaceProviderDto, ProductDto, SupplierDto, VehicleDto } from '@oryx/shared';
+import { PART_CATEGORIES } from '@oryx/shared';
 
 /**
  * The shared create/edit forms for the entities a form most often needs to add
@@ -210,7 +211,7 @@ export function ProductModal({
   const [form, setForm] = useState({
     sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
     barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
-    openingQuantity: '0', openingWarehouseId: '',
+    openingQuantity: '0', openingWarehouseId: '', partCategoryKey: '', isPublished: false, isFeatured: false,
   });
 
   useEffect(() => {
@@ -221,7 +222,7 @@ export function ProductModal({
     setForm({
       sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
       barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
-      openingQuantity: '0', openingWarehouseId: '',
+      openingQuantity: '0', openingWarehouseId: '', partCategoryKey: '', isPublished: false, isFeatured: false,
     });
   }, [open, defaultCategory]);
 
@@ -254,6 +255,10 @@ export function ProductModal({
         setError(locale === 'ar' ? 'اختر المستودع للكمية الافتتاحية.' : 'Select a warehouse for opening stock.');
         return;
       }
+      if (form.isPublished && !form.partCategoryKey) {
+        setError(locale === 'ar' ? 'اختر تصنيف المتجر قبل نشر المنتج.' : 'Choose a storefront category before publishing.');
+        return;
+      }
       const saved = createdProduct ?? await api.createProduct({
         sku: form.sku,
         nameEn: form.nameEn.trim() || form.nameAr.trim(),
@@ -268,6 +273,9 @@ export function ProductModal({
         reorderLevel: toQuantityInput(form.reorderLevel),
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
+        partCategoryKey: form.partCategoryKey || undefined,
+        isPublished: form.isPublished,
+        isFeatured: form.isFeatured,
         ...(canOpenStock && openingQuantity > 0
           ? { openingQuantity, openingWarehouseId: form.openingWarehouseId }
           : {}),
@@ -344,6 +352,32 @@ export function ProductModal({
         <Field label={t('erp.inventory.reorderQuantity')}>
           <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm((prev) => ({ ...prev, reorderQuantity: e.target.value }))} />
         </Field>
+      </div>
+      <div className="mt-4 grid gap-3 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-2">
+        <Field label={locale === 'ar' ? 'تصنيف العرض بالموقع' : 'Storefront category'}>
+          <select className="oryx-select" value={form.partCategoryKey}
+            onChange={(e) => setForm((prev) => ({ ...prev, partCategoryKey: e.target.value }))}
+            data-testid="product-storefront-category">
+            <option value="">{locale === 'ar' ? 'اختر التصنيف' : 'Select category'}</option>
+            {PART_CATEGORIES.map((category) => (
+              <option key={category.key} value={category.key}>
+                {locale === 'ar' ? category.nameAr : category.nameEn}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <label className="flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" className="oryx-checkbox" checked={form.isPublished}
+            onChange={(e) => setForm((prev) => ({ ...prev, isPublished: e.target.checked }))}
+            data-testid="product-publish-website" />
+          {locale === 'ar' ? 'نشر المنتج في الموقع الإلكتروني' : 'Publish product to website'}
+        </label>
+        <label className="flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" className="oryx-checkbox" checked={form.isFeatured}
+            onChange={(e) => setForm((prev) => ({ ...prev, isFeatured: e.target.checked }))}
+            data-testid="product-feature-website" />
+          {locale === 'ar' ? 'إظهار المنتج ضمن المنتجات المميزة' : 'Feature product on website'}
+        </label>
       </div>
       {canOpenStock && form.trackStock ? (
         <div className="mt-4 grid gap-3 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-2"
