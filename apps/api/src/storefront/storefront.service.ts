@@ -838,6 +838,57 @@ export class StorefrontService {
     };
   }
 
+  /**
+   * Staff-facing web orders. The controller authorizes the ERP company scope
+   * before supplying companyId. No consumer token can access this method directly.
+   */
+  async listStaffOrders(companyId: string, page = 1, pageSize = 20) {
+    const safePage = Math.max(1, page);
+    const safeSize = Math.min(100, Math.max(1, pageSize));
+    const where = { companyId };
+    const [total, rows] = await Promise.all([
+      this.prisma.webOrder.count({ where }),
+      this.prisma.webOrder.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (safePage - 1) * safeSize,
+        take: safeSize,
+        include: { lines: true },
+      }),
+    ]);
+    return {
+      items: rows.map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        fulfilment: order.fulfilment,
+        contactName: order.contactName,
+        contactPhone: order.contactPhone,
+        contactEmail: order.contactEmail,
+        deliveryAddress: order.deliveryAddress,
+        notes: order.notes,
+        subtotalMinor: order.subtotalMinor,
+        discountMinor: order.discountMinor,
+        taxMinor: order.taxMinor,
+        totalMinor: order.totalMinor,
+        currency: order.currency,
+        currencyScale: order.currencyScale,
+        createdAt: order.createdAt,
+        lines: order.lines.map((line) => ({
+          sku: line.sku,
+          nameEn: line.nameEn,
+          nameAr: line.nameAr,
+          quantity: line.quantity,
+          unitPriceMinor: line.unitPriceMinor,
+          lineTotalMinor: line.lineTotalMinor,
+        })),
+      })),
+      total,
+      page: safePage,
+      pageSize: safeSize,
+    };
+  }
+
   /** A customer's own orders, newest first. */
   async listOrders(accountId: string, page = 1, pageSize = 20) {
     const safePage = Math.max(1, page);
@@ -1152,8 +1203,27 @@ export class StorefrontService {
     companyId: string,
     currency: { code: string; scale: number },
   ): Promise<StorefrontProduct[]> {
-    const onHand = await this.onHandByProduct(companyId, rows.map((row) => row.id));
-    return rows.map((row) => this.toProduct({ ...row, _onHand: onHand.get(row.id) ?? 0 }, currency));
+    const productIds = rows.map((row) => row.id);
+    const [onHand, images] = await Promise.all([
+      this.onHandByProduct(companyId, productIds),
+      this.prisma.productImage.findMany({
+        where: { productId: { in: productIds } },
+        orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+        select: { productId: true, mediaAssetId: true, url: true },
+      }),
+    ]);
+    const primaryImage = new Map<string, string>();
+    for (const item of images) {
+      if (primaryImage.has(item.productId)) continue;
+      const url = item.mediaAssetId
+        ? `/api/v1/cms/media/${item.mediaAssetId}/file?variant=card`
+        : item.url;
+      if (url) primaryImage.set(item.productId, url);
+    }
+    return rows.map((row) => ({
+      ...this.toProduct({ ...row, _onHand: onHand.get(row.id) ?? 0 }, currency),
+      image: primaryImage.get(row.id) ?? this.imageFor(row),
+    }));
   }
 
   private imageFor(product: {
