@@ -804,7 +804,7 @@ function CreateEstimateModal({
               <select
                 className="oryx-input"
                 value={line.type}
-                onChange={(e) => patch(index, { type: e.target.value as EstimateLineDraft['type'] })}
+                onChange={(e) => patch(index, { type: e.target.value as EstimateLineDraft['type'], productId: '', description: '' })}
                 data-testid={`estimate-type-${index}`}
               >
                 {(['SERVICE', 'PART'] as const).map((v) => (
@@ -817,7 +817,7 @@ function CreateEstimateModal({
             {line.type === 'SERVICE' ? (
               <Field label={locale === 'ar' ? 'خدمة الصيانة' : 'Maintenance service'}>
                 <select className="oryx-input" data-testid={`maintenance-line-service-${index}`}
-                  value={availableServices.data?.find((item) => item.nameEn === line.description)?.id ?? ''}
+                  value={availableServices.data?.find((item) => (item.nameEn === line.description || item.nameAr === line.description))?.id ?? ''}
                   onChange={(event) => {
                     const service = availableServices.data?.find((item) => item.id === event.target.value);
                     if (!service) return;
