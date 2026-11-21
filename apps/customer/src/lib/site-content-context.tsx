@@ -52,14 +52,16 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
 
   const load = useCallback(async () => {
     try {
-      const [ar, en] = await Promise.all([
+      const results = await Promise.allSettled([
         publicApi.siteContent('ar'),
         publicApi.siteContent('en'),
       ]);
-      setDocuments({ ar: ar.site, en: en.site });
-    } catch {
-      // Keep the approved defaults; an unreachable CMS must not blank the site.
-      setDocuments({});
+      // One unavailable translation must not discard the published other language.
+      setDocuments((previous) => ({
+        ...previous,
+        ...(results[0].status === 'fulfilled' ? { ar: results[0].value.site } : {}),
+        ...(results[1].status === 'fulfilled' ? { en: results[1].value.site } : {}),
+      }));
     } finally {
       setLoading(false);
     }
