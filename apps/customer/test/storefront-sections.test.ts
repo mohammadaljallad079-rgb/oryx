@@ -73,7 +73,11 @@ describe('storefront sections', () => {
 
   it('drives the navigation and the footer from the shared catalogue', () => {
     const chrome = src('components/site-chrome.tsx');
-    expect(chrome).toContain('STOREFRONT_SECTIONS.map');
+    // The CMS can hide a section, so the chain is `filter(visibility).map(…)`;
+    // what matters is that both the header and the footer read the shared
+    // catalogue rather than carrying a second hard-coded list.
+    expect(chrome).toMatch(/STOREFRONT_SECTIONS\.filter\([\s\S]*?\)\.map\(/);
+    expect(chrome).toContain('sectionVisibility');
     expect(chrome).not.toContain("key: 'nav.categories'");
   });
 

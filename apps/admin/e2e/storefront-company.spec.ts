@@ -93,6 +93,81 @@ test.describe('Website storefront company', () => {
     await expect.poll(async () => (await readContext(page)).companyId).toBe(original.companyId);
   });
 
+  test('the rendered website catalogue follows the chosen company', async ({ page, browser }) => {
+    // The API assertions live in the e2e suite; this one proves the *page* a
+    // visitor loads changes too, which is what the owner actually asked for.
+    // Product ids are per tenant, so the id set is what distinguishes them —
+    // the seeded catalogue repeats the same product names in every company.
+    const CUSTOMER = process.env.ORYX_CUSTOMER_URL ?? 'http://localhost:3002';
+
+    await signIn(page, SUPER_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto(SETTINGS_URL);
+    await expect(page.locator(CARD)).toBeVisible();
+
+    const token = await apiToken(page);
+    const original = await readContext(page);
+
+    const idsFor = (companyId: string) =>
+      page.evaluate(
+        async ({ api, companyId }) => {
+          const res = await fetch(
+            `${api}/customer/catalog/products?companyId=${companyId}&pageSize=100`,
+            { credentials: 'omit' },
+          );
+          const body = (await res.json()) as { items: Array<{ id: string }> };
+          return body.items.map((item) => item.id);
+        },
+        { api: API, companyId },
+      );
+
+    const site = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
+    const sitePage = await site.newPage();
+    const renderedIds = async () => {
+      await sitePage.goto(`${CUSTOMER}/products`, { waitUntil: 'networkidle' });
+      await sitePage.locator('.oryx-product-card').first().waitFor();
+      return sitePage.locator('.oryx-product-card__media').evaluateAll((nodes) =>
+        nodes.map((node) => (node as HTMLAnchorElement).getAttribute('href')?.split('/').pop() ?? ''),
+      );
+    };
+
+    const options = await page.locator(`${SELECT} option`).evaluateAll((nodes) =>
+      nodes.map((node) => ({ value: (node as HTMLOptionElement).value })),
+    );
+    const target = options.find((option) => option.value && option.value !== original.companyId);
+    expect(target, 'the seeded platform needs a second company to switch to').toBeTruthy();
+
+    try {
+      const originalIds = await idsFor(original.companyId);
+      const before = await renderedIds();
+      expect(before.length).toBeGreaterThan(0);
+      expect(before.every((id) => originalIds.includes(id))).toBe(true);
+
+      await page.locator(SELECT).selectOption(target!.value);
+      await page.locator('[data-testid="storefront-company-save"]').click();
+      await expect(page.locator('[data-testid="storefront-company-saved"]')).toBeVisible();
+
+      const targetIds = await idsFor(target!.value);
+      const after = await renderedIds();
+      expect(after.length).toBeGreaterThan(0);
+      expect(after.every((id) => targetIds.includes(id))).toBe(true);
+      expect(after.some((id) => originalIds.includes(id))).toBe(false);
+    } finally {
+      await page.evaluate(
+        async ({ api, bearer, companyId }) => {
+          await fetch(`${api}/platform/settings`, {
+            method: 'PATCH',
+            credentials: 'omit',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+            body: JSON.stringify({ storefrontCompanyId: companyId }),
+          });
+        },
+        { api: API, bearer: token, companyId: original.companyId },
+      );
+      await site.close();
+    }
+  });
+
   test('a company administrator never sees the platform card', async ({ page }) => {
     await signIn(page, COMPANY_ADMIN);
     await setLocale(page, 'en');
