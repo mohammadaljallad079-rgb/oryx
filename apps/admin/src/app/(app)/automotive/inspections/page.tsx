@@ -29,6 +29,7 @@ import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, VehicleDoc
 import {
   basisPointsOfMinor,
   INSPECTION_TYPES,
+  INSPECTION_SECTION_SPECS,
   VEHICLE_DOCUMENT_CATEGORIES,
   type InspectionTypeKey,
 } from '@oryx/shared';
@@ -1403,9 +1404,10 @@ function CreateBookingModal({
   );
 }
 function ServicesTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const list = useAsync(() => api.inspectionServices(), []);
   const [open, setOpen] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
   const [editing, setEditing] = useState<InspectionServiceDto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -1427,9 +1429,9 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.automotive.inspectionServices')}</p>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-inspection-service">
-            <Icon name="plus" size={16} />
-            {t('erp.automotive.newService')}
+          <Button variant="primary" size="sm" onClick={() => setReplaceOpen(true)} data-testid="replace-approved-services">
+            <Icon name="clipboardCheck" size={16} />
+            {locale === 'ar' ? 'اعتماد خدمات الفحص السبعة' : 'Approve seven inspection services'}
           </Button>
         ) : null}
       </div>
@@ -1502,6 +1504,12 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
+      <ApprovedServicesModal
+        open={replaceOpen}
+        existing={list.data?.items ?? []}
+        onClose={() => setReplaceOpen(false)}
+        onSaved={list.reload}
+      />
       <ServiceModal
         open={open}
         service={editing}
@@ -1520,6 +1528,123 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
  * The picture is uploaded through the shared media library after the service row
  * exists, so a create that includes a picture is a create followed by an upload.
  */
+/** Prices and tax are supplied by the operator, never invented by the seed. */
+function ApprovedServicesModal({
+  open, existing, onClose, onSaved,
+}: {
+  open: boolean;
+  existing: InspectionServiceDto[];
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { t, locale } = useUi();
+  const codes: Record<string, string> = {
+    PAINT_BODY: 'INS-PAINT',
+    CHASSIS_UNDERCARRIAGE: 'INS-CHASSIS',
+    INTERIOR: 'INS-INTERIOR',
+    EXTERIOR: 'INS-EXTERIOR',
+    ENGINE_COMPARTMENT: 'INS-ENGINE',
+    ROAD_TEST: 'INS-ROAD',
+    COMPUTER_UNIT: 'INS-COMPUTER',
+  };
+  type PriceEntry = { area: string; price: string; tax: string; duration: string };
+  const [rows, setRows] = useState<PriceEntry[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setRows(INSPECTION_SECTION_SPECS.map((section) => {
+      const prior = existing.find((item) => item.code === codes[section.key]);
+      return {
+        area: section.key,
+        price: prior ? minorToInput(prior.priceMinor) : '',
+        tax: prior ? String(prior.taxPercentBp / 100) : '',
+        duration: prior ? String(prior.durationMinutes) : '60',
+      };
+    }));
+    // Open only: do not reset amounts mid-edit when the catalogue refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const update = (index: number, field: 'price' | 'tax' | 'duration', value: string) =>
+    setRows((previous) => previous.map((row, i) => i === index ? { ...row, [field]: value } : row));
+
+  const submit = async () => {
+    if (rows.length !== 7 || rows.some((row) =>
+      !Number.isFinite(Number(row.price)) || Number(row.price) <= 0
+      || row.tax.trim() === '' || !Number.isFinite(Number(row.tax))
+      || Number(row.tax) < 0 || Number(row.tax) > 100
+      || !Number.isInteger(Number(row.duration)) || Number(row.duration) < 1
+    )) {
+      setError(locale === 'ar' ? 'أدخل السعر والضريبة والمدة الصحيحة لكل فحص من الفحوصات السبعة.' : 'Enter a valid price, tax rate and duration for all seven inspections.');
+      return;
+    }
+    if (!window.confirm(locale === 'ar'
+      ? 'سيتم حذف الخدمات القديمة غير المستخدمة، وأرشفة المرتبطة بالحجوزات، واستبدالها بالفحوصات السبعة. هل تؤكد؟'
+      : 'Unused legacy services will be removed and historically linked ones archived. Replace with seven approved inspections?')) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.replaceApprovedInspectionServices(rows.map((row) => ({
+        area: row.area,
+        priceMinor: toMinorInput(row.price),
+        taxPercentBp: Math.round(Number(row.tax) * 100),
+        durationMinutes: Number(row.duration),
+      })));
+      await onSaved();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal open={open} size="full"
+      title={locale === 'ar' ? 'اعتماد خدمات الفحص وأسعارها' : 'Approve inspection services and prices'}
+      onClose={onClose}
+      footer={<>
+        <Button onClick={onClose}>{t('common.cancel')}</Button>
+        <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-approved-inspection-services">
+          {busy ? t('common.loading') : (locale === 'ar' ? 'حفظ الخدمات المعتمدة' : 'Save approved services')}
+        </Button>
+      </>}>
+      {error ? <ErrorBanner message={error} /> : null}
+      <p className="oryx-muted mb-3 text-sm">
+        {locale === 'ar'
+          ? 'حدد أسعار الفحوصات السبعة بالدينار البحريني والضريبة والمدة. لن تُحذف الحجوزات والفواتير القديمة.'
+          : 'Enter the price in Bahraini dinars, tax and duration for each inspection. Existing bookings and invoices are preserved.'}
+      </p>
+      <div className="flex flex-col gap-3">
+        {rows.map((row, index) => {
+          const section = INSPECTION_SECTION_SPECS.find((item) => item.key === row.area);
+          return (
+            <div key={row.area} className="grid gap-3 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-[minmax(180px,2fr)_repeat(3,minmax(90px,1fr))]">
+              <strong className="self-center">{locale === 'ar' ? section?.labelAr : section?.labelEn}</strong>
+              <Field label={locale === 'ar' ? 'السعر (BHD)' : 'Price (BHD)'}>
+                <input className="oryx-input" type="number" min="0.001" step="0.001" required
+                  value={row.price} onChange={(event) => update(index, 'price', event.target.value)}
+                  data-testid={`approved-service-price-${row.area}`} />
+              </Field>
+              <Field label={locale === 'ar' ? 'الضريبة %' : 'Tax %'}>
+                <input className="oryx-input" type="number" min="0" max="100" step="0.01" required
+                  value={row.tax} onChange={(event) => update(index, 'tax', event.target.value)} />
+              </Field>
+              <Field label={locale === 'ar' ? 'المدة (دقيقة)' : 'Minutes'}>
+                <input className="oryx-input" type="number" min="1" step="1" required
+                  value={row.duration} onChange={(event) => update(index, 'duration', event.target.value)} />
+              </Field>
+            </div>
+          );
+        })}
+      </div>
+    </Modal>
+  );
+}
+
 function ServiceModal({
   open,
   service,
