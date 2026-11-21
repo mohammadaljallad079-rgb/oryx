@@ -1088,7 +1088,8 @@ function CreateVehicleModal({
 }
 
 function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; canApprove: boolean; canInvoice: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const [showJobs, setShowJobs] = useState(false);
   const list = useAsync(() => api.inspectionBookings(), []);
   const vehicles = useAsync(() => api.vehicles(), []);
   const services = useAsync(() => api.inspectionServices(), []);
@@ -1096,6 +1097,9 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
   const [busyId, setBusyId] = useState<string | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const report = useAsync(() => (detail ? api.inspectionReport(detail) : Promise.resolve(null)), [detail]);
+  const selectedBooking = (list.data?.items ?? []).find((booking: InspectionBookingDto) => booking.id === detail) ?? null;
+  const selectedVehicle = (vehicles.data?.items ?? []).find((vehicle: VehicleDto) => vehicle.id === selectedBooking?.vehicleId) ?? null;
+  const selectedService = (services.data?.items ?? []).find((service: InspectionServiceDto) => service.id === selectedBooking?.serviceId) ?? null;
 
   const removeBooking = async (id: string) => {
     if (!window.confirm(t('erp.automotive.confirmDeleteBooking'))) return;
@@ -1182,28 +1186,57 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
         </TableShell>
       )}
 
-      {detail ? (
-        <div className="border-t border-[var(--border)] p-4" data-testid="inspection-report">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="oryx-panel-title m-0">{t('erp.automotive.report')}</p>
-            <Button size="sm" variant="ghost" onClick={() => setDetail(null)}><Icon name="close" size={14} /></Button>
-          </div>
+      <Modal open={Boolean(detail)} size="full"
+        title={selectedBooking ? `${t('common.details')} — ${selectedBooking.bookingNumber}` : t('common.details')}
+        onClose={() => setDetail(null)}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="inspection-booking-details">
+          {([
+            [t('erp.automotive.bookingNumber'), selectedBooking?.bookingNumber],
+            [t('erp.automotive.vehicle'), [selectedBooking?.make, selectedBooking?.model].filter(Boolean).join(' ')],
+            ['VIN', selectedBooking?.vin],
+            [locale === 'ar' ? 'رقم اللوحة' : 'Plate number', selectedBooking?.plateNumber],
+            [t('erp.automotive.service'), locale === 'ar' ? (selectedService?.nameAr || selectedBooking?.serviceNameAr) : (selectedService?.nameEn || selectedBooking?.serviceNameEn)],
+            [t('erp.automotive.scheduledAt'), selectedBooking?.scheduledAt ? new Date(selectedBooking.scheduledAt).toLocaleString(locale === 'ar' ? 'ar-BH' : 'en-BH') : null],
+            [t('common.status'), selectedBooking?.status],
+            [locale === 'ar' ? 'قراءة العداد' : 'Odometer', selectedBooking?.odometer],
+            [locale === 'ar' ? 'حالة التقرير' : 'Report status', selectedBooking?.reportStatus],
+            [locale === 'ar' ? 'رقم الفاتورة المرتبطة' : 'Linked invoice ID', selectedBooking?.invoiceId],
+            [locale === 'ar' ? 'سنة السيارة' : 'Vehicle year', selectedVehicle?.modelYear],
+            [locale === 'ar' ? 'اللون' : 'Color', selectedVehicle?.color],
+            [locale === 'ar' ? 'السعر قبل الضريبة' : 'Service price', selectedService ? money(selectedService.priceMinor) : null],
+          ] as Array<[string, string | number | null | undefined]>).map(([label, value]) => (
+            <div key={label} className="rounded-xl border border-[var(--border)] p-3">
+              <p className="oryx-muted m-0 text-xs">{label}</p>
+              <p className="m-0 mt-1 break-words font-semibold">{value === null || value === undefined || value === '' ? '—' : String(value)}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button variant="primary" size="sm" onClick={() => setShowJobs(true)} data-testid="booking-open-inspections">
+            <Icon name="clipboardCheck" size={16} />
+            {locale === 'ar' ? 'الانتقال إلى الفحوصات' : 'Open inspections'}
+          </Button>
+          {selectedBooking?.invoiceId ? <Badge tone="success">{t('erp.automotive.invoiced')}</Badge> : null}
+        </div>
+        <div className="mt-4 border-t border-[var(--border)] pt-4" data-testid="inspection-report">
+          {report.error ? <ErrorBanner message={report.error} onRetry={report.reload} /> : null}
           {report.loading ? <Skeleton height={80} /> : (
             <StatGrid>
               <StatCard icon="clipboardCheck" label={t('erp.automotive.findings')} value={String((report.data?.findings as unknown[] | undefined)?.length ?? 0)} />
               <StatCard icon="alert" label={t('erp.automotive.defects')} value={String(report.data?.defects ?? 0)} />
               <StatCard tone="danger" icon="alert" label={t('erp.automotive.critical')} value={String(report.data?.critical ?? 0)} />
-              {canBook && report.data?.report ? null : (
+              {canBook && !report.data?.report ? (
                 <div className="flex items-end">
-                  <Button size="sm" data-testid={`submit-report-${detail}`} onClick={async () => { await api.submitInspectionReport(detail); await report.reload(); }}>
+                  <Button size="sm" data-testid={`submit-report-${detail ?? ''}`} onClick={async () => { if (detail) { await api.submitInspectionReport(detail); await report.reload(); } }}>
                     {t('erp.automotive.submitReport')}
                   </Button>
                 </div>
-              )}
+              ) : null}
             </StatGrid>
           )}
         </div>
-      ) : null}
+      </Modal>
+      {showJobs ? <div role="status" className="px-3 pb-3 text-sm">{locale === 'ar' ? 'افتح تبويب الفحوصات من الأعلى لإنشاء فحص مرتبط بالسيارة.' : 'Open the Inspections tab above to create an inspection for this vehicle.'}</div> : null}
 
       <CreateBookingModal open={open} vehicles={vehicles.data?.items ?? []} services={services.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
