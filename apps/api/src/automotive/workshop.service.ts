@@ -21,6 +21,8 @@ import type {
   CreateJobCardDto,
   CreateListingDto,
   CreateMaintenanceBookingDto,
+  CreateMaintenanceServiceDto,
+  UpdateMaintenanceServiceDto,
   CreatePartReferenceDto,
   CreateProviderDto,
   CreateReservationDto,
@@ -64,6 +66,80 @@ export class WorkshopService {
     private readonly inventory: InventoryService,
     private readonly sales: SalesService,
   ) {}
+
+  // ------------------------------------------------------ maintenance services
+
+  async listMaintenanceServices(principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    return this.prisma.maintenanceService.findMany({
+      where: { companyId },
+      orderBy: [{ sortOrder: 'asc' }, { nameEn: 'asc' }],
+    });
+  }
+
+  private async validateServiceBranches(companyId: string, branchIds: string[]) {
+    if (!branchIds.length) return;
+    const unique = [...new Set(branchIds)];
+    if (unique.length !== branchIds.length) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Duplicate service branches are not allowed.');
+    }
+    const found = await this.prisma.branch.count({ where: { companyId, id: { in: unique } } });
+    if (found !== unique.length) throw forbidden(ERROR_CODES.VALIDATION_FAILED, 'Service branches must belong to this company.');
+  }
+
+  async createMaintenanceService(dto: CreateMaintenanceServiceDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.validateServiceBranches(companyId, dto.branchIds ?? []);
+    const code = dto.code.trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{2,40}$/.test(code)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Service code must use letters, numbers, underscores or hyphens.');
+    }
+    const service = await this.prisma.maintenanceService.create({
+      data: {
+        companyId, code, nameEn: dto.nameEn, nameAr: dto.nameAr,
+        descriptionEn: dto.descriptionEn ?? null, descriptionAr: dto.descriptionAr ?? null,
+        priceMinor: dto.priceMinor, durationMinutes: dto.durationMinutes,
+        imageUrl: dto.imageUrl ?? null, branchIds: dto.branchIds ?? [],
+        isActive: dto.isActive ?? true, isPublished: dto.isPublished ?? true,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.maintenance_service_created', targetType: 'MAINTENANCE_SERVICE', targetId: service.id, summary: `Created maintenance service ${code}` });
+    return service;
+  }
+
+  async updateMaintenanceService(id: string, dto: UpdateMaintenanceServiceDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const existing = await this.prisma.maintenanceService.findFirst({ where: { id, companyId } });
+    if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Maintenance service not found.');
+    if (dto.branchIds) await this.validateServiceBranches(companyId, dto.branchIds);
+    const updated = await this.prisma.maintenanceService.update({
+      where: { id }, data: {
+        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.descriptionEn !== undefined ? { descriptionEn: dto.descriptionEn } : {}),
+        ...(dto.descriptionAr !== undefined ? { descriptionAr: dto.descriptionAr } : {}),
+        ...(dto.priceMinor !== undefined ? { priceMinor: dto.priceMinor } : {}),
+        ...(dto.durationMinutes !== undefined ? { durationMinutes: dto.durationMinutes } : {}),
+        ...(dto.imageUrl !== undefined ? { imageUrl: dto.imageUrl } : {}),
+        ...(dto.branchIds !== undefined ? { branchIds: dto.branchIds } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.isPublished !== undefined ? { isPublished: dto.isPublished } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.maintenance_service_updated', targetType: 'MAINTENANCE_SERVICE', targetId: id, summary: `Updated maintenance service ${updated.code}` });
+    return updated;
+  }
+
+  async deleteMaintenanceService(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const existing = await this.prisma.maintenanceService.findFirst({ where: { id, companyId } });
+    if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Maintenance service not found.');
+    await this.prisma.maintenanceService.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.maintenance_service_deleted', targetType: 'MAINTENANCE_SERVICE', targetId: id, summary: `Deleted maintenance service ${existing.code}` });
+    return { id, deleted: true };
+  }
 
   // ------------------------------------------------------------------ bays
 
@@ -325,7 +401,8 @@ export class WorkshopService {
           bayId: dto.bayId ?? null,
           technicianUserId: dto.technicianUserId ?? null,
           status: 'OPEN',
-          odometer: dto.odometer ?? null,
+          // Read the mileage from the existing vehicle record, not a second job-card form field.
+          odometer: vehicle.mileage,
           complaint: dto.complaint ?? null,
           diagnosis: dto.diagnosis ?? null,
           createdById: actor.userId,
@@ -347,10 +424,11 @@ export class WorkshopService {
       if (!allowed.includes(dto.status)) {
         throw badRequest(ERROR_CODES.JOB_CARD_STATE, `Cannot move a job card from ${job.status} to ${dto.status}.`, { from: job.status, to: dto.status, allowed });
       }
-      // Completion requires an approved estimate, so work is not billed unapproved.
+      // Work items are entered directly by the operator; no separate estimate approval
+      // is required. Prevent completion when no billable lines were recorded.
       if (dto.status === 'COMPLETED') {
-        const approved = await this.prisma.repairEstimate.count({ where: { jobCardId: id, status: 'APPROVED' } });
-        if (approved === 0) throw forbidden(ERROR_CODES.ESTIMATE_NOT_APPROVED, 'The customer must approve an estimate before the job is completed.');
+        const items = await this.prisma.repairEstimateLine.count({ where: { estimate: { jobCardId: id } } });
+        if (items === 0) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Add at least one service or part before completing the job.');
       }
     }
     const updated = await this.prisma.jobCard.update({
@@ -405,7 +483,7 @@ export class WorkshopService {
           companyId,
           jobCardId,
           estimateNumber,
-          status: 'SENT',
+          status: 'SENT', // Preserve legacy estimate semantics; the new work-items endpoint uses APPROVED.
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
@@ -431,6 +509,102 @@ export class WorkshopService {
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.estimate_created', targetType: 'REPAIR_ESTIMATE', targetId: estimate.id, summary: `Created estimate ${estimate.estimateNumber}` });
     return estimate;
+  }
+
+  /**
+   * Save the job card's complete billable service/part set in one transaction.
+   * The legacy RepairEstimate tables are deliberately reused for existing
+   * invoice/reports compatibility; no approval step is exposed to operators.
+   * Replacing items instead of creating a new estimate on every Save preserves
+   * edits and prevents previously entered lines disappearing from the invoice.
+   */
+  async saveWorkItems(jobCardId: string, dto: CreateEstimateDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const job = await this.prisma.jobCard.findFirst({ where: { id: jobCardId, companyId } });
+    if (!job) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Job card not found.');
+    if (job.status === 'COMPLETED' || job.status === 'INVOICED' || job.status === 'CANCELLED') {
+      throw badRequest(ERROR_CODES.JOB_CARD_STATE, 'Work items cannot be changed after job completion or cancellation.');
+    }
+    if (dto.lines.length === 0 || dto.lines.some((line) => line.type !== 'SERVICE' && line.type !== 'PART')) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide at least one service or part line.');
+    }
+
+    if (dto.lines.some((line) => line.type === 'SERVICE' && line.productId)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Service work items cannot point to stock products.');
+    }
+    const partProductIds = [...new Set(dto.lines
+      .filter((line) => line.type === 'PART' && line.productId)
+      .map((line) => line.productId as string))];
+    if (partProductIds.length) {
+      const count = await this.prisma.product.count({
+        where: { id: { in: partProductIds }, companyId },
+      });
+      if (count !== partProductIds.length) {
+        throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'A job-card part belongs to another company.');
+      }
+    }
+
+    const totals = computeDocumentTotals(dto.lines.map((line) => ({
+      quantity: line.quantity,
+      unitPriceMinor: line.unitPriceMinor,
+      discountPercentBp: 0,
+      taxPercentBp: line.taxPercentBp ?? 0,
+    })));
+    const saved = await this.posting.withTransaction(async (tx) => {
+      const existing = await tx.repairEstimate.findFirst({
+        where: { companyId, jobCardId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      const lines = dto.lines.map((line, index) => ({
+        companyId,
+        type: line.type as never,
+        productId: line.productId ?? null,
+        description: line.description,
+        quantity: line.quantity,
+        unitPriceMinor: line.unitPriceMinor,
+        taxPercentBp: line.taxPercentBp ?? 0,
+        lineTotalMinor: totals.lines[index].lineTotalMinor,
+        sortOrder: index,
+      }));
+      if (existing) {
+        return tx.repairEstimate.update({
+          where: { id: existing.id },
+          data: {
+            status: 'APPROVED',
+            subtotalMinor: totals.subtotalMinor,
+            taxMinor: totals.taxMinor,
+            totalMinor: totals.totalMinor,
+            lines: { deleteMany: {}, create: lines },
+          },
+          include: { lines: true },
+        });
+      }
+      const estimateNumber = await this.sequences.next(tx, companyId, 'repairEstimate');
+      return tx.repairEstimate.create({
+        data: {
+          companyId,
+          jobCardId,
+          estimateNumber,
+          status: 'APPROVED',
+          subtotalMinor: totals.subtotalMinor,
+          taxMinor: totals.taxMinor,
+          totalMinor: totals.totalMinor,
+          createdById: actor.userId,
+          lines: { create: lines },
+        },
+        include: { lines: true },
+      });
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'automotive.job_work_items_saved',
+      targetType: 'JOB_CARD',
+      targetId: jobCardId,
+      summary: `Saved ${saved.lines.length} service/part items for job ${job.jobNumber}`,
+    });
+    return saved;
   }
 
   /** Record the customer's decision on an estimate. */
@@ -631,15 +805,23 @@ export class WorkshopService {
   async invoiceJobCard(id: string, dto: InvoiceJobCardDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const result = await this.posting.withTransaction(async (tx) => {
+      // Serialise double-clicks and concurrent requests for the same job across
+      // API instances. The financial document must never be posted twice.
+      await tx.$queryRaw`SELECT 1::int AS locked FROM pg_advisory_xact_lock(hashtext('oryx-workshop-invoice'), hashtext(${id}))`;
       const job = await tx.jobCard.findFirst({
         where: { id, companyId },
-        include: { labour: true, estimates: { include: { lines: true }, where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' }, take: 1 }, reservations: { include: { lines: true } } },
+        include: { labour: true, estimates: { include: { lines: true }, where: { status: { in: ['APPROVED', 'SENT'] } }, orderBy: { createdAt: 'desc' }, take: 1 }, reservations: { include: { lines: true } } },
       });
       if (!job) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Job card not found.');
-      if (job.status === 'INVOICED') throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'This job card is already invoiced.');
+      if (job.status === 'INVOICED') {
+        if (!job.invoiceId) throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'Invoiced job has no linked sales document.');
+        const existing = await tx.salesInvoice.findFirst({ where: { id: job.invoiceId, companyId } });
+        if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Linked invoice was not found.');
+        return { invoice: existing, created: false };
+      }
       if (job.status !== 'COMPLETED') throw badRequest(ERROR_CODES.JOB_CARD_STATE, 'Only a completed job card can be invoiced.');
 
-      // Prefer the approved estimate; fall back to the recorded labour.
+      // Bill the latest saved work items, retaining legacy labour fallback for old jobs.
       const lines: Array<{ productId: string | null; description: string; quantity: number; unitPriceMinor: number; taxPercentBp: number }> = [];
       const estimate = job.estimates[0];
       if (estimate) {
@@ -670,10 +852,10 @@ export class WorkshopService {
         lines,
       });
       await tx.jobCard.update({ where: { id }, data: { status: 'INVOICED', invoiceId: invoice.id } });
-      return invoice;
+      return { invoice, created: true };
     });
-    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.job_card_invoiced', targetType: 'JOB_CARD', targetId: id, summary: `Invoiced job card ${result.invoiceNumber}` });
-    return result;
+    if (result.created) await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.job_card_invoiced', targetType: 'JOB_CARD', targetId: id, summary: `Invoiced job card ${result.invoice.invoiceNumber}` });
+    return result.invoice;
   }
 
   // --------------------------------------------------------------- warranties
@@ -853,6 +1035,25 @@ export class WorkshopService {
 
   async createServiceRequest(dto: CreateServiceRequestDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    if (dto.customerId) {
+      const customer = await this.prisma.customer.findFirst({ where: { id: dto.customerId, companyId } });
+      if (!customer) throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Customer does not belong to this company.');
+    }
+    if (dto.vehicleId) {
+      const vehicle = await this.assertVehicle(companyId, dto.vehicleId);
+      if (dto.customerId && vehicle.customerId !== dto.customerId) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The vehicle must belong to the selected customer.');
+      }
+    }
+    const maintenance = await this.prisma.maintenanceService.findFirst({
+      where: { companyId, code: dto.categoryKey, isActive: true },
+    });
+    if (!maintenance && dto.categoryKey !== 'WORKSHOP') {
+      // Keep the legacy marketplace category workflow intact. The admin UI
+      // only offers maintenance services that exist in this tenant.
+      const known = await this.prisma.serviceCategory.findUnique({ where: { key: dto.categoryKey } });
+      if (!known) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Unknown service category.');
+    }
     const request = await this.posting.withTransaction(async (tx) => {
       const requestNumber = await this.sequences.next(tx, companyId, 'serviceRequest');
       return tx.serviceRequest.create({

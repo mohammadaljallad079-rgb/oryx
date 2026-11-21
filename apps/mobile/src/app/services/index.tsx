@@ -84,6 +84,12 @@ export default function Services() {
     <Screen padded={false}>
       <AppHeader />
       <View style={{ padding: space.lg, gap: space.md }}>
+        <Button
+          title={locale === 'ar' ? 'خدمات صيانة المركبات' : 'Vehicle maintenance services'}
+          variant="secondary"
+          onPress={() => router.push('/maintenance')}
+          testID="open-maintenance-services"
+        />
         <Field
           label={t('search')}
           value={query}

@@ -226,6 +226,36 @@ export class UpdateMaintenanceBookingDto {
   @IsOptional() @IsString() @MaxLength(2000) complaint?: string;
 }
 
+/** Dynamic, tenant-owned maintenance service shown on the storefront and job cards. */
+export class CreateMaintenanceServiceDto {
+  @IsString() @MinLength(2) @MaxLength(40) code!: string;
+  @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
+  @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(2000) descriptionEn?: string;
+  @IsOptional() @IsString() @MaxLength(2000) descriptionAr?: string;
+  @Type(() => Number) @IsInt() @Min(0) priceMinor!: number;
+  @Type(() => Number) @IsInt() @Min(1) durationMinutes!: number;
+  @IsOptional() @IsString() @MaxLength(2000) imageUrl?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) branchIds?: string[];
+  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional() @IsBoolean() isPublished?: boolean;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) sortOrder?: number;
+}
+
+export class UpdateMaintenanceServiceDto {
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(160) nameAr?: string;
+  @IsOptional() @IsString() @MaxLength(2000) descriptionEn?: string;
+  @IsOptional() @IsString() @MaxLength(2000) descriptionAr?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) priceMinor?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) durationMinutes?: number;
+  @IsOptional() @IsString() @MaxLength(2000) imageUrl?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) branchIds?: string[];
+  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional() @IsBoolean() isPublished?: boolean;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) sortOrder?: number;
+}
+
 export class CreateJobCardDto {
   @IsString() vehicleId!: string;
   @IsOptional() @IsString() bookingId?: string;

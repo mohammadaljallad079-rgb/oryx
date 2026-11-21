@@ -1685,6 +1685,18 @@ export const api = {
       activeWarranties: number;
     }>(`/automotive/workshop/dashboard?${toQuery(params)}`),
   createWorkshopBay: (body: Record<string, unknown>) => request<Record<string, unknown>>('/automotive/bays', { method: 'POST', body }),
+  maintenanceServices: () => request<Array<{
+    id: string; code: string; nameEn: string; nameAr: string;
+    descriptionEn: string | null; descriptionAr: string | null;
+    priceMinor: number; durationMinutes: number; imageUrl: string | null;
+    branchIds: string[]; isActive: boolean; isPublished: boolean; sortOrder: number;
+  }>>('/automotive/maintenance-services'),
+  createMaintenanceService: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/automotive/maintenance-services', { method: 'POST', body }),
+  updateMaintenanceService: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/automotive/maintenance-services/${id}`, { method: 'PATCH', body }),
+  deleteMaintenanceService: (id: string) =>
+    request<{ deleted: boolean }>(`/automotive/maintenance-services/${id}`, { method: 'DELETE' }),
   maintenanceBookings: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/maintenance-bookings?${toQuery(params)}`),
   createMaintenanceBooking: (body: Record<string, unknown>) =>
@@ -1700,10 +1712,12 @@ export const api = {
     request<Record<string, unknown>>(`/automotive/job-cards/${id}/labour`, { method: 'POST', body: { operations } }),
   createEstimate: (id: string, body: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/automotive/job-cards/${id}/estimates`, { method: 'POST', body }),
+  saveWorkItems: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/automotive/job-cards/${id}/work-items`, { method: 'PUT', body }),
   approveEstimate: (id: string) => request<Record<string, unknown>>(`/automotive/estimates/${id}/approve`, { method: 'POST', body: {} }),
   rejectEstimate: (id: string) => request<Record<string, unknown>>(`/automotive/estimates/${id}/reject`, { method: 'POST', body: {} }),
   invoiceJobCard: (id: string, body: Record<string, unknown> = {}) =>
-    request<{ invoiceNumber: string; totalMinor: number }>(`/automotive/job-cards/${id}/invoice`, { method: 'POST', body }),
+    request<{ id: string; invoiceNumber: string; totalMinor: number }>(`/automotive/job-cards/${id}/invoice`, { method: 'POST', body }),
   partReservations: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<PartsReservationDto>>(`/automotive/reservations?${toQuery(params)}`),
   createPartReservation: (body: Record<string, unknown>) =>

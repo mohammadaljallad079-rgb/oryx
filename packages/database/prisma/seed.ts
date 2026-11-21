@@ -1664,6 +1664,31 @@ async function seedCoupons(actorId: string): Promise<number> {
   return created;
 }
 
+/** Four initial maintenance services, create-only so admin edits survive reseeding. */
+async function seedMaintenanceServices(idByCode: Map<string, string>) {
+  const companyId = idByCode.get('ORYX-AUTO');
+  if (!companyId) return;
+  const examples = [
+    { code: 'OIL_CHANGE', nameEn: 'Engine Oil & Filter', nameAr: 'تغيير زيت المحرك والفلتر',
+      descriptionEn: 'Oil and filter replacement', descriptionAr: 'تبديل زيت المحرك والفلتر',
+      priceMinor: 12000, durationMinutes: 45, imageUrl: '/media/hero-maintenance.jpg', sortOrder: 1 },
+    { code: 'BRAKE_SERVICE', nameEn: 'Brake System Service', nameAr: 'صيانة نظام الفرامل',
+      descriptionEn: 'Inspect and service brakes', descriptionAr: 'فحص وصيانة الفرامل',
+      priceMinor: 18000, durationMinutes: 90, imageUrl: '/media/about-workshop.jpg', sortOrder: 2 },
+    { code: 'AC_SERVICE', nameEn: 'Air Conditioning Service', nameAr: 'صيانة المكيف',
+      descriptionEn: 'Inspect and service A/C', descriptionAr: 'فحص وصيانة المكيف',
+      priceMinor: 15000, durationMinutes: 75, imageUrl: '/media/workshop-artdeco.jpg', sortOrder: 3 },
+    { code: 'ENGINE_DIAG', nameEn: 'Engine Diagnostics', nameAr: 'تشخيص أعطال المحرك',
+      descriptionEn: 'Electronic engine diagnostics', descriptionAr: 'فحص إلكتروني لأعطال المحرك',
+      priceMinor: 10000, durationMinutes: 60, imageUrl: '/media/hero-maintenance.jpg', sortOrder: 4 },
+  ];
+  const result = await prisma.maintenanceService.createMany({
+    data: examples.map((service) => ({ companyId, ...service })),
+    skipDuplicates: true,
+  });
+  console.log(`  maintenance services: ${result.count} starter services added without overwriting existing records`);
+}
+
 async function main() {
   assertSeedIsAllowed();
   console.log('ORYX seed — start');
@@ -1674,6 +1699,7 @@ async function main() {
   const idByCode = await seedCompanies(superAdmin.id);
   await seedSubscriptions(idByCode);
   await seedCompanyAdmins(superAdmin.id, idByCode);
+  await seedMaintenanceServices(idByCode);
   await seedCms();
   await seedErpBaseline(idByCode, superAdmin.id);
   await seedExecution03Baseline(idByCode, superAdmin.id);

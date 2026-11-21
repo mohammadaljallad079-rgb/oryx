@@ -606,11 +606,10 @@ describe('ORYX Execution 03 (e2e)', () => {
       expect(job.status).toBe(201);
       const jobId = job.body.id;
 
-      // Completing without an approved estimate is refused.
+      // A job still needs billable service/part items, but no estimate approval is required.
       await erp(`/automotive/job-cards/${jobId}`, { method: 'PATCH', body: { status: 'IN_PROGRESS' } });
       const early = await erp<{ code: string }>(`/automotive/job-cards/${jobId}`, { method: 'PATCH', body: { status: 'COMPLETED' } });
-      expect(early.status).toBe(403);
-      expect(early.body.code).toBe('automotive.estimate_not_approved');
+      expect(early.status).toBe(400); // No saved work items yet.
 
       const estimate = await erp<{ id: string; totalMinor: number }>(`/automotive/job-cards/${jobId}/estimates`, {
         method: 'POST',

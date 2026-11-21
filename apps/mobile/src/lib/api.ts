@@ -970,6 +970,25 @@ export interface CustomerServiceRequest {
  * not tied to a bookable slot. The account is resolved from the bearer token, so
  * the client sends no account id and cannot read another customer's requests.
  */
+export interface MobileMaintenanceService {
+  id: string;
+  companyId: string;
+  key: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  priceMinor: number;
+  durationMinutes: number;
+  image: string;
+  branchIds: string[];
+}
+
+export const maintenanceServicesApi = {
+  list: (signal?: AbortSignal) =>
+    requestWithRetry<MobileMaintenanceService[]>('/storefront/maintenance-services', { auth: false, signal }),
+};
+
 export const serviceRequestsApi = {
   list: (params: { page?: number; pageSize?: number } = {}, signal?: AbortSignal) => {
     const q = new URLSearchParams();

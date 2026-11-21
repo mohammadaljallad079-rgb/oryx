@@ -67,6 +67,13 @@ export class StorefrontController {
   }
 
   @Public()
+  @Get('maintenance-services')
+  @ApiOperation({ summary: 'Published maintenance services for the company storefront and mobile app' })
+  maintenanceServices() {
+    return this.storefront.maintenanceServices();
+  }
+
+  @Public()
   @Get('inspection-services')
   @ApiOperation({ summary: 'Active technical inspection services with approved prices' })
   inspectionServices() {

@@ -570,6 +570,37 @@ export class StorefrontService {
   }
 
   /**
+   * Maintenance services share one company-owned catalogue with the admin
+   * work card and mobile app. Only active and published services are public.
+   */
+  async maintenanceServices() {
+    const companyId = await this.companyId();
+    const services = await this.prisma.maintenanceService.findMany({
+      where: { companyId, isActive: true, isPublished: true },
+      orderBy: [{ sortOrder: 'asc' }, { nameEn: 'asc' }],
+    });
+    const branches = await this.branches();
+    const eligible = new Set(branches.map((b) => b.id));
+    return services.map((service) => ({
+      companyId,
+      key: service.code,
+      id: service.id,
+      nameEn: service.nameEn,
+      nameAr: service.nameAr,
+      descriptionEn: service.descriptionEn,
+      descriptionAr: service.descriptionAr,
+      image: service.imageUrl ?? '/media/hero-maintenance.jpg',
+      durationMinutes: service.durationMinutes,
+      priceMinor: service.priceMinor,
+      turnaroundEn: null as string | null,
+      turnaroundAr: null as string | null,
+      branchIds: service.branchIds.length
+        ? service.branchIds.filter((id) => eligible.has(id))
+        : branches.map((branch) => branch.id),
+    }));
+  }
+
+  /**
    * The technical inspection services the storefront sells.
    *
    * The seven approved services are a fixed catalogue — `INSPECTION_SECTION_SPECS`

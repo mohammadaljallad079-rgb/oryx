@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
@@ -19,6 +19,8 @@ import {
   CreateJobCardDto,
   CreateListingDto,
   CreateMaintenanceBookingDto,
+  CreateMaintenanceServiceDto,
+  UpdateMaintenanceServiceDto,
   CreatePartReferenceDto,
   CreateProviderDto,
   CreateReservationDto,
@@ -46,6 +48,39 @@ interface RequestLike {
 @Controller('automotive')
 export class WorkshopController {
   constructor(private readonly workshop: WorkshopService) {}
+
+  // -------------------------------------------------- maintenance service catalogue
+  @Get('maintenance-services')
+  @RequireModule('automotive_maintenance')
+  @RequireAnyPermission('erp.maintenance.read', 'erp.maintenance.jobcard.manage')
+  @ApiOperation({ summary: 'List company maintenance services for admin job cards' })
+  maintenanceServices(@CurrentPrincipal() p: RequestPrincipal) {
+    return this.workshop.listMaintenanceServices(p);
+  }
+
+  @Post('maintenance-services')
+  @RequireModule('automotive_maintenance')
+  @RequirePermissions('erp.maintenance.jobcard.manage')
+  @ApiOperation({ summary: 'Create company maintenance service' })
+  createMaintenanceService(@Body() dto: CreateMaintenanceServiceDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.workshop.createMaintenanceService(dto, p, actorFrom(p, req));
+  }
+
+  @Patch('maintenance-services/:id')
+  @RequireModule('automotive_maintenance')
+  @RequirePermissions('erp.maintenance.jobcard.manage')
+  @ApiOperation({ summary: 'Edit company maintenance service' })
+  updateMaintenanceService(@Param('id') id: string, @Body() dto: UpdateMaintenanceServiceDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.workshop.updateMaintenanceService(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('maintenance-services/:id')
+  @RequireModule('automotive_maintenance')
+  @RequirePermissions('erp.maintenance.jobcard.manage')
+  @ApiOperation({ summary: 'Delete company maintenance service' })
+  deleteMaintenanceService(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.workshop.deleteMaintenanceService(id, p, actorFrom(p, req));
+  }
 
   // -------------------------------------------------------------- bays
   @Get('workshop/dashboard')
@@ -136,6 +171,14 @@ export class WorkshopController {
   @ApiOperation({ summary: 'Add labour operations' })
   addLabour(@Param('id') id: string, @Body() dto: AddLabourDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.workshop.addLabour(id, dto, p, actorFrom(p, req));
+  }
+
+  @Put('job-cards/:id/work-items')
+  @RequireModule('automotive_maintenance')
+  @RequirePermissions('erp.maintenance.estimate.manage')
+  @ApiOperation({ summary: 'Save editable service and part job-card lines without estimate approval' })
+  saveWorkItems(@Param('id') id: string, @Body() dto: CreateEstimateDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.workshop.saveWorkItems(id, dto, p, actorFrom(p, req));
   }
 
   @Post('job-cards/:id/estimates')
