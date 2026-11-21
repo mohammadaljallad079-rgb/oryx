@@ -21,6 +21,8 @@ import type {
   CreateJobCardDto,
   CreateListingDto,
   CreateMaintenanceBookingDto,
+  CreateMaintenanceServiceDto,
+  UpdateMaintenanceServiceDto,
   CreatePartReferenceDto,
   CreateProviderDto,
   CreateReservationDto,
@@ -64,6 +66,80 @@ export class WorkshopService {
     private readonly inventory: InventoryService,
     private readonly sales: SalesService,
   ) {}
+
+  // ------------------------------------------------------ maintenance services
+
+  async listMaintenanceServices(principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    return this.prisma.maintenanceService.findMany({
+      where: { companyId },
+      orderBy: [{ sortOrder: 'asc' }, { nameEn: 'asc' }],
+    });
+  }
+
+  private async validateServiceBranches(companyId: string, branchIds: string[]) {
+    if (!branchIds.length) return;
+    const unique = [...new Set(branchIds)];
+    if (unique.length !== branchIds.length) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Duplicate service branches are not allowed.');
+    }
+    const found = await this.prisma.branch.count({ where: { companyId, id: { in: unique } } });
+    if (found !== unique.length) throw forbidden(ERROR_CODES.VALIDATION_FAILED, 'Service branches must belong to this company.');
+  }
+
+  async createMaintenanceService(dto: CreateMaintenanceServiceDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.validateServiceBranches(companyId, dto.branchIds ?? []);
+    const code = dto.code.trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{2,40}$/.test(code)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Service code must use letters, numbers, underscores or hyphens.');
+    }
+    const service = await this.prisma.maintenanceService.create({
+      data: {
+        companyId, code, nameEn: dto.nameEn, nameAr: dto.nameAr,
+        descriptionEn: dto.descriptionEn ?? null, descriptionAr: dto.descriptionAr ?? null,
+        priceMinor: dto.priceMinor, durationMinutes: dto.durationMinutes,
+        imageUrl: dto.imageUrl ?? null, branchIds: dto.branchIds ?? [],
+        isActive: dto.isActive ?? true, isPublished: dto.isPublished ?? true,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.maintenance_service_created', targetType: 'MAINTENANCE_SERVICE', targetId: service.id, summary: `Created maintenance service ${code}` });
+    return service;
+  }
+
+  async updateMaintenanceService(id: string, dto: UpdateMaintenanceServiceDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const existing = await this.prisma.maintenanceService.findFirst({ where: { id, companyId } });
+    if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Maintenance service not found.');
+    if (dto.branchIds) await this.validateServiceBranches(companyId, dto.branchIds);
+    const updated = await this.prisma.maintenanceService.update({
+      where: { id }, data: {
+        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.descriptionEn !== undefined ? { descriptionEn: dto.descriptionEn } : {}),
+        ...(dto.descriptionAr !== undefined ? { descriptionAr: dto.descriptionAr } : {}),
+        ...(dto.priceMinor !== undefined ? { priceMinor: dto.priceMinor } : {}),
+        ...(dto.durationMinutes !== undefined ? { durationMinutes: dto.durationMinutes } : {}),
+        ...(dto.imageUrl !== undefined ? { imageUrl: dto.imageUrl } : {}),
+        ...(dto.branchIds !== undefined ? { branchIds: dto.branchIds } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.isPublished !== undefined ? { isPublished: dto.isPublished } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.maintenance_service_updated', targetType: 'MAINTENANCE_SERVICE', targetId: id, summary: `Updated maintenance service ${updated.code}` });
+    return updated;
+  }
+
+  async deleteMaintenanceService(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const existing = await this.prisma.maintenanceService.findFirst({ where: { id, companyId } });
+    if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Maintenance service not found.');
+    await this.prisma.maintenanceService.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.maintenance_service_deleted', targetType: 'MAINTENANCE_SERVICE', targetId: id, summary: `Deleted maintenance service ${existing.code}` });
+    return { id, deleted: true };
+  }
 
   // ------------------------------------------------------------------ bays
 
