@@ -738,6 +738,7 @@ function CreateEstimateModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<EstimateLineDraft[]>([emptyLine()]);
+  const availableServices = useAsync(() => api.maintenanceServices(), []);
   useEffect(() => {
     if (!open) return;
     setLines(initialLines.length ? initialLines.map((line) => ({
@@ -816,25 +817,44 @@ function CreateEstimateModal({
                 ))}
               </select>
             </Field>
-            <Field label={t('erp.inventory.product')}>
-              <EntitySelect
-                catalogue="product"
-                allowCreate
-                value={line.productId || null}
-                onChange={(v) => patch(index, { productId: v ?? '' })}
-                onSelectData={(data) =>
-                  patch(index, {
+            {line.type === 'SERVICE' ? (
+              <Field label={locale === 'ar' ? 'خدمة الصيانة' : 'Maintenance service'}>
+                <select className="oryx-input" data-testid={`maintenance-line-service-${index}`}
+                  value={availableServices.data?.find((item) => item.nameEn === line.description)?.id ?? ''}
+                  onChange={(event) => {
+                    const service = availableServices.data?.find((item) => item.id === event.target.value);
+                    if (!service) return;
+                    patch(index, {
+                      productId: '',
+                      description: locale === 'ar' ? service.nameAr : service.nameEn,
+                      unitPrice: minorToInput(service.priceMinor),
+                      taxRate: '10',
+                    });
+                  }}>
+                  <option value="">{t('common.select')}</option>
+                  {(availableServices.data ?? []).filter((item) => item.isActive).map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {locale === 'ar' ? service.nameAr : service.nameEn}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              <Field label={t('erp.inventory.product')}>
+                <EntitySelect
+                  catalogue="product" allowCreate value={line.productId || null}
+                  onChange={(value) => patch(index, { productId: value ?? '' })}
+                  onSelectData={(data) => patch(index, {
                     productId: String(data.id ?? ''),
-                    description: line.description || String(data.nameEn ?? ''),
+                    description: String(data.nameEn ?? ''),
                     unitPrice: minorToInput(Number(data.salesPriceMinor ?? 0)),
                     taxRate: String(Number(data.taxRateBp ?? 0) / 100),
-                  })
-                }
-                placeholder={t('common.select')}
-                emptyLabel={t('common.select')}
-                testId={`estimate-product-${index}`}
-              />
-            </Field>
+                  })}
+                  placeholder={t('common.select')} emptyLabel={t('common.select')}
+                  testId={`estimate-product-${index}`}
+                />
+              </Field>
+            )}
             <Field label={t('erp.accounting.description')} required>
               <input
                 className="oryx-input"
