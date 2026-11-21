@@ -48,10 +48,15 @@ async function approvedInspection(page: Page, areas: string[]): Promise<{ id: st
           break;
         }
       }
+      const billing = await fetch(`${api}/automotive/inspection-services?pageSize=50`, { headers });
+      if (!billing.ok) throw new Error(`Billing catalog unavailable: ${billing.status}`);
+      const catalog = (await billing.json()) as { items: Array<{ id: string; priceMinor: number; isActive: boolean }> };
+      const service = catalog.items.find(row => row.isActive && row.priceMinor > 0);
+      if (!service) throw new Error('No active priced inspection service is available');
       const created = await fetch(`${api}/automotive/inspections`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ customerId, vehicleId, selectedAreas: areas }),
+        body: JSON.stringify({ customerId, vehicleId, selectedAreas: areas, billingServiceIds: [service.id] }),
       });
       if (!created.ok) throw new Error(`Job creation failed: ${created.status} ${await created.text()}`);
       const session = (await created.json()) as { id: string; jobNumber: string };
@@ -144,6 +149,15 @@ test.describe('Execution Phase 3 — official documents', () => {
     await page.evaluate(
       async ({ api, token, id, keys }) => {
         const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+        const billing = await fetch(`${api}/automotive/inspection-services?pageSize=50`, { headers });
+        if (!billing.ok) throw new Error(`Billing catalog failed: ${billing.status}`);
+        const catalog = (await billing.json()) as { items: Array<{ id: string; priceMinor: number; isActive: boolean }> };
+        const service = catalog.items.find(row => row.isActive && row.priceMinor > 0);
+        if (!service) throw new Error('No priced inspection service to approve this inspection');
+        const setServices = await fetch(`${api}/automotive/inspections/${id}/billing-services`, {
+          method: 'POST', headers, body: JSON.stringify({ billingServiceIds: [service.id] }),
+        });
+        if (!setServices.ok) throw new Error(`Setting inspection invoice services failed: ${setServices.status} ${await setServices.text()}`);
         await fetch(`${api}/automotive/inspections/${id}/sections/INTERIOR`, {
           method: 'PUT',
           headers,
