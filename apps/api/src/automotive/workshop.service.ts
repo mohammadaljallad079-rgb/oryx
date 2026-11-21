@@ -714,12 +714,20 @@ export class WorkshopService {
   async invoiceJobCard(id: string, dto: InvoiceJobCardDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const result = await this.posting.withTransaction(async (tx) => {
+      // Serialise double-clicks and concurrent requests for the same job across
+      // API instances. The financial document must never be posted twice.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('oryx-workshop-invoice'), hashtext(${id}))`;
       const job = await tx.jobCard.findFirst({
         where: { id, companyId },
         include: { labour: true, estimates: { include: { lines: true }, where: { status: { in: ['APPROVED', 'SENT'] } }, orderBy: { createdAt: 'desc' }, take: 1 }, reservations: { include: { lines: true } } },
       });
       if (!job) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Job card not found.');
-      if (job.status === 'INVOICED') throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'This job card is already invoiced.');
+      if (job.status === 'INVOICED') {
+        if (!job.invoiceId) throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'Invoiced job has no linked sales document.');
+        const existing = await tx.salesInvoice.findFirst({ where: { id: job.invoiceId, companyId } });
+        if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Linked invoice was not found.');
+        return { invoice: existing, created: false };
+      }
       if (job.status !== 'COMPLETED') throw badRequest(ERROR_CODES.JOB_CARD_STATE, 'Only a completed job card can be invoiced.');
 
       // Bill the latest saved work items, retaining legacy labour fallback for old jobs.
@@ -753,10 +761,10 @@ export class WorkshopService {
         lines,
       });
       await tx.jobCard.update({ where: { id }, data: { status: 'INVOICED', invoiceId: invoice.id } });
-      return invoice;
+      return { invoice, created: true };
     });
-    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.job_card_invoiced', targetType: 'JOB_CARD', targetId: id, summary: `Invoiced job card ${result.invoiceNumber}` });
-    return result;
+    if (result.created) await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.job_card_invoiced', targetType: 'JOB_CARD', targetId: id, summary: `Invoiced job card ${result.invoice.invoiceNumber}` });
+    return result.invoice;
   }
 
   // --------------------------------------------------------------- warranties
