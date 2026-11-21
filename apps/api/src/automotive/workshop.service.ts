@@ -325,7 +325,8 @@ export class WorkshopService {
           bayId: dto.bayId ?? null,
           technicianUserId: dto.technicianUserId ?? null,
           status: 'OPEN',
-          odometer: dto.odometer ?? null,
+          // Read the mileage from the existing vehicle record, not a second job-card form field.
+          odometer: vehicle.mileage,
           complaint: dto.complaint ?? null,
           diagnosis: dto.diagnosis ?? null,
           createdById: actor.userId,
