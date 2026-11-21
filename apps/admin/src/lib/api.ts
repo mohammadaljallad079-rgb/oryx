@@ -1481,6 +1481,16 @@ export const api = {
     request<VehicleDocumentOcrResultDto>(`/automotive/vehicles/${id}/documents/ocr`, { method: 'POST', body: form, raw: true }),
   removeVehicleDocument: (id: string, documentId: string) =>
     request<{ removed: boolean }>(`/automotive/vehicles/${id}/documents/${documentId}`, { method: 'DELETE' }),
+  replaceApprovedInspectionServices: (services: Array<{
+    area: string;
+    priceMinor: number;
+    taxPercentBp: number;
+    durationMinutes: number;
+  }>) =>
+    request<{ items: InspectionServiceDto[]; deleted: number; archived: number }>(
+      '/automotive/inspection-services/replace-approved',
+      { method: 'POST', body: { services } },
+    ),
   inspectionServices: (params: { companyId?: string } = {}) =>
     request<Paginated<InspectionServiceDto>>(`/automotive/inspection-services?${toQuery(params)}`),
   createInspectionService: (body: Record<string, unknown>) =>
