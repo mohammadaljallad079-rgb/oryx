@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  ArrayMinSize,
   IsBoolean,
   IsDateString,
   IsIn,
@@ -157,6 +158,13 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   serviceRef?: string;
+
+  /** Multiple service IDs on one booking (single time slot). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  serviceRefs?: string[];
 
   @IsOptional()
   @IsString()
