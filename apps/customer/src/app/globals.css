@@ -2185,6 +2185,21 @@ a {
   border: 0;
 }
 
+/* Secondary-page title banners use a light surface and dark ink in Light Theme.
+   The home hero and dark theme are intentionally unaffected. */
+:root[data-theme='light'] .oryx-page-head {
+  background: linear-gradient(125deg, var(--surface-raised), color-mix(in srgb, var(--tint-wash) 100%, var(--surface-raised)));
+  border-color: var(--border);
+  color: var(--text);
+}
+:root[data-theme='light'] .oryx-page-head::after {
+  background: linear-gradient(var(--scrim-angle), color-mix(in srgb, var(--surface-raised) 96%, transparent), color-mix(in srgb, var(--surface-raised) 85%, transparent));
+}
+:root[data-theme='light'] .oryx-page-head__art { opacity: 0.13; }
+:root[data-theme='light'] .oryx-page-head__title { color: var(--text); }
+:root[data-theme='light'] .oryx-page-head__subtitle,
+:root[data-theme='light'] .oryx-page-head__back { color: var(--text-muted); }
+
 /* ------------------------------------------------------------- page header */
 
 .oryx-page-head {
