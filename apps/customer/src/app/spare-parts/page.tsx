@@ -10,7 +10,7 @@ import { Icon } from '@/components/icons';
 
 /** ORYX inventory-backed public catalogue: published and active products only. */
 export default function SparePartsPage() {
-  const { locale } = useUi();
+  const { t, locale } = useUi();
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -40,8 +40,10 @@ export default function SparePartsPage() {
   return (
     <div className="oryx-container">
       <PageHeader
-        title={locale === 'ar' ? 'قطع الغيار والمنتجات' : 'Parts & Inventory Products'}
-        subtitle={locale === 'ar' ? 'الأسعار والتوافر من مخزون ORYX الفعلي' : 'Live prices and availability from ORYX stock'}
+        eyebrow={t('brand.tagline')}
+        title={t('spareParts.title')}
+        subtitle={t('spareParts.subtitle')}
+        art="/media/hero-parts.jpg"
       />
       <form role="search" onSubmit={(event) => {
         event.preventDefault();
@@ -61,7 +63,7 @@ export default function SparePartsPage() {
       ) : error ? (
         <p role="alert" className="oryx-muted">{locale === 'ar' ? 'تعذّر تحميل قطع الغيار.' : 'Unable to load spare parts.'}</p>
       ) : items.length === 0 ? (
-        <p className="oryx-muted">{locale === 'ar' ? 'لا توجد أصناف منشورة مطابقة.' : 'No matching published items.'}</p>
+        <p className="oryx-muted">{t('spareParts.empty')}</p>
       ) : (
         <>
           <div className="oryx-grid oryx-grid--cards">

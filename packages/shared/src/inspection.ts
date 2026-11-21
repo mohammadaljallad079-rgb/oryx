@@ -362,6 +362,36 @@ export function isInspectionSectionKey(key: string): key is InspectionSectionKey
   return (INSPECTION_SECTION_KEYS as readonly string[]).includes(key);
 }
 
+/**
+ * The seven approved inspection services the booking catalogue sells.
+ *
+ * Each service is one of the seven *internal areas* above, sold as its own
+ * bookable product. This is deliberately not `INSPECTION_TYPES`: the report
+ * offers four selectable types, the catalogue sells seven services, and the
+ * public website must show the seven without changing the report.
+ *
+ * `code` is the persisted `InspectionService.code` on a seeded tenant; the order
+ * here is the order the catalogue is presented in.
+ */
+export const APPROVED_INSPECTION_SERVICES: readonly {
+  section: InspectionSectionKey;
+  code: string;
+}[] = [
+  { section: 'PAINT_BODY', code: 'INS-PAINT' },
+  { section: 'CHASSIS_UNDERCARRIAGE', code: 'INS-CHASSIS' },
+  { section: 'INTERIOR', code: 'INS-INTERIOR' },
+  { section: 'EXTERIOR', code: 'INS-EXTERIOR' },
+  { section: 'ENGINE_COMPARTMENT', code: 'INS-ENGINE' },
+  { section: 'ROAD_TEST', code: 'INS-ROAD' },
+  { section: 'COMPUTER_UNIT', code: 'INS-COMPUTER' },
+];
+
+/** Sort rank of an approved service code; unknown codes sort last. */
+export function approvedInspectionServiceRank(code: string): number {
+  const index = APPROVED_INSPECTION_SERVICES.findIndex((service) => service.code === code);
+  return index === -1 ? APPROVED_INSPECTION_SERVICES.length : index;
+}
+
 /** The results an item in a section accepts, as a concrete list. */
 export function inspectionResultsFor(section: InspectionSectionSpec): InspectionItemResult[] {
   return section.resultSet === 'PASS_FAIL_NA' ? ['PASS', 'FAIL', 'NA'] : ['PASS', 'FAIL'];

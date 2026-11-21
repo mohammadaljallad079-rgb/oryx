@@ -65,6 +65,9 @@ function ProductsCatalog() {
         companyId: store || undefined,
         query: query.trim() || undefined,
         sort,
+        // Spare parts are a section of their own; the products section lists
+        // everything the ERP does not classify as a part.
+        spareParts: 'exclude',
         pageSize: 48,
       });
       setProducts(res.items);
@@ -138,6 +141,9 @@ function ProductsCatalog() {
 
           <div className="oryx-catalog-group">
             <p className="oryx-catalog-group__title">{t('nav.categories')}</p>
+            <Link href="/spare-parts" className="oryx-catalog-filter">
+              {t('nav.spareParts')}
+            </Link>
             <Link
               href="/products"
               className="oryx-catalog-filter"
@@ -145,7 +151,10 @@ function ProductsCatalog() {
             >
               {t('common.all')}
             </Link>
-            {categories.map((item) => (
+            {/* `spare_parts` is a section of its own, linked above; keeping it
+                here would offer the same label twice with two different
+                destinations. */}
+            {categories.filter((item) => item.key !== 'spare_parts').map((item) => (
               <Link
                 key={item.key}
                 href={`/products?category=${encodeURIComponent(item.key)}`}

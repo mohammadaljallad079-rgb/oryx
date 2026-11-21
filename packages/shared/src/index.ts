@@ -18,6 +18,7 @@ export * from './contracts';
 export * from './documents';
 export * from './reports';
 export * from './storefront';
+export * from './storefront-sections';
 export * from './site-content';
 
 export * from './print';

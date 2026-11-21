@@ -159,6 +159,10 @@
    * is already direction-neutral.
    */
   --scrim-angle: 100deg;
+  /* The field the banner scrim is built from: the navy band in the dark theme,
+   * the ivory page surface in the light theme. One token, so the mobile scrim
+   * below can stay theme-correct without a second override. */
+  --hero-band: var(--band);
   --hero-scrim: linear-gradient(
     var(--scrim-angle),
     color-mix(in srgb, var(--band) 94%, transparent) 8%,
@@ -234,6 +238,24 @@
   --hero-eyebrow-ink: var(--band-text-muted);
   --hero-eyebrow-size: 16px;
   --hero-eyebrow-margin: 0 0 24px;
+  /*
+   * The banner surface. The homepage slider composites its photograph under the
+   * hero scrim, and the caption sits on top of both; these tokens keep the
+   * caption ink, the slider controls and the scrim in one place so the light
+   * theme can turn the banner into a light panel without touching a rule.
+   * The dark values reproduce the approved navy banner exactly.
+   */
+  --hero-title-ink: var(--band-text);
+  --hero-lede-ink: var(--band-text-muted);
+  --hero-cta-secondary-ink: #ffffff;
+  --hero-cta-secondary-bg: var(--secondary);
+  --hero-cta-secondary-border: var(--secondary-hover);
+  --hero-cta-secondary-hover-bg: var(--secondary-hover);
+  --hero-cta-secondary-hover-border: var(--secondary-hover);
+  --hero-dot-bg: rgba(255, 255, 255, 0.34);
+  --hero-arrow-bg: rgba(0, 15, 30, 0.4);
+  --hero-arrow-border: rgba(255, 255, 255, 0.35);
+  --hero-arrow-ink: #ffffff;
   --header-h: 68px;
 }
 
@@ -287,25 +309,32 @@
     rgba(0, 22, 43, 0.62) 55%,
     rgba(0, 22, 43, 0.9) 100%
   );
-  /* Ivory scrim so the charcoal caption keeps its contrast over artwork. */
+  /*
+   * Ivory scrim so the charcoal caption keeps its contrast over artwork. The
+   * caption sits across the middle of the tile, not only at its foot, so the
+   * top stop carries enough ivory for the muted SKU line to stay readable.
+   */
   --card-scrim: linear-gradient(
     180deg,
-    rgba(247, 244, 237, 0.55) 0%,
-    rgba(247, 244, 237, 0.82) 55%,
-    rgba(247, 244, 237, 0.94) 100%
+    rgba(247, 244, 237, 0.66) 0%,
+    rgba(247, 244, 237, 0.87) 55%,
+    rgba(247, 244, 237, 0.95) 100%
   );
   /*
-   * The hero caption spans the left ~60% of the panel, so the scrim stays
-   * near-opaque across that band and only thins out on the right, where the
-   * photograph is meant to show. It is built from the navy band token so the
-   * caption keeps white-ink contrast in both themes; in the dark theme the band
-   * equals the page field, so the approved render is unchanged.
+   * The hero caption spans the start ~60% of the panel, so the scrim stays
+   * dense across that band — the charcoal headline and lede sit on it — and
+   * thins out towards the far edge, where the photograph is meant to be read.
+   * The wash is ivory, not navy, so the light banner stays light; the far stop
+   * is deliberately low, because an ivory layer at half strength over a bright
+   * photograph bleaches it to a blank panel.
    */
+  --hero-band: var(--surface);
   --hero-scrim: linear-gradient(
     var(--scrim-angle),
-    color-mix(in srgb, var(--band) 96%, transparent) 4%,
-    color-mix(in srgb, var(--band) 92%, transparent) 55%,
-    color-mix(in srgb, var(--band) 70%, transparent) 100%
+    color-mix(in srgb, var(--hero-band) 94%, transparent) 0%,
+    color-mix(in srgb, var(--hero-band) 88%, transparent) 40%,
+    color-mix(in srgb, var(--hero-band) 62%, transparent) 68%,
+    color-mix(in srgb, var(--hero-band) 16%, transparent) 100%
   );
   --panel-scrim: linear-gradient(
     var(--scrim-angle),
@@ -416,9 +445,27 @@
   --footer-btn-hover-border: var(--band-accent);
   /* The homepage hero eyebrow: the gold accent every other eyebrow uses, at the
    * eyebrow's own size rather than the lede's. */
-  --hero-eyebrow-ink: var(--band-accent);
+  --hero-eyebrow-ink: var(--gold);
   --hero-eyebrow-size: 12.5px;
   --hero-eyebrow-margin: 0 0 10px;
+  /*
+   * The banner is a light panel in the light theme: the photograph keeps its
+   * colour on the far side of the caption, and an ivory scrim carries the
+   * caption so the charcoal ink and the deep gold eyebrow keep their contrast
+   * over any artwork. The secondary button and the slider controls flip to the
+   * page ink for the same reason — white-on-white was the defect this fixes.
+   */
+  --hero-title-ink: var(--text);
+  --hero-lede-ink: var(--text-muted);
+  --hero-cta-secondary-ink: var(--primary);
+  --hero-cta-secondary-bg: color-mix(in srgb, var(--surface) 92%, transparent);
+  --hero-cta-secondary-border: var(--border-strong);
+  --hero-cta-secondary-hover-bg: var(--tint-fill);
+  --hero-cta-secondary-hover-border: var(--border-strong);
+  --hero-dot-bg: color-mix(in srgb, var(--text) 26%, transparent);
+  --hero-arrow-bg: color-mix(in srgb, var(--surface) 92%, transparent);
+  --hero-arrow-border: var(--border);
+  --hero-arrow-ink: var(--text);
 }
 
 /*
@@ -1236,12 +1283,12 @@ a {
   line-height: 1.14;
   font-weight: 800;
   letter-spacing: -0.01em;
-  color: var(--band-text);
+  color: var(--hero-title-ink);
 }
 
 .oryx-hero__lede {
   margin: 0 0 26px;
-  color: var(--band-text-muted);
+  color: var(--hero-lede-ink);
   font-size: clamp(14px, 1.5vw, 17px);
   max-width: 60ch;
 }
@@ -1250,6 +1297,24 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+/*
+ * The secondary call to action sits on the banner, not on the page, so it takes
+ * the banner's own ink. In the dark theme the tokens resolve to the approved
+ * slate button, so that render is unchanged; in the light theme the button
+ * becomes a page-ink outline that reads on the ivory banner.
+ */
+.oryx-hero__actions .oryx-btn-secondary {
+  color: var(--hero-cta-secondary-ink);
+  background: var(--hero-cta-secondary-bg);
+  border-color: var(--hero-cta-secondary-border);
+}
+
+.oryx-hero__actions .oryx-btn-secondary:hover:not(:disabled) {
+  color: var(--hero-cta-secondary-ink);
+  background: var(--hero-cta-secondary-hover-bg);
+  border-color: var(--hero-cta-secondary-hover-border);
 }
 
 .oryx-btn-lg {
@@ -1295,6 +1360,45 @@ a {
   height: 100%;
   object-fit: cover;
   object-position: center;
+}
+
+/*
+ * The light banner carries its caption on an ivory scrim, so the photograph is
+ * read on the far side: the subject is held away from the caption instead of
+ * being cropped behind it. The direction flip keeps the same rule in RTL, where
+ * the caption sits on the right.
+ */
+:root[data-theme='light'] .oryx-hero-slide img {
+  object-position: 78% center;
+}
+
+/*
+ * The light banner is a caption on an ivory wash, not a full-screen photograph:
+ * at the dark theme's height the pale wash leaves a large empty band above the
+ * text. The dark theme keeps its approved height untouched.
+ */
+:root[data-theme='light'] .oryx-hero--slider {
+  min-height: clamp(420px, 60vh, 560px);
+}
+
+/*
+ * On a phone the caption spans the full width, so a horizontal wash would
+ * bleach the whole photograph. The scrim turns vertical there: the picture
+ * reads at the top, the caption sits on ivory at the foot.
+ */
+@media (max-width: 720px) {
+  :root[data-theme='light'] {
+    --hero-scrim: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--hero-band) 8%, transparent) 0%,
+      color-mix(in srgb, var(--hero-band) 74%, transparent) 38%,
+      color-mix(in srgb, var(--hero-band) 95%, transparent) 100%
+    );
+  }
+}
+
+:root[data-theme='light'][data-dir='rtl'] .oryx-hero-slide img {
+  object-position: 22% center;
 }
 
 .oryx-hero-slide::after {
@@ -1352,7 +1456,7 @@ a {
   height: 4px;
   border-radius: 999px;
   border: none;
-  background: rgba(255, 255, 255, 0.34);
+  background: var(--hero-dot-bg);
   cursor: pointer;
   transition: background 0.2s ease, width 0.2s ease;
 }
@@ -1371,9 +1475,9 @@ a {
   width: 44px;
   height: 44px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(0, 15, 30, 0.4);
-  color: #fff;
+  border: 1px solid var(--hero-arrow-border);
+  background: var(--hero-arrow-bg);
+  color: var(--hero-arrow-ink);
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -1384,7 +1488,7 @@ a {
 
 .oryx-hero__arrow:hover {
   background: var(--gold);
-  color: var(--navy);
+  color: var(--on-gold);
   border-color: transparent;
 }
 
@@ -1584,6 +1688,19 @@ a {
   color: var(--gold-on-tint);
   font-size: 12.5px;
   font-weight: 700;
+}
+
+/* A real count from the API, shown only when the caller has one. */
+.oryx-section-card__count {
+  align-self: flex-start;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--tint-line);
+  background: var(--tint-fill);
+  color: var(--gold-on-tint);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /* --------------------------------------------------------- dashboard */
@@ -2040,7 +2157,7 @@ a {
 }
 
 .oryx-hero p {
-  color: var(--band-text-muted);
+  color: var(--hero-lede-ink);
   max-width: 560px;
   margin: 0 0 24px;
   font-size: 16px;
@@ -2104,6 +2221,23 @@ a {
   .oryx-hero__content {
     padding: 36px 22px;
   }
+  /* On a phone the caption spans the panel, so a horizontal ramp would leave
+   * half the text over bare artwork. The scrim turns vertical and stays
+   * near-opaque behind the text in both themes. */
+  .oryx-hero--slider {
+    min-height: clamp(440px, 72vh, 560px);
+  }
+  .oryx-hero-slide::after {
+    background: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--hero-band) 96%, transparent) 34%,
+      color-mix(in srgb, var(--hero-band) 78%, transparent) 62%,
+      color-mix(in srgb, var(--hero-band) 30%, transparent) 100%
+    );
+  }
+  .oryx-hero__content {
+    padding-bottom: 84px;
+  }
   .oryx-stat-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
@@ -2142,6 +2276,24 @@ a {
   }
   .oryx-hero__actions .oryx-btn {
     flex: 1 1 auto;
+  }
+  /* The slider controls share the caption's width on a phone, so they tighten
+   * and step in from the edge rather than crowding the text or the frame. */
+  .oryx-hero__controls {
+    padding: 0 16px;
+    bottom: 18px;
+    gap: 10px;
+  }
+  .oryx-hero__dot {
+    width: 20px;
+  }
+  .oryx-hero__dot[aria-current='true'] {
+    width: 30px;
+  }
+  .oryx-hero__arrow {
+    width: 36px;
+    height: 36px;
+    font-size: 17px;
   }
   /* The tagline and the sign-in shortcut both live in the mobile panel, so the
    * bar keeps only the logo, the two toggles, the primary CTA and the menu. */
@@ -3206,6 +3358,31 @@ a {
   justify-content: space-between;
   gap: 10px;
   margin-top: 6px;
+}
+
+/* The service or inspection a customer already chose on the website, shown in
+ * the booking form as a fixed choice with a way back out of it. */
+.oryx-inspection-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--tint-wash);
+  color: var(--text);
+}
+
+.oryx-inspection-choice > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.oryx-inspection-choice strong {
+  overflow-wrap: anywhere;
 }
 
 .oryx-product-detail {

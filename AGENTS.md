@@ -78,6 +78,13 @@ Security baseline (do not regress):
   connection-test path with append-only check history, audit logging by key and
   never by value, and a customer capabilities endpoint that advertises only
   operational providers) plus platform-completion work.
+- **Public storefront (implemented and tested):** the customer site presents
+  exactly four sections — technical inspections, maintenance services, products
+  and spare parts — in that order, declared once in
+  `packages/shared/src/storefront-sections.ts`. The inspection section shows the
+  seven approved inspection services; the parts section lists only products
+  classified with `partCategoryKey`. The light-theme banners are washed ivory
+  with dark type; the dark theme is unchanged.
 - **Scaffolded only:** nothing. Every ERP module catalog entry is implemented and
   DB-backed across Executions 01–05.
 - **Execution 21 (implemented and tested):** the Reports workspace was rebuilt
@@ -973,6 +980,48 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   the suite fails with a `locator.waitFor` timeout that looks like a routing bug.
   `NEXT_PUBLIC_API_BASE_URL` is inlined into the browser bundle, so a localhost
   value bakes the wrong API origin into a preview build; use `/api`.
+
+### Storefront gotchas
+
+- **One taxonomy, declared once.** `STOREFRONT_SECTIONS` in
+  `packages/shared/src/storefront-sections.ts` fixes the order and the routes of
+  the four public sections: technical inspections, maintenance services,
+  products, spare parts. The header, the footer, the homepage cards, the
+  `/services` hub, the categories page, the sitemap and the structured data all
+  read it. Do not add a fifth list of categories — `storefrontSectionForCategoryKey`
+  maps a legacy CMS category key onto the section that owns it.
+- **Seven approved inspection services are not the four report types.** The
+  customer-facing list comes from `APPROVED_INSPECTION_SERVICES` (seven
+  `InspectionSection` values), and `/storefront/inspection-services` always
+  returns exactly those seven, priced from the operator's products when they
+  exist. `INSPECTION_TYPES` describes the report's internal sections and must
+  never be published as services.
+- **`Product.partCategoryKey` decides what is a spare part.** Never infer a part
+  from its name, SKU or price. The two sections read different endpoints, and
+  each enforces its own side of the split: `/storefront/products` is the parts
+  storefront (`isPublished` **and** `partCategoryKey not null`), while the
+  products section uses `/customer/catalog/products?spareParts=exclude`
+  (`isActive` and a selling price). The two publication rules are not the same,
+  so a product can be listed in the products section without being published to
+  the parts storefront — that is existing behaviour, not a bug to "fix" by
+  loosening either endpoint.
+- **The light banner is a token, not a per-page override.** `--hero-scrim`,
+  `--card-scrim`, `--hero-band` and the light-only hero height live in
+  `apps/customer/src/app/globals.css`. The light hero washes horizontally on
+  desktop and vertically under 720px; the dark theme keeps its own values, so a
+  change to one must be checked in the other.
+- **`next start` is not the process that serves the site.** It spawns
+  `next-server`, which `grep "next start"` does not match. A surviving stale
+  `next-server` keeps serving the previous build's CSS and chunk hashes — the
+  page renders with missing styles or 400s on `/_next/static/*` and every
+  screenshot and measurement taken against it is a lie. Kill the `next-server`
+  pid before restarting.
+- **The customer site needs `CORS_ORIGINS`, and the API suite must not have
+  it.** The API only accepts browser calls from the origins in `CORS_ORIGINS`
+  (default `http://localhost:3000`), so verifying the storefront on :3002 needs
+  `CORS_ORIGINS="http://localhost:3002,http://127.0.0.1:3002"`. That same export
+  fails `apps/api/test/reauth.e2e-spec.ts` ("accepts a login from a configured
+  origin"), which asserts the default allowlist — unset it before `test:e2e`.
 
 ### Mobile gotchas
 

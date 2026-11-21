@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
 import { useSiteContent } from '@/lib/site-content-context';
 import { IS_STATIC_PREVIEW, previewNotice } from '@/lib/preview-data';
+import { STOREFRONT_SECTIONS } from '@oryx/shared';
 import { BrandLogo } from '@/components/brand-logo';
 import { Icon } from '@/components/icons';
 
@@ -38,17 +39,26 @@ function PreviewStrip() {
  * returns, the garage, notifications and the profile) deliberately do not
  * appear here; they live in the account menu so a visitor is never offered a
  * link the API would refuse. See `ACCOUNT_LINKS` below.
+ *
+ * The four sections come from `STOREFRONT_SECTIONS` — the same list the
+ * homepage cards, the banners and the sitemap read — in their approved order,
+ * so the menu can never present a section the site does not serve or order
+ * them differently from the homepage.
  */
 const PUBLIC_LINKS = [
   { href: '/', key: 'nav.home' },
-  { href: '/categories', key: 'nav.categories' },
-  { href: '/products', key: 'nav.products' },
-  { href: '/services', key: 'nav.services' },
+  ...STOREFRONT_SECTIONS.map((section) => ({ href: section.href, key: section.navKey })),
   { href: '/about', key: 'nav.about' },
   { href: '/contact', key: 'nav.contact' },
 ];
 
 /** Account destinations, in the order the menu presents them. */
+/** A section stays current on its own detail pages, not only on its index. */
+function isCurrent(pathname: string, href: string): boolean {
+  if (href === '/') return pathname === '/';
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 const ACCOUNT_LINKS = [
   { href: '/dashboard', key: 'account.nav.overview', icon: 'grid' as const },
   { href: '/bookings', key: 'account.nav.bookings', icon: 'calendar' as const },
@@ -199,7 +209,7 @@ export function SiteHeader() {
                         href={link.href}
                         role="menuitem"
                         className="oryx-account__item"
-                        aria-current={pathname === link.href ? 'page' : undefined}
+                        aria-current={isCurrent(pathname, link.href) ? 'page' : undefined}
                       >
                         <Icon name={link.icon} size={16} />
                         {t(link.key)}
@@ -249,7 +259,7 @@ export function SiteHeader() {
             <Link
               key={link.href}
               href={link.href}
-              aria-current={pathname === link.href ? 'page' : undefined}
+              aria-current={isCurrent(pathname, link.href) ? 'page' : undefined}
             >
               {t(link.key)}
             </Link>
@@ -276,7 +286,7 @@ export function SiteHeader() {
             <Link
               key={link.href}
               href={link.href}
-              aria-current={pathname === link.href ? 'page' : undefined}
+              aria-current={isCurrent(pathname, link.href) ? 'page' : undefined}
             >
               {t(link.key)}
             </Link>
@@ -319,11 +329,10 @@ export function SiteFooter() {
   const columns = [
     {
       title: t('footer.services'),
-      links: [
-        { href: '/categories', label: t('nav.categories') },
-        { href: '/products', label: t('nav.products') },
-        { href: '/services', label: t('nav.services') },
-      ],
+      links: STOREFRONT_SECTIONS.map((section) => ({
+        href: section.href,
+        label: t(section.navKey),
+      })),
     },
     {
       title: t('footer.company'),

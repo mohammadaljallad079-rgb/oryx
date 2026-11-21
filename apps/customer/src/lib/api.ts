@@ -446,6 +446,35 @@ export interface StorefrontService {
   branchIds: string[];
 }
 
+/**
+ * One approved technical inspection service, as sold on the website.
+ *
+ * This is the `InspectionService` catalogue the control panel approves — seven
+ * services on a seeded tenant — and not a section of the inspection report.
+ */
+export interface StorefrontInspectionService {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  /** The operator's own description, when one is configured. */
+  description: string | null;
+  /** Localized one-line summary from the approved inspection catalogue. */
+  summaryEn: string | null;
+  summaryAr: string | null;
+  priceMinor: number;
+  taxPercentBp: number;
+  durationMinutes: number;
+  image: string;
+}
+
+export interface StorefrontInspectionServicePage {
+  currency: string;
+  currencyScale: number;
+  total: number;
+  items: StorefrontInspectionService[];
+}
+
 /** A store that has at least one published product. */
 export interface CatalogStore {
   id: string;
@@ -1048,6 +1077,12 @@ export const publicApi = {
       companyId?: string;
       query?: string;
       sort?: 'relevance' | 'price_asc' | 'price_desc' | 'name';
+      /**
+       * Keep the section taxonomies apart: `exclude` drops spare parts from the
+       * products section, `only` returns them. A product is a spare part when
+       * the ERP gives it a part category.
+       */
+      spareParts?: 'only' | 'exclude';
       page?: number;
       pageSize?: number;
     },
@@ -1058,12 +1093,14 @@ export const publicApi = {
         query: params.query,
         sort: params.sort,
       });
-      return { items: result.items, total: result.total, page: 1, pageSize: result.items.length };
+      const items = params.spareParts === 'only' ? [] : result.items;
+      return { items, total: items.length, page: 1, pageSize: items.length };
     }
     const qs = new URLSearchParams({ locale: params.locale });
     if (params.companyId) qs.set('companyId', params.companyId);
     if (params.query) qs.set('query', params.query);
     if (params.sort) qs.set('sort', params.sort);
+    if (params.spareParts) qs.set('spareParts', params.spareParts);
     qs.set('page', String(params.page ?? 1));
     qs.set('pageSize', String(params.pageSize ?? 20));
     return publicGet<{ items: CatalogProduct[]; total: number; page: number; pageSize: number }>(
@@ -1145,6 +1182,20 @@ export const publicApi = {
           image: categoryArt(service.key), durationMinutes: null, priceMinor: null, branchIds: [],
         })))
       : publicGet<StorefrontService[]>('/storefront/services'),
+
+  /**
+   * The approved technical inspection services.
+   *
+   * Read from the same `InspectionService` catalogue the control panel
+   * approves, so the website can never advertise an inspection an operator
+   * cannot sell. The static preview has no API and no approved services, so it
+   * returns an empty page and the section shows its empty state rather than
+   * inventing seven services.
+   */
+  inspectionServices: (): Promise<StorefrontInspectionServicePage> =>
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ currency: 'BHD', currencyScale: 3, total: 0, items: [] })
+      : publicGet<StorefrontInspectionServicePage>('/storefront/inspection-services'),
 
   /** Published stock products (including spare parts) from ORYX inventory. */
   storefrontProducts: (params: { page?: number; pageSize?: number; search?: string } = {}) => {

@@ -119,7 +119,7 @@ describe('productListJsonLd', () => {
 });
 
 describe('serviceJsonLd', () => {
-  it('links to the service page with an encoded category', () => {
+  it('links to the section that lists the service', () => {
     const ld = serviceJsonLd({
       key: 'vehicle_inspection',
       nameEn: 'Vehicle inspection',
@@ -127,8 +127,17 @@ describe('serviceJsonLd', () => {
       descriptionEn: 'Periodic inspection.',
     }) as unknown as ServiceLd;
     expect(ld['@type']).toBe('Service');
-    expect(ld.url).toBe('http://localhost:3002/services?category=vehicle_inspection');
+    expect(ld.url).toBe('http://localhost:3002/services/inspections');
     expect(ld.provider.name).toBe('ORYX Auto Services');
+  });
+
+  it('sends a non-inspection service to the maintenance section', () => {
+    const ld = serviceJsonLd({
+      key: 'maintenance',
+      nameEn: 'Periodic maintenance',
+      nameAr: 'صيانة دورية',
+    }) as unknown as ServiceLd;
+    expect(ld.url).toBe('http://localhost:3002/services/maintenance');
   });
 });
 

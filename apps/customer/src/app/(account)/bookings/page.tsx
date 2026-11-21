@@ -43,6 +43,30 @@ function BookingsContent() {
   const bookings = useAsync(() => customerApi.bookings(), []);
   const vehicles = useAsync(() => customerApi.vehicles(), []);
 
+  /**
+   * An inspection chosen on the website arrives as `?serviceId=<id>`.
+   *
+   * The id is the approved `InspectionService` the customer clicked, and it is
+   * what the booking engine is asked to hold a slot for. The display name is
+   * only used to label the choice; the id is never derived from it.
+   */
+  const initialServiceId = params.get('serviceId');
+  const [inspectionService, setInspectionService] = useState<{ id: string; name: string } | null>(
+    initialServiceId
+      ? { id: initialServiceId, name: params.get('service') ?? initialServiceId }
+      : null,
+  );
+
+  useEffect(() => {
+    if (!initialServiceId || params.get('service')) return;
+    let active = true;
+    publicApi.inspectionServices().then((page) => {
+      const found = page.items.find((item) => item.id === initialServiceId);
+      if (active && found) setInspectionService({ id: found.id, name: found.nameEn });
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [initialServiceId, params]);
+
   const initialCategory = params.get('category') ?? (IS_STATIC_PREVIEW ? SERVICE_CATEGORIES[0].key : '');
   const [categoryKey, setCategoryKey] = useState<string>(initialCategory);
   const [liveCategories, setLiveCategories] = useState<WebsiteCategory[]>([]);
@@ -69,6 +93,11 @@ function BookingsContent() {
   const [bookingType, setBookingType] = useState<'INSPECTION' | 'MAINTENANCE' | 'PROVIDER_SERVICE'>(
     'INSPECTION',
   );
+  // A chosen inspection is an inspection booking; the type follows it instead of
+  // letting the two disagree.
+  const effectiveType = inspectionService ? 'INSPECTION' : bookingType;
+  /** What the engine is asked to book: an inspection id, or a service category. */
+  const serviceRef = inspectionService?.id ?? categoryKey;
   const [date, setDate] = useState(todayIso());
   const whatsappMessage = locale === 'ar'
     ? `مرحباً، أرغب بحجز ${serviceName} بتاريخ ${date}. يرجى تأكيد الموعد المتاح.`
@@ -85,7 +114,7 @@ function BookingsContent() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const duration = DURATIONS[bookingType] ?? 60;
+  const duration = DURATIONS[effectiveType] ?? 60;
 
   const loadSlots = useCallback(async () => {
     setSlotsLoading(true);
@@ -95,7 +124,7 @@ function BookingsContent() {
       const result = await customerApi.availability({
         date,
         durationMinutes: duration,
-        serviceRef: categoryKey,
+        serviceRef,
       });
       setSlots(result);
     } catch (err) {
@@ -104,7 +133,7 @@ function BookingsContent() {
     } finally {
       setSlotsLoading(false);
     }
-  }, [date, duration, categoryKey]);
+  }, [date, duration, serviceRef]);
 
   useEffect(() => {
     void loadSlots();
@@ -125,7 +154,7 @@ function BookingsContent() {
         from: todayIso(),
         durationMinutes: duration,
         days: 21,
-        serviceRef: categoryKey,
+        serviceRef,
       });
       setOpenDays(days.filter((day) => day.slots > 0));
     } catch {
@@ -133,7 +162,7 @@ function BookingsContent() {
     } finally {
       setDaysLoading(false);
     }
-  }, [duration, categoryKey]);
+  }, [duration, serviceRef]);
 
   useEffect(() => {
     void loadOpenDays();
@@ -158,10 +187,10 @@ function BookingsContent() {
     setBusy(true);
     try {
       const booking = await customerApi.createBooking({
-        bookingType,
+        bookingType: effectiveType,
         startsAt: chosen,
         durationMinutes: duration,
-        serviceRef: categoryKey,
+        serviceRef,
         ...(vehicleId ? { vehicleId } : {}),
         ...(notes ? { notes } : {}),
       });
@@ -216,8 +245,9 @@ function BookingsContent() {
           <Field label={t('bookings.type')}>
             <select
               className="oryx-select"
-              value={bookingType}
+              value={effectiveType}
               onChange={(e) => setBookingType(e.target.value as typeof bookingType)}
+              disabled={Boolean(inspectionService)}
               data-testid="booking-type"
             >
               <option value="INSPECTION">{t('bookings.inspection')}</option>
@@ -227,17 +257,34 @@ function BookingsContent() {
           </Field>
 
           <Field label={t('services.title')}>
-            <select
-              className="oryx-select"
-              value={categoryKey}
-              onChange={(e) => setCategoryKey(e.target.value)}
-            >
-              {serviceOptions.map((category) => (
-                <option key={category.key} value={category.key}>
-                  {locale === 'ar' ? category.nameAr : category.nameEn}
-                </option>
-              ))}
-            </select>
+            {inspectionService ? (
+              <div className="oryx-inspection-choice" data-testid="booking-inspection">
+                <span>
+                  <Icon name="clipboard" size={15} />
+                  <strong>{inspectionService.name}</strong>
+                </span>
+                <button
+                  type="button"
+                  className="oryx-btn oryx-btn-sm"
+                  onClick={() => setInspectionService(null)}
+                  data-testid="booking-inspection-clear"
+                >
+                  {t('inspection.change')}
+                </button>
+              </div>
+            ) : (
+              <select
+                className="oryx-select"
+                value={categoryKey}
+                onChange={(e) => setCategoryKey(e.target.value)}
+              >
+                {serviceOptions.map((category) => (
+                  <option key={category.key} value={category.key}>
+                    {locale === 'ar' ? category.nameAr : category.nameEn}
+                  </option>
+                ))}
+              </select>
+            )}
           </Field>
 
           <Field label={t('bookings.pickVehicle')} hint={t('common.optional')}>

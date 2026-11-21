@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { storefrontSectionForCategoryKey } from '@oryx/shared';
 import { useUi } from '@/lib/ui-context';
 import { categoryImage, publicApi, resolveImage, type CatalogCategory } from '@/lib/api';
 import { Card } from '@/components/ui';
@@ -71,7 +72,7 @@ export default function CategoriesPage() {
                   {t('nav.products')}
                 </Link>
                 <Link
-                  href={`/services?category=${encodeURIComponent(category.key)}`}
+                  href={storefrontSectionForCategoryKey(category.key).href}
                   className="oryx-btn oryx-btn-sm"
                 >
                   <Icon name="calendar" size={15} />
