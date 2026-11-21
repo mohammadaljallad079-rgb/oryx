@@ -129,7 +129,7 @@ export default function InspectionWorkspacePage() {
                   setBundleLoading(false);
                 }
               }}>
-                <Icon name="fileText" size={14} />
+                <Icon name="file" size={14} />
                 {bundleLoading ? t('common.loading') : 'Invoice + Inspection PDF'}
               </Button>
             ) : null}
