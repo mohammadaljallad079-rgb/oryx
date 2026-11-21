@@ -2041,7 +2041,14 @@ export interface InspectionBookingDto {
   make: string | null;
   model: string | null;
   plateNumber: string | null;
+  modelYear?: number | null;
+  color?: string | null;
+  mileage?: number | null;
   customerId: string;
+  customerNameEn?: string | null;
+  customerNameAr?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
   serviceId: string;
   /** Every inspection service in one booking; legacy bookings contain only serviceId. */
   serviceIds?: string[];
