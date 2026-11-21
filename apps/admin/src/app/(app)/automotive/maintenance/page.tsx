@@ -37,10 +37,9 @@ import type { JobCardDto, MarketplaceProviderDto, ServiceRequestDto } from '@ory
  * screen never invents a job or a request.
  *
  * The job-card detail dialog is the single place a vehicle moves through the
- * workshop: record the diagnosis, add labour, raise and decide an estimate,
- * reserve and issue parts, then complete and invoice. Each step calls the same
- * service the API exposes, so the enforced state machine (a job cannot be
- * completed without an approved estimate, and only a completed job invoices)
+ * workshop: record diagnosis, add one or more service/part work items,
+ * reserve and issue parts, then complete and invoice without an estimate approval.
+ * Each operation calls the existing tenant-scoped API and financial ledger
  * holds no matter which control the operator uses.
  */
 
@@ -383,7 +382,7 @@ function JobCardDetailModal({
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const detail = useAsync<JobCardDetail | null>(
     () => (jobId ? (api.jobCard(jobId) as unknown as Promise<JobCardDetail>) : Promise.resolve(null)),
     [jobId],
@@ -393,7 +392,6 @@ function JobCardDetailModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [estimateOpen, setEstimateOpen] = useState(false);
-  const [labourOpen, setLabourOpen] = useState(false);
   const [reserveOpen, setReserveOpen] = useState(false);
 
   const job = detail.data;
@@ -491,47 +489,10 @@ function JobCardDetailModal({
             ) : null}
           </div>
 
-          {/* Labour operations. */}
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="oryx-label m-0">{t('erp.automotive.ws.labour')}</span>
-              {canManage ? (
-                <Button size="sm" onClick={() => setLabourOpen(true)} data-testid="add-labour">
-                  <Icon name="plus" size={14} />
-                  {t('erp.automotive.ws.addLabour')}
-                </Button>
-              ) : null}
-            </div>
-            {(job.labour?.length ?? 0) === 0 ? (
-              <p className="oryx-muted m-0 text-[12px]">{t('erp.automotive.ws.emptyLabour')}</p>
-            ) : (
-              <TableShell>
-                <thead>
-                  <tr>
-                    <th>{t('erp.accounting.description')}</th>
-                    <th>{t('erp.automotive.ws.hours')}</th>
-                    <th>{t('erp.automotive.ws.rate')}</th>
-                    <th>{t('erp.automotive.ws.total')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {job.labour!.map((op) => (
-                    <tr key={op.id}>
-                      <td className="text-[12.5px]">{op.description}</td>
-                      <td className="tabular-nums text-[12.5px]">{(op.hours / 100).toFixed(2)}</td>
-                      <td className="tabular-nums text-[12.5px]">{money(op.rateMinor)}</td>
-                      <td className="tabular-nums text-[12.5px]">{money(op.amountMinor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </TableShell>
-            )}
-          </div>
-
           {/* Estimates. */}
           <div>
             <div className="flex items-center justify-between gap-2">
-              <span className="oryx-label m-0">{t('erp.automotive.estimate')}</span>
+              <span className="oryx-label m-0">{locale === 'ar' ? 'بنود العمل (خدمات وقطع)' : 'Work items (services and parts)'}</span>
               {canEstimate ? (
                 <Button size="sm" onClick={() => setEstimateOpen(true)} data-testid="new-estimate">
                   <Icon name="plus" size={14} />
@@ -540,15 +501,12 @@ function JobCardDetailModal({
               ) : null}
             </div>
             {!latestEstimate ? (
-              <p className="oryx-muted m-0 text-[12px]">{t('erp.automotive.ws.noEstimate')}</p>
+              <p className="oryx-muted m-0 text-[12px]">{locale === 'ar' ? 'لم تُضف بنود بعد.' : 'No work items added yet.'}</p>
             ) : (
               <div className="rounded-[10px] border border-[var(--border)] p-3" data-testid="job-estimate">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="font-mono text-[12px]">{latestEstimate.estimateNumber}</span>
-                  <StatusBadge
-                    status={latestEstimate.status}
-                    label={t(`erp.automotive.ws.estimateStatus.${latestEstimate.status}`)}
-                  />
+
                 </div>
                 <TableShell>
                   <thead>
@@ -588,28 +546,6 @@ function JobCardDetailModal({
                     <span className="tabular-nums">{money(latestEstimate.totalMinor)}</span>
                   </div>
                 </div>
-                {canEstimate && latestEstimate.status !== 'APPROVED' && latestEstimate.status !== 'REJECTED' ? (
-                  <div className="mt-3 flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      disabled={busy}
-                      data-testid="approve-estimate"
-                      onClick={() => act(() => api.approveEstimate(latestEstimate.id))}
-                    >
-                      {t('erp.automotive.ws.approveEstimate')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      disabled={busy}
-                      data-testid="reject-estimate"
-                      onClick={() => act(() => api.rejectEstimate(latestEstimate.id))}
-                    >
-                      {t('erp.automotive.ws.reject')}
-                    </Button>
-                  </div>
-                ) : null}
               </div>
             )}
           </div>
@@ -683,35 +619,9 @@ function JobCardDetailModal({
 
           {/* Lifecycle controls. */}
           <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
-            {canManage && (job.status === 'DRAFT' || job.status === 'OPEN') ? (
-              <Button
-                size="sm"
-                disabled={busy}
-                data-testid="send-for-approval"
-                onClick={() => act(() => api.updateJobCard(job.id, { status: 'AWAITING_APPROVAL' }))}
-              >
-                {t('erp.automotive.ws.sendForApproval')}
-              </Button>
-            ) : null}
-            {canManage && job.status === 'AWAITING_APPROVAL' ? (
-              <Button
-                size="sm"
-                variant="primary"
-                disabled={busy}
-                data-testid="mark-approved"
-                onClick={() => act(() => api.updateJobCard(job.id, { status: 'APPROVED' }))}
-              >
-                {t('erp.automotive.ws.approve')}
-              </Button>
-            ) : null}
-            {canManage && job.status === 'APPROVED' ? (
-              <Button
-                size="sm"
-                variant="primary"
-                disabled={busy}
-                data-testid="start-work"
-                onClick={() => act(() => api.updateJobCard(job.id, { status: 'IN_PROGRESS' }))}
-              >
+            {canManage && ['OPEN', 'APPROVED', 'AWAITING_APPROVAL'].includes(job.status) ? (
+              <Button size="sm" variant="primary" disabled={busy} data-testid="start-work"
+                onClick={() => act(() => api.updateJobCard(job.id, { status: 'IN_PROGRESS' }))}>
                 {t('erp.automotive.ws.startWork')}
               </Button>
             ) : null}
@@ -748,7 +658,6 @@ function JobCardDetailModal({
             onClose={() => setEstimateOpen(false)}
             onCreated={refresh}
           />
-          <AddLabourModal open={labourOpen} jobId={job.id} onClose={() => setLabourOpen(false)} onCreated={refresh} />
           <ReservePartsModal open={reserveOpen} jobId={job.id} onClose={() => setReserveOpen(false)} onCreated={refresh} />
         </>
       ) : null}
@@ -758,7 +667,7 @@ function JobCardDetailModal({
 
 /** A single editable estimate line. */
 interface EstimateLineDraft {
-  type: 'LABOUR' | 'PART' | 'SERVICE';
+  type: 'PART' | 'SERVICE';
   productId: string;
   description: string;
   quantity: string;
@@ -767,7 +676,7 @@ interface EstimateLineDraft {
 }
 
 function emptyLine(): EstimateLineDraft {
-  return { type: 'LABOUR', productId: '', description: '', quantity: '1', unitPrice: '0.000', taxRate: '10' };
+  return { type: 'SERVICE', productId: '', description: '', quantity: '1', unitPrice: '0.000', taxRate: '10' };
 }
 
 function CreateEstimateModal({
@@ -781,7 +690,7 @@ function CreateEstimateModal({
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<EstimateLineDraft[]>([emptyLine()]);
@@ -818,7 +727,7 @@ function CreateEstimateModal({
   return (
     <Modal
       open={open}
-      title={t('erp.automotive.estimate')}
+      title={locale === 'ar' ? 'إضافة بنود العمل' : 'Add work items'}
       onClose={onClose}
       size="document"
       footer={
@@ -845,7 +754,7 @@ function CreateEstimateModal({
                 onChange={(e) => patch(index, { type: e.target.value as EstimateLineDraft['type'] })}
                 data-testid={`estimate-type-${index}`}
               >
-                {(['LABOUR', 'PART', 'SERVICE'] as const).map((v) => (
+                {(['SERVICE', 'PART'] as const).map((v) => (
                   <option key={v} value={v}>
                     {t(`erp.automotive.ws.lineType.${v}`)}
                   </option>
@@ -866,8 +775,8 @@ function CreateEstimateModal({
                     taxRate: String(Number(data.taxRateBp ?? 0) / 100),
                   })
                 }
-                placeholder={t('erp.automotive.labour')}
-                emptyLabel={t('erp.automotive.labour')}
+                placeholder={t('common.select')}
+                emptyLabel={t('common.select')}
                 testId={`estimate-product-${index}`}
               />
             </Field>
@@ -923,94 +832,6 @@ function CreateEstimateModal({
             {t('erp.automotive.ws.addLine')}
           </Button>
         </div>
-      </div>
-    </Modal>
-  );
-}
-
-function AddLabourModal({
-  open,
-  jobId,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  jobId: string;
-  onClose: () => void;
-  onCreated: () => Promise<void>;
-}) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ description: '', hours: '1', rate: '0.000' });
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      // `hours` is hundredths of an hour (250 = 2.5 h), matching the API's model.
-      await api.addLabour(jobId, [
-        {
-          description: form.description.trim(),
-          hours: Math.round(Number(form.hours) * 100),
-          rateMinor: toMinorInput(form.rate),
-        },
-      ]);
-      await onCreated();
-      setForm({ description: '', hours: '1', rate: '0.000' });
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={t('erp.automotive.ws.addLabour')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={busy || !form.description.trim()}
-            onClick={submit}
-            data-testid="save-labour"
-          >
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('erp.accounting.description')} required>
-          <input
-            className="oryx-input"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            data-testid="labour-description"
-          />
-        </Field>
-        <Field label={t('erp.automotive.ws.hours')}>
-          <input
-            className="oryx-input"
-            value={form.hours}
-            onChange={(e) => setForm({ ...form, hours: e.target.value })}
-            data-testid="labour-hours"
-          />
-        </Field>
-        <Field label={t('erp.automotive.ws.rate')}>
-          <input
-            className="oryx-input"
-            value={form.rate}
-            onChange={(e) => setForm({ ...form, rate: e.target.value })}
-            data-testid="labour-rate"
-          />
-        </Field>
       </div>
     </Modal>
   );
@@ -1123,7 +944,6 @@ function CreateJobCardModal({
     vehicleId: '',
     complaint: '',
     diagnosis: '',
-    odometer: '',
     technicianUserId: '',
     branchId: '',
   });
@@ -1161,7 +981,6 @@ function CreateJobCardModal({
       vehicleId: '',
       complaint: '',
       diagnosis: '',
-      odometer: '',
       technicianUserId: '',
       branchId: '',
     });
@@ -1175,7 +994,6 @@ function CreateJobCardModal({
         vehicleId: form.vehicleId,
         complaint: form.complaint || undefined,
         diagnosis: form.diagnosis || undefined,
-        odometer: form.odometer ? Number(form.odometer) : undefined,
         technicianUserId: form.technicianUserId || undefined,
         branchId: form.branchId || undefined,
       });
@@ -1296,15 +1114,7 @@ function CreateJobCardModal({
             ))}
           </select>
         </Field>
-        <Field label={t('erp.automotive.odometer')}>
-          <input
-            className="oryx-input"
-            inputMode="numeric"
-            value={form.odometer}
-            onChange={(e) => setForm({ ...form, odometer: e.target.value })}
-            data-testid="job-odometer"
-          />
-        </Field>
+
         <Field label={t('erp.automotive.complaint')}>
           <textarea
             className="oryx-input min-h-[70px]"
