@@ -897,6 +897,47 @@ export class InspectionService {
     return invoice.id;
   }
 
+  /**
+   * An authorized approver may supply prices for an older, unbooked session
+   * that predates the service-selection form. The invoice remains immutable
+   * once issued; this changes no inspection findings or accounting records.
+   */
+  async setBillingServices(id: string, serviceIds: string[], principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const uniqueIds = [...new Set(serviceIds)];
+    if (!uniqueIds.length || uniqueIds.length > 20) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Choose between one and twenty inspection services.');
+    }
+    await this.prisma.$transaction(async tx => {
+      const session = await tx.inspectionSession.update({ where: { id }, data: { updatedAt: new Date() } });
+      if (session.companyId !== companyId) {
+        throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');
+      }
+      if (session.bookingId) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'A booked inspection must use its booked services.');
+      }
+      if (session.invoiceId) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'A billed inspection cannot change its invoice services.');
+      }
+      const services = await tx.inspectionService.findMany({
+        where: { companyId, id: { in: uniqueIds }, isActive: true, priceMinor: { gt: 0 } },
+        select: { id: true },
+      });
+      if (services.length !== uniqueIds.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'All billing services must exist, be active and have approved positive prices.');
+      }
+      await tx.inspectionSession.update({ where: { id }, data: { billingServiceIds: uniqueIds } });
+    }, { timeout: 30000 });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId,
+      action: 'inspection.billing_services_set',
+      targetType: 'INSPECTION_SESSION', targetId: id,
+      summary: 'Selected priced services for an unbilled inspection',
+      metadata: { serviceIds: uniqueIds },
+    });
+    return this.get(id, principal);
+  }
+
   /** Repair a previously-approved inspection or reuse its invoice on download. */
   async ensureInvoice(id: string, principal: RequestPrincipal, actor: ActorContext): Promise<string> {
     const { companyId } = await this.context.resolveCompanyScope(principal);
