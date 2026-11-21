@@ -1001,6 +1001,22 @@ export const api = {
     request<SalesDocumentDto>(`/sales/quotations/${id}/convert`, { method: 'POST', body: { warehouseId } }),
   convertQuotationToDraftInvoice: (id: string, warehouseId?: string) =>
     request<SalesDocumentDto>(`/sales/quotations/${id}/convert-to-invoice`, { method: 'POST', body: { warehouseId } }),
+  /** Website checkout orders, distinct from ERP sales-order documents. */
+  webOrders: (page = 1, pageSize = 20) =>
+    request<{
+      items: Array<{
+        id: string; orderNumber: string; status: string; fulfilment: string;
+        contactName: string; contactPhone: string; contactEmail: string | null;
+        deliveryAddress: unknown; notes: string | null; subtotalMinor: number;
+        discountMinor: number; taxMinor: number; totalMinor: number;
+        currency: string; currencyScale: number; createdAt: string;
+        lines: Array<{
+          sku: string; nameEn: string; nameAr: string; quantity: number;
+          unitPriceMinor: number; lineTotalMinor: number;
+        }>;
+      }>;
+      total: number; page: number; pageSize: number;
+    }>(`/storefront/admin/orders?page=${page}&pageSize=${pageSize}`),
   salesOrders: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/orders?${toQuery(params)}`),
   createSalesOrder: (body: Record<string, unknown>) =>
