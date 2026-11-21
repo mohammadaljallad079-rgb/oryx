@@ -61,7 +61,7 @@ async function issueAndPreviewJobInvoice(jobId: string, locale: string): Promise
     if (!result.id) throw new Error('The invoice was issued but its document ID was not returned.');
     const document = await api.printDocument('SALES_INVOICE', result.id);
     const toolbar = '<div class="oryx-print-toolbar" style="position:fixed;top:0;left:0;right:0;z-index:10;padding:8px;background:#0a4175;text-align:end"><button onclick="window.print()" style="padding:8px 16px;background:white;color:#0a4175;border:0;cursor:pointer">Print / طباعة</button></div><style>@media screen{body{padding-top:44px}}@media print{.oryx-print-toolbar{display:none}}</style>';
-    const html = renderPrintDocument(document, locale).replace('</body>', toolbar + '</body>');
+    const html = renderPrintDocument(document, locale === 'ar' ? 'ar' : 'en').replace('</body>', toolbar + '</body>');
     win.document.open();
     win.document.write(html);
     win.document.close();
