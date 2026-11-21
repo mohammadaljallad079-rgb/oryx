@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { SITE_URL, publicFetch } from '@/lib/structured-data';
+import { resolveSiteContent, type SiteContent } from '@oryx/shared';
 
 /**
  * Sitemap.
@@ -49,15 +50,26 @@ async function fetchAllProductIds(): Promise<string[]> {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
+  // CMS visibility is authoritative for discoverability, not only for menu cards.
+  const siteResponse = await publicFetch<{ site: SiteContent }>('/cms/public/content?locale=ar');
+  const visibility = resolveSiteContent('ar', siteResponse?.site ?? null).sectionVisibility;
+  const isVisible = (path: string): boolean => {
+    if (path.startsWith('/services/inspections')) return visibility.inspections;
+    if (path.startsWith('/services/maintenance')) return visibility.maintenance;
+    if (path === '/services') return visibility.inspections || visibility.maintenance;
+    if (path.startsWith('/products')) return visibility.products;
+    if (path.startsWith('/spare-parts') || path === '/categories') return visibility.spare_parts;
+    return true;
+  };
 
-  const staticRoutes: MetadataRoute.Sitemap = STATIC_ROUTES.map((path) => ({
+  const staticRoutes: MetadataRoute.Sitemap = STATIC_ROUTES.filter(isVisible).map((path) => ({
     url: `${SITE_URL}${path}`,
     lastModified: now,
     changeFrequency: 'weekly',
     priority: path === '' ? 1 : 0.7,
   }));
 
-  const productIds = await fetchAllProductIds();
+  const productIds = visibility.products ? await fetchAllProductIds() : [];
   const productRoutes: MetadataRoute.Sitemap = productIds.map((id) => ({
     url: `${SITE_URL}/products/${id}`,
     lastModified: now,
