@@ -842,7 +842,7 @@ export class MarketplaceService {
   async resolveRequestCompany(preferred: string | null): Promise<string> {
     if (preferred) {
       const company = await this.prisma.company.findUnique({ where: { id: preferred } });
-      if (company) return company.id;
+      if (company?.status === 'ACTIVE') return company.id;
     }
     const fallback = await this.prisma.company.findFirst({
       where: { status: 'ACTIVE' },
@@ -874,9 +874,18 @@ export class MarketplaceService {
     customerId?: string | null;
     createdById: string;
   }) {
+    // Maintenance requests must route to the company that actually publishes the
+    // service. A client-supplied tenant header cannot redirect them elsewhere.
+    const maintenance = await this.prisma.maintenanceService.findFirst({
+      where: { code: input.categoryKey, isActive: true, isPublished: true },
+      select: { companyId: true },
+    });
+    if (maintenance && maintenance.companyId !== input.companyId) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'The maintenance service is not published by the selected company.');
+    }
     if (input.vehicleId) {
       const vehicle = await this.prisma.vehicle.findFirst({
-        where: { id: input.vehicleId, customerAccountId: input.customerAccountId },
+        where: { id: input.vehicleId, customerAccountId: input.customerAccountId, companyId: input.companyId },
       });
       if (!vehicle) {
         throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'That vehicle is not in your garage.');
