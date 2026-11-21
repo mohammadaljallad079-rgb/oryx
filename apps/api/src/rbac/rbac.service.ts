@@ -195,8 +195,11 @@ export class RbacService {
     if (actor.kind === 'COMPANY' && actor.companyId !== role.companyId) {
       throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
     }
-    if (role.isSystem) {
-      throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'System roles cannot be modified. Create a custom role instead.');
+    // Only the platform super admin may edit a company's seeded/system role.
+    // Platform roles (which have no companyId) are excluded above. Regular
+    // company administrators continue to edit custom roles only.
+    if (role.isSystem && actor.kind !== 'PLATFORM') {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'Only the platform super admin can modify a company system role.');
     }
 
     if (dto.permissions) {
