@@ -511,8 +511,14 @@ export class VehicleService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     const vehicle = await this.assertVehicle(companyId, dto.vehicleId);
-    const service = await this.prisma.inspectionService.findFirst({ where: { id: dto.serviceId, companyId } });
-    if (!service) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection service not found.');
+    const serviceIds = [...new Set([dto.serviceId, ...(dto.serviceIds ?? [])])];
+    const services = await this.prisma.inspectionService.findMany({
+      where: { companyId, id: { in: serviceIds }, isActive: true },
+      select: { id: true },
+    });
+    if (services.length !== serviceIds.length) {
+      throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'One or more selected inspection services are unavailable.');
+    }
 
     const booking = await this.posting.withTransaction(async (tx) => {
       const bookingNumber = await this.sequences.next(tx, companyId, 'inspectionBooking');
@@ -523,6 +529,7 @@ export class VehicleService {
           vehicleId: dto.vehicleId,
           customerId: vehicle.customerId,
           serviceId: dto.serviceId,
+          serviceIds,
           branchId: dto.branchId ?? null,
           scheduledAt: new Date(dto.scheduledAt),
           status: 'SCHEDULED',
@@ -703,6 +710,14 @@ export class VehicleService {
       if (booking.report?.status !== 'APPROVED') throw forbidden(ERROR_CODES.INSPECTION_NOT_COMPLETE, 'Only an approved inspection can be invoiced.');
       if (booking.report.invoiceId) throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'This inspection has already been invoiced.');
 
+      const selectedIds = [...new Set(booking.serviceIds.length > 0 ? booking.serviceIds : [booking.serviceId])];
+      const selectedServices = await tx.inspectionService.findMany({
+        where: { companyId, id: { in: selectedIds } },
+      });
+      if (selectedServices.length !== selectedIds.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'An inspection service linked to this booking is missing.');
+      }
+      const orderedServices = selectedIds.map((selectedId) => selectedServices.find((item) => item.id === selectedId)!);
       const invoice = await this.sales.issueInvoice(tx, {
         companyId,
         branchId: dto.branchId ?? booking.branchId,
@@ -714,16 +729,14 @@ export class VehicleService {
         actorUserId: actor.userId,
         notes: `Inspection ${booking.bookingNumber}`,
         issueStock: false,
-        lines: [
-          {
-            productId: null,
-            description: `${booking.service.nameEn} — inspection ${booking.bookingNumber}`,
-            quantity: 10000,
-            unitPriceMinor: booking.service.priceMinor,
-            discountPercentBp: 0,
-            taxPercentBp: booking.service.taxPercentBp,
-          },
-        ],
+        lines: orderedServices.map((service) => ({
+          productId: null,
+          description: `${service.nameEn} — inspection ${booking.bookingNumber}`,
+          quantity: 10000,
+          unitPriceMinor: service.priceMinor,
+          discountPercentBp: 0,
+          taxPercentBp: service.taxPercentBp,
+        })),
       });
       await tx.inspectionReport.update({ where: { bookingId: id }, data: { invoiceId: invoice.id } });
       return invoice;
@@ -868,6 +881,7 @@ function toInspectionBookingDto(b: {
   vehicleId: string;
   customerId: string;
   serviceId: string;
+  serviceIds: string[];
   status: string;
   scheduledAt: Date;
   inspectorUserId: string | null;
@@ -888,6 +902,7 @@ function toInspectionBookingDto(b: {
     plateNumber: b.vehicle?.plateNumber ?? null,
     customerId: b.customerId,
     serviceId: b.serviceId,
+    serviceIds: b.serviceIds.length ? b.serviceIds : [b.serviceId],
     serviceNameEn: b.service?.nameEn ?? null,
     serviceNameAr: b.service?.nameAr ?? null,
     status: b.status,
