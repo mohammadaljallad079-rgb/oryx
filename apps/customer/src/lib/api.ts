@@ -414,6 +414,38 @@ export interface CatalogProduct {
   store: { id: string; code: string; name: string };
 }
 
+/** ORYX Auto storefront inventory item, published from the ERP stock catalogue. */
+export interface StorefrontProduct {
+  id: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  brand: string | null;
+  categoryKey: string | null;
+  priceMinor: number;
+  compareAtPriceMinor: number | null;
+  currency: string;
+  currencyScale: number;
+  image: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  inStock: boolean;
+  onHand: number;
+  partNumber: string | null;
+}
+
+export interface StorefrontService {
+  key: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  image: string;
+  durationMinutes: number | null;
+  priceMinor: number | null;
+  branchIds: string[];
+}
+
 /** A store that has at least one published product. */
 export interface CatalogStore {
   id: string;
@@ -768,6 +800,24 @@ export const customerApi = {
       ? previewReadOnly()
       : request<BookingSlot>(`/customer/bookings/${id}/cancel`, { method: 'POST', body: { reason } }),
 
+  /** Creates a real ORYX stock order, linked to the customer's account. */
+  placeStorefrontOrder: (body: {
+    lines: Array<{ productId: string; quantity: number }>;
+    fulfilment: 'COLLECTION' | 'DELIVERY';
+    address?: { addressLine1: string; addressLine2?: string; area?: string; city: string; postalCode?: string };
+    contactName: string;
+    contactPhone: string;
+    contactEmail?: string;
+    notes?: string;
+    paymentMethod: 'CASH' | 'CARD_TERMINAL' | 'BANK_TRANSFER';
+  }) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ id: string; orderNumber: string; status: string; totalMinor: number; currency: string }>(
+          '/customer/storefront/orders',
+          { method: 'POST', body },
+        ),
+
   // ------------------------------------------------------------ payments
   payments: () =>
     IS_STATIC_PREVIEW
@@ -1086,6 +1136,38 @@ export const publicApi = {
     }
     return publicGet<ProviderDetail>(`/marketplace/providers/${id}`);
   },
+  /** Real ORYX Auto services shared with the operations booking engine. */
+  storefrontServices: (): Promise<StorefrontService[]> =>
+    IS_STATIC_PREVIEW
+      ? Promise.resolve(SERVICE_CATEGORIES.map((service) => ({
+          key: service.key, nameEn: service.nameEn, nameAr: service.nameAr,
+          descriptionEn: service.descEn, descriptionAr: service.descAr,
+          image: categoryArt(service.key), durationMinutes: null, priceMinor: null, branchIds: [],
+        })))
+      : publicGet<StorefrontService[]>('/storefront/services'),
+
+  /** Published stock products (including spare parts) from ORYX inventory. */
+  storefrontProducts: (params: { page?: number; pageSize?: number; search?: string } = {}) => {
+    if (IS_STATIC_PREVIEW) {
+      return Promise.resolve({
+        items: [] as StorefrontProduct[], total: 0, page: 1, pageSize: params.pageSize ?? 12,
+        pageCount: 1, currency: 'BHD', currencyScale: 3,
+      });
+    }
+    const qs = new URLSearchParams({
+      page: String(params.page ?? 1),
+      pageSize: String(params.pageSize ?? 12),
+    });
+    if (params.search) qs.set('search', params.search);
+    return publicGet<{
+      items: StorefrontProduct[]; total: number; page: number; pageSize: number;
+      pageCount: number; currency: string; currencyScale: number;
+    }>(`/storefront/products?${qs.toString()}`);
+  },
+
+  storefrontProduct: (id: string) =>
+    publicGet<StorefrontProduct>(`/storefront/products/${encodeURIComponent(id)}`),
+
   /** Published website content managed in the admin CMS. */
   website: async (locale: string) => {
     if (IS_STATIC_PREVIEW) return previewWebsiteContent(locale);
