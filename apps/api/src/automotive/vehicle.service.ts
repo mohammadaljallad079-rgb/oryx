@@ -560,7 +560,9 @@ export class VehicleService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const service = await this.prisma.inspectionService.findFirst({ where: { id, companyId } });
     if (!service) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection service not found.');
-    const bookings = await this.prisma.inspectionBooking.count({ where: { serviceId: id } });
+    const bookings = await this.prisma.inspectionBooking.count({
+      where: { companyId, OR: [{ serviceId: id }, { serviceIds: { has: id } }] },
+    });
     if (bookings > 0) {
       throw conflict(
         ERROR_CODES.RESOURCE_CONFLICT,
