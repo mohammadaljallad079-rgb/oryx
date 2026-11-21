@@ -6,7 +6,7 @@ import {
   BODY_SCHEME_DATA_URI,
   CHASSIS_DIAGRAM_DATA_URI,
 } from './inspection-artwork.assets';
-import { documentQualityBadge, signatureBlock, type DocumentChrome } from './chrome';
+import { signatureBlock, type DocumentChrome } from './chrome';
 import { docStamp, esc, escMultiline, grouped, orDash } from './html.util';
 import { oryxLogoMark } from './oryx-logo.asset';
 import type {
@@ -118,7 +118,12 @@ function reportHeader(issuer: DocumentIssuer): string {
       <span class="rh-tag-ar">خبراء فحص المركبات</span>
       <span class="rh-tag-en">VEHICLE INSPECTION EXPERTS</span>
     </div>
-    <span class="doc-quality-badge rh-badge">${documentQualityBadge()}</span>
+    <span class="doc-quality-badge rh-badge"><svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">
+        <g fill="#0a4175">
+          <path d="M12.48,12.16 C13.53,10.02 14.74,8.06 16.30,6.35 C17.49,5.05 18.85,3.99 20.48,3.29 C21.59,2.81 22.80,2.64 23.67,2.82 C23.66,2.84 23.66,2.87 23.65,2.88 C21.52,3.74 19.92,5.26 18.61,7.08 C17.62,8.46 16.74,9.92 15.83,11.36 C14.52,13.41 13.55,15.63 12.60,17.86 C12.58,17.91 12.56,17.95 12.52,18.01 C11.99,17.21 11.48,16.42 10.95,15.64 C10.08,14.35 9.19,13.06 8.32,11.77 C7.80,10.99 7.28,10.22 6.79,9.43 C6.64,9.19 6.53,8.89 6.51,8.61 C6.49,8.33 6.54,7.99 6.68,7.75 C7.01,7.20 7.57,6.90 8.17,6.72 C8.53,6.61 8.86,6.78 9.07,7.06 C9.70,7.84 10.33,8.62 10.89,9.44 C11.38,10.14 11.78,10.89 12.21,11.62 C12.30,11.78 12.38,11.95 12.48,12.16 Z"/>
+          <path d="M21.70,6.62 L19.98,8.34 C20.48,9.44 20.75,10.66 20.75,11.94 C20.75,16.78 16.84,20.69 12.00,20.69 C7.17,20.69 3.25,16.78 3.25,11.94 C3.25,7.11 7.17,3.19 12.00,3.19 C13.21,3.19 14.36,3.44 15.41,3.88 L17.14,2.14 C15.61,1.34 13.86,0.88 12.00,0.88 C5.89,0.88 0.94,5.83 0.94,11.94 C0.94,18.05 5.89,23.00 12.00,23.00 C18.11,23.00 23.06,18.05 23.06,11.94 C23.06,10.01 22.57,8.20 21.70,6.62 Z"/>
+        </g>
+      </svg></span>
   </header>`;
 }
 
@@ -734,12 +739,12 @@ export const INSPECTION_REPORT_CSS = `
    * header (measured x557-579, y29-51), the identity "quality assured" mark. */
   /* Reuse the exact financial-document certification badge markup and sizing. */
   .report-head .doc-quality-badge.rh-badge{
-    position:absolute; right:0.3pt; top:12pt;
+    position:absolute; right:0; top:13pt;
     display:inline-flex; align-items:center; justify-content:center;
-    width:22pt; height:22pt; flex:0 0 auto;
+    width:24pt; height:24pt; flex:0 0 auto;
   }
   .report-head .doc-quality-badge.rh-badge svg{
-    display:block; width:22pt; height:22pt;
+    display:block; width:24pt; height:24pt;
   }
   .rh-left{ display:flex; align-items:center; gap:9px; }
   /* The approved lockup prints the mark across x16-213pt (41.8pt tall). The
