@@ -568,7 +568,7 @@ function EditProductModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<File[]>([]);
-  const categoryOptions = useAsync(() => api.productCategories(), []);
+  const categoryOptions = useAsync(() => api.managedProductCategories(), []);
   const [form, setForm] = useState({
     nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15', isActive: true,
     barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
@@ -682,10 +682,14 @@ function EditProductModal({
           <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="edit-product-barcode" />
         </Field>
         <Field label={t('erp.inventory.category')}>
-          <input className="oryx-input" list="edit-product-category-options" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="edit-product-category" />
-          <datalist id="edit-product-category-options">
-            {(categoryOptions.data?.items ?? ['Spare Parts']).map((name) => <option key={name} value={name} />)}
-          </datalist>
+          <select className="oryx-select" value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            data-testid="edit-product-category">
+            <option value="">{t('common.select')}</option>
+            {form.category && !(categoryOptions.data?.items ?? []).some((item) => item.name === form.category)
+              ? <option value={form.category}>{form.category}</option> : null}
+            {(categoryOptions.data?.items ?? []).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+          </select>
         </Field>
         <Field label={t('erp.inventory.reorderLevel')}>
           <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="edit-product-reorder-level" />
@@ -1161,6 +1165,7 @@ function ProductCategoriesTab({ canManage }: { canManage: boolean }) {
   const categories = useAsync(() => api.managedProductCategories(), []);
   const allCategories = useAsync(() => api.productCategories(), []);
   const [name, setName] = useState('');
+  const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1175,6 +1180,7 @@ function ProductCategoriesTab({ canManage }: { canManage: boolean }) {
       else await api.createProductCategory(next);
       setEditing(null);
       setName('');
+      setShowForm(false);
       await Promise.all([categories.reload(), allCategories.reload()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
@@ -1187,8 +1193,14 @@ function ProductCategoriesTab({ canManage }: { canManage: boolean }) {
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{locale === 'ar' ? 'تصنيفات المنتجات وقطع الغيار' : 'Product and spare-parts categories'}</p>
+        {canManage ? (
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setName(''); setShowForm(true); }} data-testid="new-product-category">
+            <Icon name="plus" size={16} />
+            {locale === 'ar' ? 'إضافة تصنيف' : 'Add category'}
+          </Button>
+        ) : null}
       </div>
-      {canManage ? (
+      {canManage && showForm ? (
         <div className="flex flex-wrap items-end gap-3 border-b border-[var(--border)] p-4">
           <Field label={editing ? (locale === 'ar' ? 'تعديل التصنيف' : 'Rename category') : (locale === 'ar' ? 'تصنيف جديد' : 'New category')}>
             <input className="oryx-input" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} data-testid="category-name" placeholder={locale === 'ar' ? 'مثال: قطع غيار' : 'e.g. Spare Parts'} />
@@ -1196,7 +1208,7 @@ function ProductCategoriesTab({ canManage }: { canManage: boolean }) {
           <Button variant="primary" disabled={busy || !name.trim()} onClick={() => void save()} data-testid="save-product-category">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
-          {editing ? <Button onClick={() => { setEditing(null); setName(''); }}>{t('common.cancel')}</Button> : null}
+          <Button onClick={() => { setEditing(null); setName(''); setShowForm(false); }}>{t('common.cancel')}</Button>
         </div>
       ) : null}
       {error ? <ErrorBanner message={error} /> : null}
@@ -1211,7 +1223,7 @@ function ProductCategoriesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums">{item.productCount}</td>
                 <td>
                   {canManage ? <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => { setEditing({ id: item.id, name: item.name }); setName(item.name); }} data-testid={`edit-category-${item.id}`}>{t('common.edit')}</Button>
+                    <Button size="sm" onClick={() => { setEditing({ id: item.id, name: item.name }); setName(item.name); setShowForm(true); }} data-testid={`edit-category-${item.id}`}>{t('common.edit')}</Button>
                     <Button size="sm" variant="danger" onClick={async () => {
                       if (!window.confirm(t('common.deleteConfirm'))) return;
                       try {

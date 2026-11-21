@@ -201,7 +201,7 @@ export function ProductModal({
   const { can } = useAuth();
   const canOpenStock = can('erp.inventory.movement.manage');
   const [warehouseOptions, setWarehouseOptions] = useState<Array<{ id: string; code: string; nameEn: string; nameAr: string }>>([]);
-  const [categoryOptions, setCategoryOptions] = useState<string[]>(['Spare Parts']);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<File[]>([]);
@@ -240,9 +240,9 @@ export function ProductModal({
   useEffect(() => {
     if (!open) return;
     let live = true;
-    void api.productCategories().then((result) => {
-      if (live) setCategoryOptions(result.items);
-    }).catch(() => { if (live) setCategoryOptions(['Spare Parts']); });
+    void api.managedProductCategories().then((result) => {
+      if (live) setCategoryOptions(result.items.map((category) => category.name));
+    }).catch(() => { if (live) setCategoryOptions([]); });
     return () => { live = false; };
   }, [open]);
 
@@ -341,10 +341,13 @@ export function ProductModal({
           <input className="oryx-input" value={form.barcode} onChange={(e) => setForm((prev) => ({ ...prev, barcode: e.target.value }))} data-testid="product-barcode" />
         </Field>
         <Field label={t('erp.inventory.category')}>
-          <input className="oryx-input" list="new-product-category-options" value={form.category} onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))} data-testid="product-category" />
-          <datalist id="new-product-category-options">
-            {categoryOptions.map((name) => <option key={name} value={name} />)}
-          </datalist>
+          <select className="oryx-select" value={form.category}
+            onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+            data-testid="product-category">
+            <option value="">{t('common.select')}</option>
+            {form.category && !categoryOptions.includes(form.category) ? <option value={form.category}>{form.category}</option> : null}
+            {categoryOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
         </Field>
         <Field label={t('erp.inventory.reorderLevel')}>
           <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm((prev) => ({ ...prev, reorderLevel: e.target.value }))} data-testid="product-reorder-level" />
