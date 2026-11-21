@@ -483,7 +483,7 @@ export class WorkshopService {
           companyId,
           jobCardId,
           estimateNumber,
-          status: 'APPROVED', // Internal legacy storage for work items; no customer estimate-approval step.
+          status: 'SENT', // Preserve legacy estimate semantics; the new work-items endpoint uses APPROVED.
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
