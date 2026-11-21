@@ -5,18 +5,11 @@ import { useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
 import { useSiteContent } from '@/lib/site-content-context';
-import {
-  blockValue,
-  categoryImage,
-  mediaAlt,
-  resolveImage,
-  IS_STATIC_PREVIEW,
-  publicApi,
-  type CatalogProduct,
-  type StorefrontProduct,
-} from '@/lib/api';
+import { isMaintenanceServiceCategory, normalizeStorefrontHref } from '@oryx/shared';
+import { blockValue, resolveImage, publicApi } from '@/lib/api';
 import { useWebsiteContent } from '@/lib/use-website-content';
 import { Card, HeroSlider, TrustStrip, type HeroSlide } from '@/components/ui';
+import { SectionGrid, type SectionCounts } from '@/components/section-grid';
 import { Icon } from '@/components/icons';
 
 /**
@@ -24,9 +17,9 @@ import { Icon } from '@/components/icons';
  *
  * The hero is a real image slider and the trust strip is authored in the admin
  * "Website Settings"; both read the editable site document, whose defaults the
- * provider has already merged in. The service cards remain the ORYX service
- * catalogue itself — a customer books an ORYX service, not a third-party
- * supplier — so the page never routes a visitor into a supplier directory.
+ * provider has already merged in. Below them the page presents the four site
+ * sections — inspections, maintenance, products and spare parts — in their
+ * approved order, each linking to the section that lists its real catalogue.
  * Photography and headline copy come from the admin CMS when an administrator
  * has authored them, and fall back to the bundled design otherwise, so a page
  * never renders empty because the CMS is unreachable.
@@ -34,67 +27,55 @@ import { Icon } from '@/components/icons';
 export default function HomePage() {
   const { t, locale } = useUi();
   const { isAuthenticated } = useCustomerAuth();
-  const { content, loaded } = useWebsiteContent(locale);
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
-  const [productsError, setProductsError] = useState(false);
-  const [stockProducts, setStockProducts] = useState<StorefrontProduct[]>([]);
-  const [stockLoading, setStockLoading] = useState(true);
-  const [stockError, setStockError] = useState(false);
+  const { content } = useWebsiteContent(locale);
+  const [counts, setCounts] = useState<SectionCounts>({});
 
+  // One real count per section, from the API that serves that section. A
+  // section whose catalogue cannot be read simply shows no number.
   useEffect(() => {
     let active = true;
-    setStockLoading(true);
-    setStockError(false);
-    publicApi.storefrontProducts({ page: 1, pageSize: 12 })
-      .then((data) => { if (active) setStockProducts(data.items); })
-      .catch(() => {
-        if (active) { setStockProducts([]); setStockError(true); }
-      })
-      .finally(() => { if (active) setStockLoading(false); });
-    return () => { active = false; };
-  }, []);
-
-
-  useEffect(() => {
-    let active = true;
-    setProductsLoading(true);
-    setProductsError(false);
-    publicApi.products({ locale, pageSize: 12 }).then((response) => {
-      if (active) setProducts(response.items);
-    }).catch(() => {
-      if (active) { setProducts([]); setProductsError(true); }
-    }).finally(() => { if (active) setProductsLoading(false); });
+    Promise.allSettled([
+      publicApi.inspectionServices(),
+      publicApi.storefrontServices(),
+      publicApi.products({ locale, spareParts: 'exclude', pageSize: 1 }),
+      publicApi.storefrontProducts({ pageSize: 1 }),
+    ]).then(([inspections, services, products, parts]) => {
+      if (!active) return;
+      const next: SectionCounts = {};
+      if (inspections.status === 'fulfilled') next.inspections = inspections.value.total;
+      if (services.status === 'fulfilled') {
+        next.maintenance = services.value.filter((service) =>
+          isMaintenanceServiceCategory(service.key),
+        ).length;
+      }
+      if (products.status === 'fulfilled') next.products = products.value.total;
+      if (parts.status === 'fulfilled') next.spare_parts = parts.value.total;
+      setCounts(next);
+    });
     return () => { active = false; };
   }, [locale]);
+
   const { content: site, pick } = useSiteContent();
 
   // Hero slider slides: every slide carries its own photograph, headline,
-  // description and calls to action from the editable site document.
+  // description and calls to action from the editable site document. A slide
+  // saved before the sections existed still carries the old href, so each link
+  // is normalised onto the section that now serves it instead of 404ing.
   const slides: HeroSlide[] = site.hero.slides.map((slide) => ({
     image: resolveImage(slide.image) ?? slide.image,
     alt: pick(slide.altEn, slide.altAr),
     headline: pick(slide.headlineEn, slide.headlineAr),
     description: pick(slide.descriptionEn, slide.descriptionAr),
     ctaLabel: pick(slide.ctaLabelEn, slide.ctaLabelAr),
-    ctaHref: slide.ctaHref,
+    ctaHref: normalizeStorefrontHref(slide.ctaHref),
     secondaryLabel: pick(slide.secondaryLabelEn, slide.secondaryLabelAr),
-    secondaryHref: slide.secondaryHref,
+    secondaryHref: normalizeStorefrontHref(slide.secondaryHref),
   }));
 
   const trust = site.trust.items.map((item) => ({
     icon: item.icon,
     title: pick(item.titleEn, item.titleAr),
     subtitle: pick(item.subtitleEn, item.subtitleAr),
-  }));
-
-  // Only published CMS categories appear in production; never generate demo categories.
-  const categories = content.categories.map((category) => ({
-    key: category.key,
-    name: (locale === 'ar' ? category.nameAr : category.nameEn) || category.nameEn || category.nameAr,
-    desc: (locale === 'ar' ? category.descriptionAr : category.descriptionEn) || '',
-    art: categoryImage(category.media, category.key, 'card'),
-    alt: mediaAlt(category.media, locale, category.nameEn || category.nameAr),
   }));
 
   const values = [
@@ -117,112 +98,18 @@ export default function HomePage() {
       <HeroSlider slides={slides} />
       <TrustStrip items={trust} />
 
-      {/* -------------------------------------------------- categories */}
-      <section className="oryx-section" id="services">
+      {/* --------------------------------------------------- sections */}
+      {/* The four sections, in the approved order, from the shared catalogue. */}
+      <section className="oryx-section" id="sections">
         <header className="oryx-section-head">
           <h2 className="oryx-section-title">
-            {blockValue(content, 'home.categories.title', t('home.categories'))}
+            {blockValue(content, 'home.categories.title', t('sections.title'))}
           </h2>
           <p className="oryx-muted">
-            {blockValue(content, 'home.categories.subtitle', t('home.categoriesSubtitle'))}
+            {blockValue(content, 'home.categories.subtitle', t('sections.subtitle'))}
           </p>
         </header>
-        <div className="oryx-grid oryx-grid--cards">
-          {categories.map((category) => (
-            <Link
-              key={category.key}
-              href={`/services?category=${category.key}`}
-              className="oryx-cat-card"
-            >
-              <span
-                className="oryx-cat-card__art"
-                style={{ backgroundImage: `url(${category.art})` }}
-                role="img"
-                aria-label={category.alt}
-              />
-              <span className="oryx-cat-card__body">
-                <strong>{category.name}</strong>
-                <span className="oryx-muted oryx-cat-card__desc">{category.desc}</span>
-                <span className="oryx-cat-card__link">
-                  {t('home.viewService')}
-                  <Icon name="arrow" size={14} />
-                </span>
-              </span>
-            </Link>
-          ))}
-        </div>
-        {loaded && categories.length === 0 && !IS_STATIC_PREVIEW && (
-          <p className="oryx-muted" role="status">{locale === 'ar' ? 'لا توجد خدمات منشورة حالياً في لوحة التحكم.' : 'No published services are available yet.'}</p>
-        )}
-      </section>
-
-      {/* Live products and spare parts from the same ERP-backed public catalogue. */}
-      <section className="oryx-section" id="products">
-        <header className="oryx-section-head">
-          <h2 className="oryx-section-title">{locale === 'ar' ? 'المنتجات وقطع الغيار' : 'Products & spare parts'}</h2>
-          <p className="oryx-muted">{locale === 'ar' ? 'المنتجات المتاحة والمنشورة من لوحة التحكم' : 'Available products published from the control panel'}</p>
-        </header>
-        {productsLoading ? (
-          <p className="oryx-muted" role="status">{locale === 'ar' ? 'جارٍ تحميل المنتجات…' : 'Loading products…'}</p>
-        ) : productsError ? (
-          <p className="oryx-muted" role="alert">{locale === 'ar' ? 'تعذّر تحميل المنتجات. يرجى المحاولة لاحقاً.' : 'Products could not be loaded. Please try again later.'}</p>
-        ) : products.length === 0 ? (
-          <p className="oryx-muted">{locale === 'ar' ? 'لا توجد منتجات منشورة حالياً.' : 'No published products yet.'}</p>
-        ) : (
-          <div className="oryx-grid oryx-grid--cards">
-            {products.map((product) => (
-              <Link href={`/products/${encodeURIComponent(product.id)}`} key={product.id} className="oryx-cat-card">
-                {product.imageUrl ? (
-                  <span className="oryx-cat-card__art" role="img" aria-label={product.name}
-                    style={{ backgroundImage: `url("${resolveImage(product.imageUrl) ?? ''}")` }} />
-                ) : null}
-                <span className="oryx-cat-card__body">
-                  <strong>{(locale === 'ar' ? product.nameAr : product.nameEn) || product.name}</strong>
-                  <span className="oryx-muted">{product.sku}</span>
-                  <span className="oryx-cat-card__link">{locale === 'ar' ? 'عرض المنتج' : 'View product'} <Icon name="arrow" size={14} /></span>
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
-        <div className="oryx-section-cta">
-          <Link href="/products" className="oryx-btn oryx-btn-primary">{locale === 'ar' ? 'عرض جميع المنتجات وقطع الغيار' : 'Browse all products & spare parts'}</Link>
-        </div>
-      </section>
-
-      {/* ORYX stock: published directly from inventory, distinct from marketplace stores. */}
-      <section className="oryx-section" id="spare-parts">
-        <header className="oryx-section-head">
-          <h2 className="oryx-section-title">{locale === 'ar' ? 'قطع الغيار من مخزون ORYX' : 'ORYX spare parts & stock'}</h2>
-          <p className="oryx-muted">{locale === 'ar' ? 'الأصناف المنشورة من لوحة المخزون، بأسعارها وتوافرها الحالي' : 'Inventory items published by the admin, with live prices and availability'}</p>
-        </header>
-        {stockLoading ? (
-          <p className="oryx-muted" role="status">{locale === 'ar' ? 'جارٍ تحميل قطع الغيار…' : 'Loading spare parts…'}</p>
-        ) : stockError ? (
-          <p className="oryx-muted" role="alert">{locale === 'ar' ? 'تعذّر تحميل المخزون حالياً.' : 'Inventory is temporarily unavailable.'}</p>
-        ) : stockProducts.length === 0 ? (
-          <p className="oryx-muted">{locale === 'ar' ? 'لا توجد قطع غيار منشورة حالياً.' : 'No spare parts are published yet.'}</p>
-        ) : (
-          <div className="oryx-grid oryx-grid--cards">
-            {stockProducts.map((product) => (
-              <Link key={product.id} href={`/spare-parts/${encodeURIComponent(product.id)}`} className="oryx-cat-card">
-                {product.image ? (
-                  <span className="oryx-cat-card__art" role="img"
-                    aria-label={(locale === 'ar' ? product.nameAr : product.nameEn) || product.sku}
-                    style={{ backgroundImage: `url("${resolveImage(product.image) ?? ''}")` }} />
-                ) : null}
-                <span className="oryx-cat-card__body">
-                  <strong>{(locale === 'ar' ? product.nameAr : product.nameEn) || product.sku}</strong>
-                  <span className="oryx-muted">{product.sku} · {product.inStock ? (locale === 'ar' ? 'متوفر' : 'In stock') : (locale === 'ar' ? 'غير متوفر' : 'Out of stock')}</span>
-                  <span className="oryx-cat-card__link">{locale === 'ar' ? 'عرض التفاصيل' : 'View details'} <Icon name="arrow" size={14} /></span>
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
-        <div className="oryx-section-cta">
-          <Link href="/spare-parts" className="oryx-btn oryx-btn-primary">{locale === 'ar' ? 'عرض جميع قطع الغيار' : 'Browse all spare parts'}</Link>
-        </div>
+        <SectionGrid counts={counts} />
       </section>
 
       {/* ----------------------------------------------------- value */}

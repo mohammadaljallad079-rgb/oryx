@@ -3,6 +3,8 @@ import type { Prisma } from '@oryx/database';
 import {
   PART_CATEGORIES,
   SERVICE_CATEGORIES,
+  APPROVED_INSPECTION_SERVICES,
+  INSPECTION_SECTION_SPECS,
   categoryArt,
   currencyScale,
   lineAmountMinor,
@@ -568,6 +570,81 @@ export class StorefrontService {
         .filter((b) => b.services.length === 0 || b.services.includes(service.key))
         .map((b) => b.id),
     }));
+  }
+
+  /**
+   * The technical inspection services the storefront sells.
+   *
+   * The seven approved services are a fixed catalogue — `INSPECTION_SECTION_SPECS`
+   * names them and `APPROVED_INSPECTION_SERVICES` maps each one to the
+   * `InspectionService.code` the control panel persists — so this method always
+   * returns those seven, in the approved order, and never a service an operator
+   * typed in by hand.
+   *
+   * Everything a customer reads about a service comes from the database row for
+   * its code: the operator's name, description, price, tax and duration. A
+   * service with no configured row is still listed (its name and summary come
+   * from the approved catalogue) with no price, which the website shows as
+   * "price on request" rather than inventing a figure. A service the operator
+   * deactivated is dropped, so retiring a service in the control panel retires
+   * it on the website.
+   *
+   * This reads the *service catalogue*, not the report engine: the four
+   * inspection-report types and their sections are a different taxonomy and are
+   * deliberately not consulted here.
+   */
+  async inspectionServices() {
+    const companyId = await this.companyId();
+    const currency = await this.currencyFor(companyId);
+    const codes = APPROVED_INSPECTION_SERVICES.map((service) => service.code);
+    const rows = await this.prisma.inspectionService.findMany({
+      where: { companyId, code: { in: codes } },
+      select: {
+        id: true,
+        code: true,
+        nameEn: true,
+        nameAr: true,
+        description: true,
+        priceMinor: true,
+        taxPercentBp: true,
+        durationMinutes: true,
+        isActive: true,
+        imageAssetId: true,
+      },
+    });
+    const byCode = new Map(rows.map((row) => [row.code, row]));
+
+    const items = APPROVED_INSPECTION_SERVICES.map((service) => {
+      const spec = INSPECTION_SECTION_SPECS.find((section) => section.key === service.section);
+      const row = byCode.get(service.code);
+      if (row && !row.isActive) return null;
+      return {
+        // The row id is what the booking engine is asked to hold; a service with
+        // no configured row is identified by its approved code, which is stable.
+        id: row?.id ?? `code:${service.code}`,
+        code: service.code,
+        nameEn: row?.nameEn ?? spec?.labelEn ?? service.code,
+        nameAr: row?.nameAr ?? spec?.labelAr ?? service.code,
+        description: row?.description ?? null,
+        // The approved catalogue carries a localized one-line summary, used
+        // when the operator has not written a description of their own.
+        summaryEn: spec?.summaryEn ?? null,
+        summaryAr: spec?.summaryAr ?? null,
+        priceMinor: row?.priceMinor ?? 0,
+        taxPercentBp: row?.taxPercentBp ?? 0,
+        durationMinutes: row?.durationMinutes ?? 60,
+        image: row?.imageAssetId
+          ? `/api/v1/cms/media/${row.imageAssetId}/file?variant=card`
+          : '/media/svc-inspection.jpg',
+      };
+    }).filter((item): item is NonNullable<typeof item> => item !== null);
+
+    return {
+      currency: currency.code,
+      currencyScale: currency.scale,
+      total: items.length,
+      items,
+    };
   }
 
   // -------------------------------------------------------------- availability

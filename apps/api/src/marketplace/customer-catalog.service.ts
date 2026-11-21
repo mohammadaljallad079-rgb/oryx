@@ -14,6 +14,13 @@ export interface CatalogQuery {
   query?: string;
   /** A product's free-text part group, matched case-insensitively. */
   group?: string;
+  /**
+   * Restrict the catalogue to spare parts (`only`) or to everything else
+   * (`exclude`). A product is a spare part when it carries a `partCategoryKey`;
+   * that is the same column the storefront spare-parts catalogue publishes, so
+   * the two sections partition the catalogue instead of overlapping.
+   */
+  spareParts?: 'only' | 'exclude';
   sort?: 'relevance' | 'price_asc' | 'price_desc' | 'name';
   page: number;
   pageSize: number;
@@ -72,6 +79,11 @@ export class CustomerCatalogService {
       isActive: true,
       salesPriceMinor: { gt: 0 },
       ...(params.companyId ? { companyId: params.companyId } : {}),
+      ...(params.spareParts === 'only'
+        ? { partCategoryKey: { not: null } }
+        : params.spareParts === 'exclude'
+          ? { partCategoryKey: null }
+          : {}),
       ...(params.query
         ? {
             OR: [

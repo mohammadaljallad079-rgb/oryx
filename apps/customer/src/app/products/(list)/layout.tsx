@@ -8,13 +8,13 @@ import {
 } from '@/lib/structured-data';
 
 export const metadata: Metadata = {
-  title: 'Spare parts',
+  title: 'Products',
   description:
-    'Browse genuine and aftermarket spare parts from ORYX Auto Services in Bahrain. Filter by category and search by name or SKU.',
+    'Browse the published ORYX Auto Services product catalogue in Bahrain, with live prices and availability.',
   alternates: { canonical: '/products' },
   openGraph: {
-    title: 'Spare parts | ORYX',
-    description: 'Browse genuine and aftermarket spare parts from ORYX Auto Services.',
+    title: 'Products | ORYX',
+    description: 'Published products from the ORYX Auto Services catalogue.',
     url: `${SITE_URL}/products`,
   },
 };
@@ -33,7 +33,11 @@ interface ProductPage {
  * the page reads, so the listing a crawler sees matches what a visitor sees.
  */
 export default async function ProductsListLayout({ children }: { children: React.ReactNode }) {
-  const page = await publicFetch<ProductPage>('/customer/catalog/products?pageSize=50');
+  // The products section is everything the ERP does not classify as a spare
+  // part; the parts catalogue is its own section.
+  const page = await publicFetch<ProductPage>(
+    '/customer/catalog/products?pageSize=50&spareParts=exclude',
+  );
   return (
     <>
       {page && page.items.length > 0 && (

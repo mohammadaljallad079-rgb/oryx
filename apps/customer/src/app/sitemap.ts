@@ -1,20 +1,22 @@
 import type { MetadataRoute } from 'next';
-import { SERVICE_CATEGORIES } from '@/lib/api';
 import { SITE_URL, publicFetch } from '@/lib/structured-data';
 
 /**
  * Sitemap.
  *
- * The static routes and the service catalogue are listed explicitly; the
+ * The four sections and the other static routes are listed explicitly; the
  * product entries are read from the public API, so a newly published product
  * appears without a code change. If the API is unreachable the sitemap still
- * returns the static and service routes rather than failing the build.
+ * returns the static routes rather than failing the build.
  */
 
 const STATIC_ROUTES = [
   '',
   '/services',
+  '/services/inspections',
+  '/services/maintenance',
   '/products',
+  '/spare-parts',
   '/categories',
   '/providers',
   '/about',
@@ -55,13 +57,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: path === '' ? 1 : 0.7,
   }));
 
-  const serviceRoutes: MetadataRoute.Sitemap = SERVICE_CATEGORIES.map((category) => ({
-    url: `${SITE_URL}/services?category=${encodeURIComponent(category.key)}`,
-    lastModified: now,
-    changeFrequency: 'monthly',
-    priority: 0.6,
-  }));
-
   const productIds = await fetchAllProductIds();
   const productRoutes: MetadataRoute.Sitemap = productIds.map((id) => ({
     url: `${SITE_URL}/products/${id}`,
@@ -70,5 +65,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticRoutes, ...serviceRoutes, ...productRoutes];
+  return [...staticRoutes, ...productRoutes];
 }

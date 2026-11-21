@@ -5,6 +5,7 @@ import {
   resolveSiteContent,
   resolveSiteContentPair,
 } from '../src/site-content';
+import { STOREFRONT_SECTIONS, normalizeStorefrontHref } from '../src/storefront-sections';
 
 /**
  * The public website merges an administrator's stored document over the
@@ -26,6 +27,20 @@ describe('site content — approved defaults', () => {
       expect(slide.headlineAr.length).toBeGreaterThan(0);
       expect(slide.headlineEn.length).toBeGreaterThan(0);
       expect(slide.ctaHref.startsWith('/')).toBe(true);
+    }
+  });
+
+  it('points each hero slide at one of the four storefront sections, in order', () => {
+    for (const locale of ['ar', 'en'] as const) {
+      const slides = DEFAULT_SITE_CONTENT[locale].hero.slides;
+      expect(slides.map((slide) => slide.ctaHref)).toEqual(
+        STOREFRONT_SECTIONS.map((section) => section.href),
+      );
+      // A default must never carry a link the site cannot serve.
+      for (const slide of slides) {
+        expect(normalizeStorefrontHref(slide.ctaHref)).toBe(slide.ctaHref);
+        expect(normalizeStorefrontHref(slide.secondaryHref)).toBe(slide.secondaryHref);
+      }
     }
   });
 });

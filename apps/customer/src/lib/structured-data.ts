@@ -8,6 +8,8 @@
  * deliberately uses a relative `/api` so the site talks to the API same-origin.
  */
 
+import { storefrontSectionForCategoryKey } from '@oryx/shared';
+
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3002').replace(
   /\/$/,
   '',
@@ -136,7 +138,7 @@ export function serviceJsonLd(service: {
     ...(service.nameAr ? { alternateName: service.nameAr } : {}),
     ...(service.descriptionEn ? { description: service.descriptionEn } : {}),
     serviceType: service.nameEn,
-    url: `${SITE_URL}/services?category=${encodeURIComponent(service.key)}`,
+    url: `${SITE_URL}${storefrontSectionForCategoryKey(service.key).href}`,
     provider: { '@type': 'Organization', name: 'ORYX Auto Services' },
     areaServed: { '@type': 'Country', name: 'Bahrain' },
   };

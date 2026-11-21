@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  APPROVED_INSPECTION_SERVICES,
   CHASSIS_REGIONS,
   INSPECTION_SECTION_SPECS,
   INSPECTION_SECTION_KEYS,
@@ -15,6 +16,7 @@ import {
   isInspectionSectionKey,
   isInspectionTypeKey,
   paintConditionSpec,
+  approvedInspectionServiceRank,
   sectionsForType,
   typeForSection,
 } from '../src/inspection';
@@ -173,5 +175,31 @@ describe('inspection catalogue — editability', () => {
     expect(isInspectionEditable('PENDING_REVIEW')).toBe(false);
     expect(isInspectionEditable('APPROVED')).toBe(false);
     expect(isInspectionEditable('CANCELLED')).toBe(false);
+  });
+});
+
+/**
+ * The bookable catalogue and the report are two different taxonomies: seven
+ * services are sold, four types are printed. These assertions keep a website
+ * change from collapsing one into the other.
+ */
+describe('approved inspection services — the seven bookable products', () => {
+  it('declares exactly the seven approved services, one per internal area', () => {
+    expect(APPROVED_INSPECTION_SERVICES).toHaveLength(7);
+    expect(APPROVED_INSPECTION_SERVICES.map((service) => service.section)).toEqual([
+      ...INSPECTION_SECTION_KEYS,
+    ]);
+    expect(new Set(APPROVED_INSPECTION_SERVICES.map((service) => service.code)).size).toBe(7);
+  });
+
+  it('keeps the seven services distinct from the four report types', () => {
+    expect(APPROVED_INSPECTION_SERVICES.length).not.toBe(INSPECTION_TYPES.length);
+  });
+
+  it('ranks the approved codes in declaration order and unknown codes last', () => {
+    APPROVED_INSPECTION_SERVICES.forEach((service, index) => {
+      expect(approvedInspectionServiceRank(service.code)).toBe(index);
+    });
+    expect(approvedInspectionServiceRank('BASIC')).toBe(7);
   });
 });

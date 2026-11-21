@@ -32,6 +32,7 @@ export class CustomerCatalogController {
     @Query('companyId') companyId?: string,
     @Query('query') query?: string,
     @Query('sort') sort?: string,
+    @Query('spareParts') spareParts?: string,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '20',
   ) {
@@ -39,6 +40,7 @@ export class CustomerCatalogController {
       locale: CustomerCatalogController.localeOf(locale),
       companyId: companyId || undefined,
       query: query?.trim() || undefined,
+      spareParts: spareParts === 'only' || spareParts === 'exclude' ? spareParts : undefined,
       sort: (sort as 'relevance' | 'price_asc' | 'price_desc' | 'name') || undefined,
       page: Math.max(1, Number(page) || 1),
       pageSize: Math.min(50, Math.max(1, Number(pageSize) || 20)),

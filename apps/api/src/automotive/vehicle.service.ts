@@ -1,6 +1,6 @@
 import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
-import { sumMinor, INSPECTION_SECTION_SPECS } from '@oryx/shared';
+import { sumMinor, APPROVED_INSPECTION_SERVICES, INSPECTION_SECTION_SPECS } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService } from '../common/accounting-posting.service';
@@ -34,16 +34,12 @@ import type {
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
-/** Canonical, approved inspection products; their prices come from the operator. */
-const APPROVED_INSPECTION_CODES: Readonly<Record<string, string>> = {
-  PAINT_BODY: 'INS-PAINT',
-  CHASSIS_UNDERCARRIAGE: 'INS-CHASSIS',
-  INTERIOR: 'INS-INTERIOR',
-  EXTERIOR: 'INS-EXTERIOR',
-  ENGINE_COMPARTMENT: 'INS-ENGINE',
-  ROAD_TEST: 'INS-ROAD',
-  COMPUTER_UNIT: 'INS-COMPUTER',
-};
+/** Canonical, approved inspection products; their prices come from the operator.
+ * The codes and their order are declared once in `@oryx/shared` so the public
+ * website can present the same seven services. */
+const APPROVED_INSPECTION_CODES: Readonly<Record<string, string>> = Object.fromEntries(
+  APPROVED_INSPECTION_SERVICES.map((service) => [service.section, service.code]),
+);
 
 
 /**
