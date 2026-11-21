@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { VEHICLE_DOCUMENT_CATEGORIES } from '@oryx/shared';
+import { VEHICLE_DOCUMENT_CATEGORIES, INSPECTION_SECTION_KEYS } from '@oryx/shared';
 import {
   ArrayMinSize,
   ArrayMaxSize,
@@ -135,6 +135,19 @@ export class CreateChecklistItemDto {
   @IsString() @MinLength(1) @MaxLength(200) labelEn!: string;
   @IsString() @MinLength(1) @MaxLength(200) labelAr!: string;
   @IsString() @MinLength(1) @MaxLength(60) category!: string;
+}
+
+export class ApprovedInspectionServicePriceDto {
+  @IsIn(INSPECTION_SECTION_KEYS as unknown as string[]) area!: string;
+  @Type(() => Number) @IsInt() @Min(1) priceMinor!: number;
+  @Type(() => Number) @IsInt() @Min(0) @Max(10000) taxPercentBp!: number;
+  @Type(() => Number) @IsInt() @Min(1) durationMinutes!: number;
+}
+
+export class ReplaceInspectionServicesDto {
+  @IsArray() @ArrayMinSize(7) @ArrayMaxSize(7)
+  @ValidateNested({ each: true }) @Type(() => ApprovedInspectionServicePriceDto)
+  services!: ApprovedInspectionServicePriceDto[];
 }
 
 export class CreateInspectionBookingDto {
