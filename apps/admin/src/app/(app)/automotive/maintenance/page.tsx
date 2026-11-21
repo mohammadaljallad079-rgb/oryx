@@ -11,6 +11,7 @@ import { EntityPicker } from '@/components/inline-create';
 import { CustomerModal } from '@/components/customer-modal';
 import { VehicleModal } from '@/components/entity-modals';
 import { JobCardPrintActions } from '@/components/job-card-print';
+import { MaintenanceServicesTab } from '@/components/maintenance-services-tab';
 import { DocumentPrintActions } from '@/components/document-print';
 import { renderPrintDocument } from '@/lib/print-document';
 import { Icon } from '@/components/icons';
@@ -71,7 +72,7 @@ async function issueAndPreviewJobInvoice(jobId: string, locale: string): Promise
   }
 }
 
-type Tab = 'job-cards' | 'providers' | 'requests';
+type Tab = 'job-cards' | 'services' | 'providers' | 'requests';
 
 const JOB_STATUSES = [
   'DRAFT',
@@ -91,6 +92,7 @@ export default function MaintenancePage() {
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'job-cards', label: t('erp.automotive.jobCards') },
+    { key: 'services', label: t('erp.automotive.ws.lineType.SERVICE') },
     { key: 'providers', label: t('erp.automotive.providers') },
     { key: 'requests', label: t('erp.automotive.serviceRequests') },
   ];
@@ -130,6 +132,7 @@ export default function MaintenancePage() {
           canIssue={can('erp.parts.issue')}
         />
       ) : null}
+      {tab === 'services' ? <MaintenanceServicesTab canManage={can('erp.maintenance.jobcard.manage')} /> : null}
       {tab === 'providers' ? <ProvidersTab canManage={can('erp.marketplace.provider.manage')} /> : null}
       {tab === 'requests' ? <RequestsTab canManage={can('erp.marketplace.request.manage')} /> : null}
     </div>
