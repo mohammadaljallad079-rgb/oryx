@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import { VEHICLE_DOCUMENT_CATEGORIES } from '@oryx/shared';
 import {
   ArrayMinSize,
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -138,7 +139,10 @@ export class CreateChecklistItemDto {
 
 export class CreateInspectionBookingDto {
   @IsString() vehicleId!: string;
+  /** Backward compatible primary service. */
   @IsString() serviceId!: string;
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(7) @IsString({ each: true })
+  serviceIds?: string[];
   @IsOptional() @IsString() branchId?: string;
   @IsISO8601() scheduledAt!: string;
   @IsOptional() @IsString() inspectorUserId?: string;
