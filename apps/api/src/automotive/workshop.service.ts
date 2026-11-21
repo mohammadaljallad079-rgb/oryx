@@ -529,6 +529,21 @@ export class WorkshopService {
       throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide at least one service or part line.');
     }
 
+    if (dto.lines.some((line) => line.type === 'SERVICE' && line.productId)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Service work items cannot point to stock products.');
+    }
+    const partProductIds = [...new Set(dto.lines
+      .filter((line) => line.type === 'PART' && line.productId)
+      .map((line) => line.productId as string))];
+    if (partProductIds.length) {
+      const count = await this.prisma.product.count({
+        where: { id: { in: partProductIds }, companyId },
+      });
+      if (count !== partProductIds.length) {
+        throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'A job-card part belongs to another company.');
+      }
+    }
+
     const totals = computeDocumentTotals(dto.lines.map((line) => ({
       quantity: line.quantity,
       unitPriceMinor: line.unitPriceMinor,
