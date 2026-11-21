@@ -164,16 +164,15 @@ test.describe('Execution 21 — workshop redesign', () => {
         if (!created.ok) throw new Error(`create job card ${created.status} ${await created.text()}`);
         const job = (await created.json()) as { id: string; status: string };
 
-        // An estimate is required before completion; approve it first.
-        const estimateRes = await fetch(`${api}/automotive/job-cards/${job.id}/estimates`, {
-          method: 'POST',
+        // Save service and part work items without a separate estimate approval.
+        const estimateRes = await fetch(`${api}/automotive/job-cards/${job.id}/work-items`, {
+          method: 'PUT',
           headers,
           body: JSON.stringify({
-            lines: [{ type: 'LABOUR', description: 'E2E labour', quantity: 10000, unitPriceMinor: 25000, taxPercentBp: 1000 }],
+            lines: [{ type: 'SERVICE', description: 'E2E diagnostic service', quantity: 10000, unitPriceMinor: 25000, taxPercentBp: 1000 }, { type: 'PART', description: 'E2E replacement part', quantity: 20000, unitPriceMinor: 10000, taxPercentBp: 1000 }],
           }),
         });
         const estimate = (await estimateRes.json()) as { id: string; subtotalMinor: number; taxMinor: number; totalMinor: number };
-        await fetch(`${api}/automotive/estimates/${estimate.id}/approve`, { method: 'POST', headers, body: '{}' });
 
         const patch = async (status: string) => {
           const res = await fetch(`${api}/automotive/job-cards/${job.id}`, {
@@ -184,8 +183,6 @@ test.describe('Execution 21 — workshop redesign', () => {
           return { status: res.status, body: (await res.json()) as { status?: string } };
         };
 
-        const toApproval = await patch('AWAITING_APPROVAL');
-        const toApproved = await patch('APPROVED');
         const toProgress = await patch('IN_PROGRESS');
         const toCompleted = await patch('COMPLETED');
         // An illegal jump (COMPLETED -> OPEN) must be refused by the server.
@@ -195,7 +192,7 @@ test.describe('Execution 21 — workshop redesign', () => {
           skipped: false,
           estimate,
           estimateMath: estimate.subtotalMinor + estimate.taxMinor === estimate.totalMinor,
-          transitions: [toApproval.status, toApproved.status, toProgress.status, toCompleted.status],
+          transitions: [toProgress.status, toCompleted.status],
           completedStatus: toCompleted.body.status,
           illegalStatus: illegal.status,
         } as const;
@@ -208,7 +205,7 @@ test.describe('Execution 21 — workshop redesign', () => {
       return;
     }
     expect(outcome.estimateMath).toBe(true);
-    expect(outcome.transitions).toEqual([200, 200, 200, 200]);
+    expect(outcome.transitions).toEqual([200, 200]);
     expect(outcome.completedStatus).toBe('COMPLETED');
     // The state machine is server-side: an illegal transition is a 4xx.
     expect(outcome.illegalStatus).toBeGreaterThanOrEqual(400);
