@@ -363,6 +363,8 @@ interface JobCardDetail {
   }>;
 }
 
+const EMPTY_WORK_ITEM_LINES: NonNullable<JobCardDetail['estimates']>[number]['lines'] = [];
+
 function JobCardDetailModal({
   jobId,
   canManage,
@@ -619,7 +621,7 @@ function JobCardDetailModal({
 
           {/* Lifecycle controls. */}
           <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
-            {canManage && ['OPEN', 'APPROVED', 'AWAITING_APPROVAL'].includes(job.status) ? (
+            {canManage && ['OPEN', 'APPROVED'].includes(job.status) ? (
               <Button size="sm" variant="primary" disabled={busy} data-testid="start-work"
                 onClick={() => act(() => api.updateJobCard(job.id, { status: 'IN_PROGRESS' }))}>
                 {t('erp.automotive.ws.startWork')}
@@ -655,7 +657,7 @@ function JobCardDetailModal({
           <CreateEstimateModal
             open={estimateOpen}
             jobId={job.id}
-            initialLines={latestEstimate?.lines ?? []}
+            initialLines={latestEstimate?.lines ?? EMPTY_WORK_ITEM_LINES}
             onClose={() => setEstimateOpen(false)}
             onCreated={refresh}
           />
