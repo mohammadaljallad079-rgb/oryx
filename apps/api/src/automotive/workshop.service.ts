@@ -347,10 +347,11 @@ export class WorkshopService {
       if (!allowed.includes(dto.status)) {
         throw badRequest(ERROR_CODES.JOB_CARD_STATE, `Cannot move a job card from ${job.status} to ${dto.status}.`, { from: job.status, to: dto.status, allowed });
       }
-      // Completion requires an approved estimate, so work is not billed unapproved.
+      // Work items are entered directly by the operator; no separate estimate approval
+      // is required. Prevent completion when no billable lines were recorded.
       if (dto.status === 'COMPLETED') {
-        const approved = await this.prisma.repairEstimate.count({ where: { jobCardId: id, status: 'APPROVED' } });
-        if (approved === 0) throw forbidden(ERROR_CODES.ESTIMATE_NOT_APPROVED, 'The customer must approve an estimate before the job is completed.');
+        const items = await this.prisma.repairEstimateLine.count({ where: { estimate: { jobCardId: id } } });
+        if (items === 0) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Add at least one service or part before completing the job.');
       }
     }
     const updated = await this.prisma.jobCard.update({
@@ -405,7 +406,7 @@ export class WorkshopService {
           companyId,
           jobCardId,
           estimateNumber,
-          status: 'SENT',
+          status: 'APPROVED', // Internal legacy storage for work items; no customer estimate-approval step.
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
@@ -633,13 +634,13 @@ export class WorkshopService {
     const result = await this.posting.withTransaction(async (tx) => {
       const job = await tx.jobCard.findFirst({
         where: { id, companyId },
-        include: { labour: true, estimates: { include: { lines: true }, where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' }, take: 1 }, reservations: { include: { lines: true } } },
+        include: { labour: true, estimates: { include: { lines: true }, where: { status: { in: ['APPROVED', 'SENT'] } }, orderBy: { createdAt: 'desc' }, take: 1 }, reservations: { include: { lines: true } } },
       });
       if (!job) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Job card not found.');
       if (job.status === 'INVOICED') throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'This job card is already invoiced.');
       if (job.status !== 'COMPLETED') throw badRequest(ERROR_CODES.JOB_CARD_STATE, 'Only a completed job card can be invoiced.');
 
-      // Prefer the approved estimate; fall back to the recorded labour.
+      // Bill the latest saved work items, retaining legacy labour fallback for old jobs.
       const lines: Array<{ productId: string | null; description: string; quantity: number; unitPriceMinor: number; taxPercentBp: number }> = [];
       const estimate = job.estimates[0];
       if (estimate) {
