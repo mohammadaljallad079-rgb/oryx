@@ -14,6 +14,7 @@ import {
   CreateChecklistItemDto,
   CreateInspectionBookingDto,
   CreateInspectionServiceDto,
+  ReplaceInspectionServicesDto,
   CreateVehicleDto,
   DecideReportDto,
   InvoiceInspectionDto,
@@ -154,6 +155,18 @@ export class VehicleController {
   @ApiOperation({ summary: 'List the inspection service catalog' })
   services(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
     return this.vehicles.listInspectionServices(query, p);
+  }
+
+  @Post('inspection-services/replace-approved')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.service.manage')
+  @ApiOperation({ summary: 'Replace old inspection services with seven approved priced inspection categories' })
+  replaceApprovedServices(
+    @Body() dto: ReplaceInspectionServicesDto,
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.vehicles.replaceInspectionServices(dto, principal, actorFrom(principal, req));
   }
 
   @Post('inspection-services')
