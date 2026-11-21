@@ -49,7 +49,7 @@ test.describe('Execution 20 — inspection input form (close-up)', () => {
       await expect(page.getByTestId('job-customer-search')).toBeVisible();
       await page.getByTestId('job-customer-search').fill('نور');
       await page.waitForTimeout(300);
-      await shotEl(page.getByTestId('job-customer').locator('[role="listbox"]'), `form-04-customer-search-ar-${theme}`);
+      await shotEl(page.getByRole('listbox'), `form-04-customer-search-ar-${theme}`);
       await page.getByTestId('job-customer-search').fill('');
       await page.waitForTimeout(200);
 
@@ -74,7 +74,7 @@ test.describe('Execution 20 — inspection input form (close-up)', () => {
     await expect(page.getByTestId('job-types')).toBeVisible();
     // A vehicle can only be added against a chosen customer, so select one first.
     await page.getByTestId('job-customer').locator('button').first().click();
-    await page.getByTestId('job-customer').locator('[role="option"]').first().click();
+    await page.getByRole('listbox').locator('[role="option"]').first().click();
     await page.waitForTimeout(400);
     await page.getByTestId('job-add-vehicle').click();
     await page.waitForTimeout(600);
