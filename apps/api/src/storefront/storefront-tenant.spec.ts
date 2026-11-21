@@ -1,4 +1,4 @@
-import { StorefrontService } from '../src/storefront/storefront.service';
+import { StorefrontService } from './storefront.service';
 
 describe('Public ORYX storefront tenant isolation', () => {
   const makeService = (options: {
@@ -13,10 +13,12 @@ describe('Public ORYX storefront tenant isolation', () => {
         findFirst: jest.fn((args: { where: { id?: string } }) =>
           Promise.resolve(args.where.id ? (options.chosen ?? null) : (options.company ?? null)),
         ),
-        findUniqueOrThrow: jest.fn().mockResolvedValue({
-          id: 'oryx-company', nameEn: 'ORYX Auto Services', nameAr: 'أوريكس لخدمات السيارات',
-          currency: 'BHD', countryCode: 'BH',
-        }),
+        findUniqueOrThrow: jest.fn((args: { where: { id: string } }) =>
+          Promise.resolve({
+            id: args.where.id, nameEn: 'ORYX Auto Services', nameAr: 'أوريكس لخدمات السيارات',
+            currency: 'BHD', countryCode: 'BH',
+          }),
+        ),
       },
     };
     const platform = { getSetting: jest.fn().mockResolvedValue(options.configured ?? null) };

@@ -100,6 +100,26 @@ describe('Storefront tenant (e2e)', () => {
     // The same page a visitor would see for the tenant directly — no divergence.
     const direct = await catalog(`companyId=${otherCompanyId}&pageSize=50&locale=en`);
     expect(listed.body.total).toBe(direct.body.total);
+
+    // The seven approved inspection services are tenant rows, so they move with
+    // the storefront instead of staying on the company it left behind.
+    const inspections = await call<{ items: Array<{ id: string; code: string }> }>(
+      ctx.base,
+      '/storefront/inspection-services',
+    );
+    expect(inspections.status).toBe(200);
+    expect(inspections.body.items.length).toBe(7);
+
+    const owned = await ctx.prisma.inspectionService.findMany({
+      where: { companyId: otherCompanyId },
+      select: { id: true },
+    });
+    const ownedIds = new Set(owned.map((row) => row.id));
+    for (const item of inspections.body.items) {
+      // A service with no configured row is identified by its approved code.
+      if (item.id.startsWith('code:')) continue;
+      expect(ownedIds.has(item.id)).toBe(true);
+    }
   });
 
   it('refuses an unknown or inactive company', async () => {
@@ -147,6 +167,34 @@ describe('Storefront tenant (e2e)', () => {
     const explicit = await catalog(`storefront=true&companyId=${defaultCompanyId}&pageSize=10`);
     expect(explicit.status).toBe(200);
     expect(explicit.body.items.every((item) => item.storeId === defaultCompanyId)).toBe(true);
+  });
+
+  it('keeps products and spare parts disjoint and classified', async () => {
+    const products = await catalog('storefront=true&spareParts=exclude&pageSize=100&locale=en');
+    const parts = await catalog('storefront=true&spareParts=only&pageSize=100&locale=en');
+    expect(products.status).toBe(200);
+    expect(parts.status).toBe(200);
+
+    // Both sections are filled from the same catalogue, so neither can be an
+    // empty shell, and no row may appear in both.
+    expect(parts.body.total).toBeGreaterThan(0);
+    const productIds = new Set(products.body.items.map((item) => item.id));
+    for (const part of parts.body.items) expect(productIds.has(part.id)).toBe(false);
+
+    // The split is the approved `partCategoryKey`, read from the database: a
+    // part carries one, a product carries none. The parts page can therefore
+    // never list an unclassified row.
+    const partRows = await ctx.prisma.product.findMany({
+      where: { id: { in: parts.body.items.map((item) => item.id) } },
+      select: { partCategoryKey: true, isPublished: true },
+    });
+    expect(partRows.every((row) => row.partCategoryKey !== null && row.isPublished)).toBe(true);
+
+    const productRows = await ctx.prisma.product.findMany({
+      where: { id: { in: products.body.items.map((item) => item.id) } },
+      select: { partCategoryKey: true },
+    });
+    expect(productRows.every((row) => row.partCategoryKey === null)).toBe(true);
   });
 
   it('falls back to the configured default when the choice is cleared', async () => {

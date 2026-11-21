@@ -188,6 +188,12 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   refresh endpoint's default ceiling (120/min) will return 429, silently dropping
   sessions and failing late tests with a login 403. Use
   `AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000`.
+- **A UI-provisioned tenant can capture the demo admin.** `admin.spec.ts`
+  picks the first registered user as the new company's manager, which adds a
+  `Membership` for `admin@demo-alnoor.local` in that tenant. Login then resolves
+  that tenant — which has no subscription — and every later API suite fails with
+  a `403` on its first permission check. Delete the stray `Membership` row (or
+  re-seed) before running the API suite against a reused local database.
 - **Rebuild the API before running UI tests after an API change.** `next start`
   and the Node API serve compiled output; a stale `dist/main.js` will fail tests
   with request-validation errors that the source no longer produces.
