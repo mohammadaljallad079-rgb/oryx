@@ -49,6 +49,7 @@ export default function InspectionWorkspacePage() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [issueError, setIssueError] = useState<string | null>(null);
   const [issuing, setIssuing] = useState(false);
+  const [bundleLoading, setBundleLoading] = useState(false);
   const [docsKey, setDocsKey] = useState(0);
 
   const canWrite = can('erp.inspection.write');
@@ -109,6 +110,29 @@ export default function InspectionWorkspacePage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={session.status} label={t(`inspection.status.${session.status}`)} />
+            {session.status === 'APPROVED' && session.bookingId && can('erp.sales.read') && can('erp.inspection.read') ? (
+              <Button disabled={bundleLoading} data-testid="inspection-download-bundle" onClick={async () => {
+                setBundleLoading(true);
+                setError(null);
+                try {
+                  const url = await api.inspectionBundleBlobUrl(id);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${session.jobNumber}-invoice-and-inspection.pdf`;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : t('common.error'));
+                } finally {
+                  setBundleLoading(false);
+                }
+              }}>
+                <Icon name="file" size={14} />
+                {bundleLoading ? t('common.loading') : 'Invoice + Inspection PDF'}
+              </Button>
+            ) : null}
             <Button onClick={load} data-testid="inspection-refresh">
               <Icon name="refresh" size={14} />
               {t('common.refresh')}
@@ -829,16 +853,39 @@ function AttachmentsPanel({
   const [busy, setBusy] = useState(false);
   const [area, setArea] = useState<string>('');
 
-  const upload = async (file: File) => {
+  const upload = async (files: File[]) => {
+    if (files.length === 0) return;
+    const limit = 12 * 1024 * 1024;
+    const supported = files.every((file) =>
+      file.type === 'application/pdf' || file.type.startsWith('image/'));
+    if (!supported) {
+      onError(locale === 'ar' ? 'المرفقات المسموحة صور أو ملفات PDF فقط.' : 'Only images and PDF documents are allowed.');
+      return;
+    }
+    if (files.some((file) => file.size > limit)) {
+      onError(locale === 'ar'
+        ? 'حجم الملف يتجاوز 12 ميغابايت. قم بتصغيره قبل الرفع.'
+        : 'File exceeds the 12 MB upload limit. Please reduce the file size.');
+      return;
+    }
     setBusy(true);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      if (area) form.append('sectionArea', area);
-      await api.uploadInspectionAttachment(sessionId, form);
+      // One request per attachment: a multi-file multipart body must not
+      // exceed the reverse proxy's request-size limit.
+      for (const file of files) {
+        const form = new FormData();
+        form.append('file', file);
+        if (area) form.append('sectionArea', area);
+        await api.uploadInspectionAttachment(sessionId, form);
+      }
       onSaved(await api.inspectionSession(sessionId));
     } catch (e) {
-      onError(e instanceof Error ? e.message : t('common.error'));
+      const status = e instanceof Error ? e.message : '';
+      onError(status.includes('413')
+        ? (locale === 'ar'
+          ? 'السيرفر رفض حجم الطلب (413). يجب مراجعة حد رفع الملفات في Nginx.'
+          : 'The server rejected the upload (413). Check the Nginx body-size limit.')
+        : e instanceof Error ? e.message : t('common.error'));
     } finally {
       setBusy(false);
     }
@@ -876,16 +923,20 @@ function AttachmentsPanel({
           </Field>
           <input
             type="file"
-            accept="image/*,application/pdf"
+            accept="image/png,image/jpeg,image/webp,image/avif,application/pdf,.pdf"
+            multiple
             className="oryx-input"
             disabled={busy}
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void upload(file);
+              const files = Array.from(e.target.files ?? []);
+              if (files.length > 0) void upload(files);
               e.target.value = '';
             }}
             data-testid="attachment-input"
           />
+          <p className="oryx-muted m-0 text-xs">
+            {locale === 'ar' ? 'صور وملفات PDF، حتى 12 ميغابايت لكل ملف. يمكن اختيار عدة ملفات.' : 'Images and PDF files, up to 12 MB each. Multiple files supported.'}
+          </p>
         </div>
       ) : null}
 

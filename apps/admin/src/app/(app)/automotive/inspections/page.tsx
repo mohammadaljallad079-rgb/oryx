@@ -29,6 +29,7 @@ import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, VehicleDoc
 import {
   basisPointsOfMinor,
   INSPECTION_TYPES,
+  INSPECTION_SECTION_SPECS,
   VEHICLE_DOCUMENT_CATEGORIES,
   type InspectionTypeKey,
 } from '@oryx/shared';
@@ -41,6 +42,7 @@ export default function InspectionsPage() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('jobs');
+  const [bookingToInspect, setBookingToInspect] = useState<InspectionBookingDto | null>(null);
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'jobs', label: t('inspection.jobs') },
@@ -73,13 +75,15 @@ export default function InspectionsPage() {
         ))}
       </div>
 
-      {tab === 'jobs' ? <JobsTab canWrite={can('erp.inspection.write')} /> : null}
+      {tab === 'jobs' ? <JobsTab canWrite={can('erp.inspection.write')} bookingToInspect={bookingToInspect}
+        onBookingPrepared={() => setBookingToInspect(null)} /> : null}
       {tab === 'vehicles' ? <VehiclesTab canManage={can('erp.vehicle.manage')} /> : null}
       {tab === 'bookings' ? (
         <BookingsTab
           canBook={can('erp.inspection.booking.manage')}
           canApprove={can('erp.inspection.report.approve')}
           canInvoice={can('erp.inspection.invoice')}
+          onStartInspection={(booking) => { setBookingToInspect(booking); setTab('jobs'); }}
         />
       ) : null}
       {tab === 'services' ? <ServicesTab canManage={can('erp.inspection.service.manage')} /> : null}
@@ -94,12 +98,19 @@ export default function InspectionsPage() {
  * by choosing the customer, the vehicle and the inspection types, then opened in
  * the workspace where the sections are filled in.
  */
-function JobsTab({ canWrite }: { canWrite: boolean }) {
+function JobsTab({ canWrite, bookingToInspect, onBookingPrepared }: {
+  canWrite: boolean;
+  bookingToInspect: InspectionBookingDto | null;
+  onBookingPrepared: () => void;
+}) {
   const { t, locale } = useUi();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  useEffect(() => {
+    if (bookingToInspect && canWrite) setOpen(true);
+  }, [bookingToInspect, canWrite]);
   const debounced = useDebounced(search);
   const list = useAsync(() => api.inspectionSessions({ search: debounced || undefined }), [debounced]);
 
@@ -211,7 +222,11 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
         )
       ) : null}
 
-      {open ? <NewJobModal onClose={() => setOpen(false)} onCreated={list.reload} /> : null}
+      {open ? <NewJobModal
+        initialBooking={bookingToInspect}
+        onClose={() => { setOpen(false); onBookingPrepared(); }}
+        onCreated={list.reload}
+      /> : null}
     </div>
   );
 }
@@ -254,12 +269,17 @@ const EMPTY_IDENTITY: JobIdentity = {
  * confirms them rather than retyping them, and can correct any value before the
  * report is issued.
  */
-function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => Promise<void> }) {
+function NewJobModal({ onClose, onCreated, initialBooking }: {
+  onClose: () => void;
+  onCreated: () => Promise<void>;
+  initialBooking?: InspectionBookingDto | null;
+}) {
   const { t, locale } = useUi();
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [customerId, setCustomerId] = useState('');
-  const [vehicleId, setVehicleId] = useState('');
+  const [customerId, setCustomerId] = useState(initialBooking?.customerId ?? '');
+  const [vehicleId, setVehicleId] = useState(initialBooking?.vehicleId ?? '');
   const [types, setTypes] = useState<InspectionTypeKey[]>([]);
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
   const [identity, setIdentity] = useState<JobIdentity>(EMPTY_IDENTITY);
@@ -338,10 +358,11 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
     setBusy(true);
     setError(null);
     try {
-      await api.createInspectionSession({
+      const created = await api.createInspectionSession({
         customerId,
         vehicleId,
         selectedTypes: types,
+        ...(initialBooking?.id ? { bookingId: initialBooking.id } : {}),
         ...(identity.customerName.trim() ? { customerName: identity.customerName.trim() } : {}),
         ...(identity.contactNumber.trim() ? { contactNumber: identity.contactNumber.trim() } : {}),
         ...(identity.plateNumber.trim() ? { plateNumber: identity.plateNumber.trim() } : {}),
@@ -354,6 +375,7 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       });
       await onCreated();
       onClose();
+      router.push(`/automotive/inspections/${created.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -1087,8 +1109,14 @@ function CreateVehicleModal({
   );
 }
 
-function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; canApprove: boolean; canInvoice: boolean }) {
-  const { t } = useUi();
+function BookingsTab({ canBook, canApprove, canInvoice, onStartInspection }: {
+  canBook: boolean;
+  canApprove: boolean;
+  canInvoice: boolean;
+  onStartInspection: (booking: InspectionBookingDto) => void;
+}) {
+  const { t, locale } = useUi();
+  const router = useRouter();
   const list = useAsync(() => api.inspectionBookings(), []);
   const vehicles = useAsync(() => api.vehicles(), []);
   const services = useAsync(() => api.inspectionServices(), []);
@@ -1096,6 +1124,9 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
   const [busyId, setBusyId] = useState<string | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const report = useAsync(() => (detail ? api.inspectionReport(detail) : Promise.resolve(null)), [detail]);
+  const selectedBooking = (list.data?.items ?? []).find((booking: InspectionBookingDto) => booking.id === detail) ?? null;
+  const selectedVehicle = (vehicles.data?.items ?? []).find((vehicle: VehicleDto) => vehicle.id === selectedBooking?.vehicleId) ?? null;
+  const selectedService = (services.data?.items ?? []).find((service: InspectionServiceDto) => service.id === selectedBooking?.serviceId) ?? null;
 
   const removeBooking = async (id: string) => {
     if (!window.confirm(t('erp.automotive.confirmDeleteBooking'))) return;
@@ -1182,28 +1213,75 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
         </TableShell>
       )}
 
-      {detail ? (
-        <div className="border-t border-[var(--border)] p-4" data-testid="inspection-report">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="oryx-panel-title m-0">{t('erp.automotive.report')}</p>
-            <Button size="sm" variant="ghost" onClick={() => setDetail(null)}><Icon name="close" size={14} /></Button>
-          </div>
+      <Modal open={Boolean(detail)} size="full"
+        title={selectedBooking ? `${t('common.details')} — ${selectedBooking.bookingNumber}` : t('common.details')}
+        onClose={() => setDetail(null)}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="inspection-booking-details">
+          {([
+            [t('erp.automotive.bookingNumber'), selectedBooking?.bookingNumber],
+            [t('erp.automotive.customer'), locale === 'ar' ? (selectedBooking?.customerNameAr || selectedBooking?.customerNameEn) : (selectedBooking?.customerNameEn || selectedBooking?.customerNameAr)],
+            [locale === 'ar' ? 'رقم هاتف العميل' : 'Customer phone', selectedBooking?.customerPhone],
+            [locale === 'ar' ? 'البريد الإلكتروني' : 'Email', selectedBooking?.customerEmail],
+            [t('erp.automotive.vehicle'), [selectedBooking?.make, selectedBooking?.model].filter(Boolean).join(' ')],
+            ['VIN', selectedBooking?.vin],
+            [locale === 'ar' ? 'رقم اللوحة' : 'Plate number', selectedBooking?.plateNumber],
+            [t('erp.automotive.service'), (selectedBooking?.serviceIds?.length ?? 0) > 1
+              ? selectedBooking!.serviceIds!.map((serviceId) => {
+                  const service = (services.data?.items ?? []).find((item: InspectionServiceDto) => item.id === serviceId);
+                  return service ? ((locale === 'ar' ? service.nameAr : service.nameEn) || service.nameEn) : serviceId;
+                }).join(' · ')
+              : locale === 'ar' ? (selectedService?.nameAr || selectedBooking?.serviceNameAr) : (selectedService?.nameEn || selectedBooking?.serviceNameEn)],
+            [t('erp.automotive.scheduledAt'), selectedBooking?.scheduledAt ? new Date(selectedBooking.scheduledAt).toLocaleString(locale === 'ar' ? 'ar-BH' : 'en-BH') : null],
+            [t('common.status'), selectedBooking?.status],
+            [locale === 'ar' ? 'قراءة العداد' : 'Odometer', selectedBooking?.odometer],
+            [locale === 'ar' ? 'حالة التقرير' : 'Report status', selectedBooking?.reportStatus],
+            [locale === 'ar' ? 'رقم الفاتورة المرتبطة' : 'Linked invoice ID', selectedBooking?.invoiceId],
+            [locale === 'ar' ? 'سنة السيارة' : 'Vehicle year', selectedBooking?.modelYear ?? selectedVehicle?.modelYear],
+            [locale === 'ar' ? 'اللون' : 'Color', selectedBooking?.color ?? selectedVehicle?.color],
+            [locale === 'ar' ? 'عداد المركبة' : 'Vehicle mileage', selectedBooking?.mileage ?? selectedVehicle?.mileage],
+            [locale === 'ar' ? 'السعر قبل الضريبة' : 'Service price', selectedService ? money(selectedService.priceMinor) : null],
+          ] as Array<[string, string | number | null | undefined]>).map(([label, value]) => (
+            <div key={label} className="rounded-xl border border-[var(--border)] p-3">
+              <p className="oryx-muted m-0 text-xs">{label}</p>
+              <p className="m-0 mt-1 break-words font-semibold">{value === null || value === undefined || value === '' ? '—' : String(value)}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button variant="primary" size="sm" disabled={!selectedBooking}
+            onClick={() => {
+              if (!selectedBooking) return;
+              if (selectedBooking.sessionId) {
+                router.push(`/automotive/inspections/${selectedBooking.sessionId}`);
+              } else {
+                onStartInspection(selectedBooking);
+              }
+              setDetail(null);
+            }}
+            data-testid="booking-open-inspections">
+            <Icon name="clipboardCheck" size={16} />
+            {locale === 'ar' ? 'الانتقال إلى الفحوصات' : 'Open inspections'}
+          </Button>
+          {selectedBooking?.invoiceId ? <Badge tone="success">{t('erp.automotive.invoiced')}</Badge> : null}
+        </div>
+        <div className="mt-4 border-t border-[var(--border)] pt-4" data-testid="inspection-report">
+          {report.error ? <ErrorBanner message={report.error} onRetry={report.reload} /> : null}
           {report.loading ? <Skeleton height={80} /> : (
             <StatGrid>
               <StatCard icon="clipboardCheck" label={t('erp.automotive.findings')} value={String((report.data?.findings as unknown[] | undefined)?.length ?? 0)} />
               <StatCard icon="alert" label={t('erp.automotive.defects')} value={String(report.data?.defects ?? 0)} />
               <StatCard tone="danger" icon="alert" label={t('erp.automotive.critical')} value={String(report.data?.critical ?? 0)} />
-              {canBook && report.data?.report ? null : (
+              {canBook && !report.data?.report ? (
                 <div className="flex items-end">
-                  <Button size="sm" data-testid={`submit-report-${detail}`} onClick={async () => { await api.submitInspectionReport(detail); await report.reload(); }}>
+                  <Button size="sm" data-testid={`submit-report-${detail ?? ''}`} onClick={async () => { if (detail) { await api.submitInspectionReport(detail); await report.reload(); } }}>
                     {t('erp.automotive.submitReport')}
                   </Button>
                 </div>
-              )}
+              ) : null}
             </StatGrid>
           )}
         </div>
-      ) : null}
+      </Modal>
 
       <CreateBookingModal open={open} vehicles={vehicles.data?.items ?? []} services={services.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
@@ -1218,16 +1296,16 @@ function CreateBookingModal({
 }: {
   open: boolean;
   vehicles: Array<{ id: string; vin: string; make: string; model: string }>;
-  services: Array<{ id: string; nameEn: string; priceMinor: number; taxPercentBp: number }>;
+  services: Array<{ id: string; nameEn: string; nameAr: string; priceMinor: number; taxPercentBp: number; isActive?: boolean }>;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     vehicleId: '',
-    serviceId: '',
+    serviceIds: [] as string[],
     scheduledAt: new Date().toISOString().slice(0, 16),
     branchId: '',
     odometer: '',
@@ -1237,18 +1315,20 @@ function CreateBookingModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
-    setForm({ vehicleId: '', serviceId: '', scheduledAt: new Date().toISOString().slice(0, 16), branchId: '', odometer: '', notes: '' });
+    setForm({ vehicleId: '', serviceIds: [], scheduledAt: new Date().toISOString().slice(0, 16), branchId: '', odometer: '', notes: '' });
   }, [open]);
 
-  const service = services.find((s) => s.id === form.serviceId);
-  const vatMinor = service ? basisPointsOfMinor(service.priceMinor, service.taxPercentBp) : 0;
+  const chosenServices = services.filter((service) => form.serviceIds.includes(service.id));
+  const amountMinor = chosenServices.reduce((sum, service) => sum + service.priceMinor, 0);
+  const vatMinor = chosenServices.reduce((sum, service) => sum + basisPointsOfMinor(service.priceMinor, service.taxPercentBp), 0);
 
   const submit = async () => {
     setBusy(true); setError(null);
     try {
       await api.createInspectionBooking({
         vehicleId: form.vehicleId,
-        serviceId: form.serviceId,
+        serviceId: form.serviceIds[0],
+        serviceIds: form.serviceIds,
         scheduledAt: new Date(form.scheduledAt).toISOString(),
         ...(form.branchId ? { branchId: form.branchId } : {}),
         ...(form.odometer ? { odometer: Number(form.odometer) } : {}),
@@ -1261,7 +1341,7 @@ function CreateBookingModal({
 
   return (
     <Modal open={open} title={t('erp.automotive.newBooking')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.vehicleId || !form.serviceId || !form.scheduledAt} onClick={submit} data-testid="save-booking">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.vehicleId || form.serviceIds.length === 0 || !form.scheduledAt} onClick={submit} data-testid="save-booking">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.automotive.vehicle')} required>
@@ -1273,15 +1353,23 @@ function CreateBookingModal({
             testId="booking-vehicle"
           />
         </Field>
-        <Field label={t('erp.automotive.service')} required>
-          <EntitySelect
-            catalogue="inspectionService"
-            allowCreate
-            value={form.serviceId || null}
-            onChange={(v) => setForm({ ...form, serviceId: v ?? '' })}
-            placeholder={t('common.select')}
-            testId="booking-service"
-          />
+        <Field label={locale === 'ar' ? 'خدمات الفحص (يمكن اختيار عدة خدمات)' : 'Inspection services (select multiple)'} required>
+          <div className="max-h-52 overflow-auto rounded-xl border border-[var(--border)] p-2" data-testid="booking-services">
+            {services.filter((service) => service.isActive !== false).map((service) => (
+              <label key={service.id} className="flex items-center gap-2 border-b border-[var(--border)] px-2 py-2 last:border-b-0">
+                <input type="checkbox" className="oryx-checkbox" checked={form.serviceIds.includes(service.id)}
+                  onChange={(event) => setForm((current) => ({
+                    ...current,
+                    serviceIds: event.target.checked
+                      ? [...current.serviceIds, service.id]
+                      : current.serviceIds.filter((id) => id !== service.id),
+                  }))}
+                  data-testid={`booking-service-${service.id}`} />
+                <span className="min-w-0 flex-1">{(locale === 'ar' ? service.nameAr : service.nameEn) || service.nameEn}</span>
+                <span className="tabular-nums">{money(service.priceMinor)}</span>
+              </label>
+            ))}
+          </div>
         </Field>
         <Field label={t('erp.automotive.scheduledAt')} required>
           <input type="datetime-local" className="oryx-input oryx-input--date" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} data-testid="booking-date" />
@@ -1304,20 +1392,33 @@ function CreateBookingModal({
           <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="booking-notes" />
         </Field>
       </div>
-      {service ? (
+      {chosenServices.length > 0 ? (
         <div className="mt-3 rounded-xl border border-[var(--border)] p-3 text-sm" data-testid="booking-price-summary">
-          <div className="flex justify-between gap-3"><span>{t('erp.automotive.basePrice')}</span><span className="tabular-nums">{money(service.priceMinor)}</span></div>
-          <div className="mt-1 flex justify-between gap-3"><span>{t('erp.automotive.vatAmount')} ({(service.taxPercentBp / 100).toFixed(2)}%)</span><span className="tabular-nums">{money(vatMinor)}</span></div>
-          <div className="mt-2 flex justify-between gap-3 border-t border-[var(--border)] pt-2 font-bold"><span>{t('erp.automotive.totalInclVat')}</span><span className="tabular-nums">{money(service.priceMinor + vatMinor)}</span></div>
+          {chosenServices.map((service) => (
+            <div key={service.id} className="flex justify-between gap-3 py-1">
+              <span>{(locale === 'ar' ? service.nameAr : service.nameEn) || service.nameEn}</span>
+              <span className="tabular-nums">{money(service.priceMinor)}</span>
+            </div>
+          ))}
+          <div className="mt-1 flex justify-between gap-3 border-t border-[var(--border)] pt-2">
+            <span>{t('erp.automotive.basePrice')}</span><span className="tabular-nums">{money(amountMinor)}</span>
+          </div>
+          <div className="mt-1 flex justify-between gap-3">
+            <span>{t('erp.automotive.vatAmount')}</span><span className="tabular-nums">{money(vatMinor)}</span>
+          </div>
+          <div className="mt-2 flex justify-between gap-3 border-t border-[var(--border)] pt-2 font-bold">
+            <span>{t('erp.automotive.totalInclVat')}</span><span className="tabular-nums">{money(amountMinor + vatMinor)}</span>
+          </div>
         </div>
       ) : null}
     </Modal>
   );
 }
 function ServicesTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const list = useAsync(() => api.inspectionServices(), []);
   const [open, setOpen] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
   const [editing, setEditing] = useState<InspectionServiceDto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -1339,9 +1440,9 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.automotive.inspectionServices')}</p>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-inspection-service">
-            <Icon name="plus" size={16} />
-            {t('erp.automotive.newService')}
+          <Button variant="primary" size="sm" onClick={() => setReplaceOpen(true)} data-testid="replace-approved-services">
+            <Icon name="clipboardCheck" size={16} />
+            {locale === 'ar' ? 'اعتماد خدمات الفحص السبعة' : 'Approve seven inspection services'}
           </Button>
         ) : null}
       </div>
@@ -1414,6 +1515,12 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
+      <ApprovedServicesModal
+        open={replaceOpen}
+        existing={list.data?.items ?? []}
+        onClose={() => setReplaceOpen(false)}
+        onSaved={list.reload}
+      />
       <ServiceModal
         open={open}
         service={editing}
@@ -1432,6 +1539,129 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
  * The picture is uploaded through the shared media library after the service row
  * exists, so a create that includes a picture is a create followed by an upload.
  */
+/** Prices and tax are supplied by the operator, never invented by the seed. */
+function ApprovedServicesModal({
+  open, existing, onClose, onSaved,
+}: {
+  open: boolean;
+  existing: InspectionServiceDto[];
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { t, locale } = useUi();
+  const codes: Record<string, string> = {
+    PAINT_BODY: 'INS-PAINT',
+    CHASSIS_UNDERCARRIAGE: 'INS-CHASSIS',
+    INTERIOR: 'INS-INTERIOR',
+    EXTERIOR: 'INS-EXTERIOR',
+    ENGINE_COMPARTMENT: 'INS-ENGINE',
+    ROAD_TEST: 'INS-ROAD',
+    COMPUTER_UNIT: 'INS-COMPUTER',
+  };
+  type PriceEntry = { area: string; price: string; tax: string; duration: string };
+  const [rows, setRows] = useState<PriceEntry[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setRows(INSPECTION_SECTION_SPECS.map((section) => {
+      const prior = existing.find((item) => item.code === codes[section.key]);
+      return {
+        area: section.key,
+        price: prior ? minorToInput(prior.priceMinor) : '',
+        tax: prior ? String(prior.taxPercentBp / 100) : '',
+        duration: prior ? String(prior.durationMinutes) : '60',
+      };
+    }));
+    // Open only: do not reset amounts mid-edit when the catalogue refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const update = (index: number, field: 'price' | 'tax' | 'duration', value: string) =>
+    setRows((previous) => previous.map((row, i) => i === index ? { ...row, [field]: value } : row));
+
+  const submit = async () => {
+    if (rows.length !== 7 || rows.some((row) =>
+      !Number.isFinite(Number(row.price)) || Number(row.price) <= 0
+      || row.tax.trim() === '' || !Number.isFinite(Number(row.tax))
+      || Number(row.tax) < 0 || Number(row.tax) > 100
+      || !Number.isInteger(Number(row.duration)) || Number(row.duration) < 1
+    )) {
+      setError(locale === 'ar' ? 'أدخل السعر والضريبة والمدة الصحيحة لكل فحص من الفحوصات السبعة.' : 'Enter a valid price, tax rate and duration for all seven inspections.');
+      return;
+    }
+    if (!window.confirm(locale === 'ar'
+      ? 'سيتم حذف الخدمات القديمة غير المستخدمة، وأرشفة المرتبطة بالحجوزات، واستبدالها بالفحوصات السبعة. هل تؤكد؟'
+      : 'Unused legacy services will be removed and historically linked ones archived. Replace with seven approved inspections?')) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.replaceApprovedInspectionServices(rows.map((row) => ({
+        area: row.area,
+        priceMinor: toMinorInput(row.price),
+        taxPercentBp: Math.round(Number(row.tax) * 100),
+        durationMinutes: Number(row.duration),
+      })));
+      await onSaved();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal open={open} size="full"
+      title={locale === 'ar' ? 'اعتماد خدمات الفحص وأسعارها' : 'Approve inspection services and prices'}
+      onClose={onClose}
+      footer={<>
+        <Button onClick={onClose}>{t('common.cancel')}</Button>
+        <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-approved-inspection-services">
+          {busy ? t('common.loading') : (locale === 'ar' ? 'حفظ الخدمات المعتمدة' : 'Save approved services')}
+        </Button>
+      </>}>
+      {error ? <ErrorBanner message={error} /> : null}
+      <p className="oryx-muted mb-3 text-sm">
+        {locale === 'ar'
+          ? 'حدد أسعار الفحوصات السبعة بالدينار البحريني والضريبة والمدة. لن تُحذف الحجوزات والفواتير القديمة.'
+          : 'Enter the price in Bahraini dinars, tax and duration for each inspection. Existing bookings and invoices are preserved.'}
+      </p>
+      <div className="flex flex-col gap-3">
+        {rows.map((row, index) => {
+          const section = INSPECTION_SECTION_SPECS.find((item) => item.key === row.area);
+          return (
+            <div key={row.area} className="grid gap-3 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-[minmax(180px,2fr)_repeat(3,minmax(90px,1fr))]">
+              <strong className="self-center">{locale === 'ar' ? section?.labelAr : section?.labelEn}</strong>
+              <Field label={locale === 'ar' ? 'السعر (BHD)' : 'Price (BHD)'}>
+                <input className="oryx-input" type="number" min="0.001" step="0.001" required
+                  value={row.price} onChange={(event) => update(index, 'price', event.target.value)}
+                  data-testid={`approved-service-price-${row.area}`} />
+              </Field>
+              <Field label={locale === 'ar' ? 'الضريبة %' : 'Tax %'}>
+                <input className="oryx-input" type="number" min="0" max="100" step="0.01" required
+                  value={row.tax} onChange={(event) => update(index, 'tax', event.target.value)}
+                  data-testid={`approved-service-tax-${row.area}`} />
+              </Field>
+              <Field label={locale === 'ar' ? 'المدة (دقيقة)' : 'Minutes'}>
+                <input className="oryx-input" type="number" min="1" step="1" required
+                  value={row.duration} onChange={(event) => update(index, 'duration', event.target.value)} />
+              </Field>
+              <div className="sm:col-span-4 flex flex-wrap gap-x-5 gap-y-1 text-sm" data-testid={`approved-service-preview-${row.area}`}>
+                <span>{t('erp.automotive.basePrice')}: {money(Number(row.price) > 0 ? toMinorInput(row.price) : 0)}</span>
+                <span>{t('erp.automotive.vatAmount')}: <strong data-testid={`approved-service-vat-${row.area}`}>{money(basisPointsOfMinor(Number(row.price) > 0 ? toMinorInput(row.price) : 0, Math.round((Number(row.tax) || 0) * 100)))}</strong></span>
+                <span>{t('erp.automotive.totalInclVat')}: <strong data-testid={`approved-service-total-${row.area}`}>{money((Number(row.price) > 0 ? toMinorInput(row.price) : 0) + basisPointsOfMinor(Number(row.price) > 0 ? toMinorInput(row.price) : 0, Math.round((Number(row.tax) || 0) * 100)))}</strong></span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Modal>
+  );
+}
+
 function ServiceModal({
   open,
   service,

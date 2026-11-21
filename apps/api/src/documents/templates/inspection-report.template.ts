@@ -108,13 +108,7 @@ function reportHeader(issuer: DocumentIssuer): string {
   const left = issuer.logoDataUri
     ? `<img class="rh-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
     : `<div class="rh-lockup">
-         ${oryxLogoMark('31.3pt', 'rh-logo-mark')}
-         <div class="rh-wordmark">
-           <span class="rh-wordmark-ar">اوريكس</span>
-           <span class="rh-wordmark-ar">لخـدمات</span>
-           <span class="rh-wordmark-ar">السيارات</span>
-           <span class="rh-wordmark-en">AUTO SERVICES</span>
-         </div>
+         ${oryxLogoMark('44.5pt', 'rh-logo-mark')}
        </div>`;
   return `
   <header class="report-head">
@@ -872,7 +866,7 @@ export const INSPECTION_REPORT_CSS = `
    * cards: the Arabic column on the right at 8pt and the English column on the
    * left at 6pt (measured y524-660 of page 1). The banner is forced LTR so the
    * English always leads on the left regardless of the document direction. */
-  .terms{ margin-top:16px; }
+  .terms{ margin-top:28px; }
   .terms-banner{ display:flex; direction:ltr; align-items:center; justify-content:space-between;
     background:#0f2b48; color:#fff; padding:3px 10px; font-size:10pt; font-weight:700; }
   .terms-banner-en{ text-align:left; }
@@ -907,7 +901,10 @@ export const INSPECTION_REPORT_CSS = `
   .two-col > *{ flex:1 1 0; min-width:0; }
   .cabin .two-col{ margin-top:5px; }
   .grid{ width:100%; direction:rtl; table-layout:fixed; border-collapse:separate; border-spacing:4px 2px; }
-  .grid > tbody > tr > td{ box-sizing:border-box; width:50%; max-width:50%; vertical-align:top; padding:0; }
+  .grid > tbody > tr > td{ box-sizing:border-box; width:50%; max-width:50%; vertical-align:top; padding:0; overflow:hidden; }
+  .cabin .grid{ border-collapse:separate; page-break-inside:auto; }
+  .cabin .grid > tbody > tr{ page-break-inside:avoid; break-inside:avoid; }
+  .cabin .grid > tbody > tr > td{ width:50%; max-width:50%; overflow:hidden; }
   /* The approved form paints the interior fittings drawing as a faint
    * background behind the lower-left (exterior) checklist, at 250x163pt (333px
    * at Chromium's 96dpi/72pt ratio). It is out of flow, so it neither adds page
@@ -951,6 +948,11 @@ export const INSPECTION_REPORT_CSS = `
   .items .c-res{ text-align:center; vertical-align:middle; white-space:nowrap; }
   .items .c-res .mark{ vertical-align:middle; }
   .cabin .itable{ position:relative; z-index:1; background:#fff; }
+  .cabin .grp{ min-width:0; overflow:hidden; }
+  .cabin .items{ width:100%; max-width:100%; table-layout:fixed; }
+  .cabin .items th,.cabin .items td{ word-break:normal; overflow-wrap:anywhere; }
+  .cabin .items thead{ display:table-header-group; }
+  .cabin .items tbody{ display:table-row-group; }
   .cabin .items tbody td{ background:#fff; }
   .cabin .no-findings{ position:relative; z-index:2; clear:both; background:#fff; padding:5px 6px; font-size:7pt; line-height:1.35; min-height:26px; text-align:center; }
   .no-findings-ar,.no-findings-en{ display:block; width:100%; white-space:normal; overflow-wrap:anywhere; unicode-bidi:isolate; }

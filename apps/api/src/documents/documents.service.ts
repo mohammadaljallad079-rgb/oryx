@@ -187,6 +187,70 @@ export class DocumentsService {
   }
 
   /**
+   * Produce one printable file in the required order:
+   * posted sales invoice -> approved inspection report -> diagnostic PDF scans.
+   *
+   * The report issue path already appends the uploaded diagnostic PDF scans.
+   * The invoice must be posted by the existing ERP sales workflow first;
+   * this download never silently posts a ledger entry.
+   */
+  async inspectionBundle(
+    sessionId: string,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+    req?: RequestLike,
+  ): Promise<{ bytes: Buffer; filename: string; contentType: string }> {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const session = await this.prisma.inspectionSession.findFirst({
+      where: { id: sessionId, companyId },
+      select: { id: true, bookingId: true, jobNumber: true, status: true },
+    });
+    if (!session) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');
+    if (session.status !== 'APPROVED') {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Approve the inspection before issuing its final PDF.');
+    }
+    if (!session.bookingId) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This inspection is not linked to an inspection booking; invoice it before requesting a combined PDF.');
+    }
+    const booking = await this.prisma.inspectionBooking.findFirst({
+      where: { id: session.bookingId, companyId },
+      include: { report: { select: { invoiceId: true } } },
+    });
+    const invoiceId = booking?.report?.invoiceId;
+    if (!invoiceId) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Issue the inspection sales invoice first, then download the combined report.');
+    }
+    let invoiceDocument = await this.prisma.officialDocument.findFirst({
+      where: { companyId, type: 'SALES_INVOICE', sourceType: 'SalesInvoice', sourceId: invoiceId, status: 'ISSUED' },
+      orderBy: { version: 'desc' },
+      select: { id: true },
+    });
+    if (!invoiceDocument) {
+      const issued = await this.issueFinancialDocument('SALES_INVOICE', invoiceId, principal, actor, req);
+      invoiceDocument = { id: issued.id };
+    }
+    let reportDocument = await this.prisma.officialDocument.findFirst({
+      where: { companyId, type: 'VEHICLE_INSPECTION_REPORT', sourceType: 'InspectionSession', sourceId: session.id, status: 'ISSUED' },
+      orderBy: { version: 'desc' },
+      select: { id: true },
+    });
+    if (!reportDocument) {
+      const issued = await this.issueInspectionReport(session.id, principal, actor, req);
+      reportDocument = { id: issued.id };
+    }
+    const [invoice, report] = await Promise.all([
+      this.download(invoiceDocument.id, principal, actor, req),
+      this.download(reportDocument.id, principal, actor, req),
+    ]);
+    const bytes = await appendPdf(invoice.bytes, report.bytes);
+    return {
+      bytes,
+      filename: `${session.jobNumber}-invoice-and-inspection.pdf`,
+      contentType: 'application/pdf',
+    };
+  }
+
+  /**
    * Issues a financial document (invoice, quotation, order, receipt, voucher)
    * for a sales or purchasing record.
    *

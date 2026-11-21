@@ -4405,6 +4405,8 @@ model InspectionBooking {
   vehicleId       String
   customerId      String
   serviceId       String
+  /// All services selected on a single appointment; old bookings use serviceId as fallback.
+  serviceIds      String[]                @default([])
   branchId        String?
   scheduledAt     DateTime
   status          InspectionBookingStatus @default(REQUESTED)

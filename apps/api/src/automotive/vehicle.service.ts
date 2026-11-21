@@ -1,6 +1,6 @@
 import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
-import { sumMinor } from '@oryx/shared';
+import { sumMinor, INSPECTION_SECTION_SPECS } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService } from '../common/accounting-posting.service';
@@ -17,6 +17,7 @@ import type {
   CreateChecklistItemDto,
   CreateInspectionBookingDto,
   CreateInspectionServiceDto,
+  ReplaceInspectionServicesDto,
   CreateVehicleDto,
   DecideReportDto,
   InvoiceInspectionDto,
@@ -32,6 +33,18 @@ import type {
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+
+/** Canonical, approved inspection products; their prices come from the operator. */
+const APPROVED_INSPECTION_CODES: Readonly<Record<string, string>> = {
+  PAINT_BODY: 'INS-PAINT',
+  CHASSIS_UNDERCARRIAGE: 'INS-CHASSIS',
+  INTERIOR: 'INS-INTERIOR',
+  EXTERIOR: 'INS-EXTERIOR',
+  ENGINE_COMPARTMENT: 'INS-ENGINE',
+  ROAD_TEST: 'INS-ROAD',
+  COMPUTER_UNIT: 'INS-COMPUTER',
+};
+
 
 /**
  * VIN validation.
@@ -344,10 +357,84 @@ export class VehicleService {
 
   // -------------------------------------------------------------- inspections
 
+  /**
+   * Replace the bookable inspection catalogue with the seven approved services.
+   * Prices and taxes MUST be explicitly supplied; nothing is silently set to zero.
+   * Historical services with bookings/checklist records are archived, not deleted.
+   */
+  async replaceInspectionServices(dto: ReplaceInspectionServicesDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const approved = INSPECTION_SECTION_SPECS.filter((section) => APPROVED_INSPECTION_CODES[section.key]);
+    const byArea = new Map(dto.services.map((service) => [service.area, service]));
+    if (approved.length !== 7 || byArea.size !== 7 || approved.some((section) => !byArea.has(section.key))) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Specify prices, tax rates and durations for exactly seven approved inspection services.');
+    }
+    const codes = approved.map((section) => APPROVED_INSPECTION_CODES[section.key]);
+    const result = await this.posting.withTransaction(async (tx) => {
+      const previous = await tx.inspectionService.findMany({
+        where: { companyId, code: { notIn: codes } },
+        select: { id: true },
+      });
+      const current = [];
+      for (const section of approved) {
+        const row = byArea.get(section.key)!;
+        const code = APPROVED_INSPECTION_CODES[section.key];
+        current.push(await tx.inspectionService.upsert({
+          where: { companyId_code: { companyId, code } },
+          update: {
+            nameEn: section.labelEn,
+            nameAr: section.labelAr,
+            priceMinor: row.priceMinor,
+            taxPercentBp: row.taxPercentBp,
+            durationMinutes: row.durationMinutes,
+            isActive: true,
+          },
+          create: {
+            companyId,
+            code,
+            nameEn: section.labelEn,
+            nameAr: section.labelAr,
+            priceMinor: row.priceMinor,
+            taxPercentBp: row.taxPercentBp,
+            durationMinutes: row.durationMinutes,
+            isActive: true,
+          },
+        }));
+      }
+      let deleted = 0;
+      let archived = 0;
+      for (const old of previous) {
+        const [bookings, checklistItems] = await Promise.all([
+          tx.inspectionBooking.count({
+            where: { companyId, OR: [{ serviceId: old.id }, { serviceIds: { has: old.id } }] },
+          }),
+          tx.inspectionChecklistItem.count({ where: { companyId, serviceId: old.id } }),
+        ]);
+        if (bookings === 0 && checklistItems === 0) {
+          await tx.inspectionService.delete({ where: { id: old.id } });
+          deleted++;
+        } else {
+          await tx.inspectionService.update({ where: { id: old.id }, data: { isActive: false } });
+          archived++;
+        }
+      }
+      return { items: current.map(toInspectionServiceDto), deleted, archived };
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'automotive.inspection_services_replaced',
+      targetType: 'INSPECTION_SERVICE',
+      targetId: companyId,
+      summary: `Approved seven inspection services; removed ${result.deleted} unused old entries and archived ${result.archived} historical entries.`,
+    });
+    return result;
+  }
+
   async listInspectionServices(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.inspectionService.findMany({
-      where: { companyId },
+      where: { companyId, isActive: true },
       include: { items: { orderBy: { sortOrder: 'asc' } }, imageAsset: { select: { id: true } } },
       orderBy: { code: 'asc' },
     });
@@ -473,7 +560,9 @@ export class VehicleService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const service = await this.prisma.inspectionService.findFirst({ where: { id, companyId } });
     if (!service) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection service not found.');
-    const bookings = await this.prisma.inspectionBooking.count({ where: { serviceId: id } });
+    const bookings = await this.prisma.inspectionBooking.count({
+      where: { companyId, OR: [{ serviceId: id }, { serviceIds: { has: id } }] },
+    });
     if (bookings > 0) {
       throw conflict(
         ERROR_CODES.RESOURCE_CONFLICT,
@@ -501,18 +590,41 @@ export class VehicleService {
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const where = { companyId, ...(query.status ? { status: query.status as never } : {}), ...(query.vehicleId ? { vehicleId: query.vehicleId } : {}) };
     const [rows, total] = await Promise.all([
-      this.prisma.inspectionBooking.findMany({ where, orderBy: { scheduledAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize, include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true } }, service: { select: { nameEn: true, nameAr: true } }, report: true, _count: { select: { findings: true } } } }),
+      this.prisma.inspectionBooking.findMany({ where, orderBy: { scheduledAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize, include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true, modelYear: true, color: true, mileage: true } }, service: { select: { nameEn: true, nameAr: true } }, session: { select: { id: true } }, report: true, _count: { select: { findings: true } } } }),
       this.prisma.inspectionBooking.count({ where }),
     ]);
-    return { items: rows.map(toInspectionBookingDto), total, page, pageSize };
+    const customerIds = [...new Set(rows.map((row) => row.customerId))];
+    const customers = await this.prisma.customer.findMany({
+      where: { companyId, id: { in: customerIds } },
+      select: { id: true, nameEn: true, nameAr: true, phone: true, email: true },
+    });
+    const byId = new Map(customers.map((row) => [row.id, row]));
+    return {
+      items: rows.map((row) => ({
+        ...toInspectionBookingDto(row),
+        customerNameEn: byId.get(row.customerId)?.nameEn ?? null,
+        customerNameAr: byId.get(row.customerId)?.nameAr ?? null,
+        customerPhone: byId.get(row.customerId)?.phone ?? null,
+        customerEmail: byId.get(row.customerId)?.email ?? null,
+      })),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async createInspectionBooking(dto: CreateInspectionBookingDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     const vehicle = await this.assertVehicle(companyId, dto.vehicleId);
-    const service = await this.prisma.inspectionService.findFirst({ where: { id: dto.serviceId, companyId } });
-    if (!service) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection service not found.');
+    const serviceIds = [...new Set([dto.serviceId, ...(dto.serviceIds ?? [])])];
+    const services = await this.prisma.inspectionService.findMany({
+      where: { companyId, id: { in: serviceIds }, isActive: true },
+      select: { id: true },
+    });
+    if (services.length !== serviceIds.length) {
+      throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'One or more selected inspection services are unavailable.');
+    }
 
     const booking = await this.posting.withTransaction(async (tx) => {
       const bookingNumber = await this.sequences.next(tx, companyId, 'inspectionBooking');
@@ -523,6 +635,7 @@ export class VehicleService {
           vehicleId: dto.vehicleId,
           customerId: vehicle.customerId,
           serviceId: dto.serviceId,
+          serviceIds,
           branchId: dto.branchId ?? null,
           scheduledAt: new Date(dto.scheduledAt),
           status: 'SCHEDULED',
@@ -703,6 +816,14 @@ export class VehicleService {
       if (booking.report?.status !== 'APPROVED') throw forbidden(ERROR_CODES.INSPECTION_NOT_COMPLETE, 'Only an approved inspection can be invoiced.');
       if (booking.report.invoiceId) throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'This inspection has already been invoiced.');
 
+      const selectedIds = [...new Set(booking.serviceIds.length > 0 ? booking.serviceIds : [booking.serviceId])];
+      const selectedServices = await tx.inspectionService.findMany({
+        where: { companyId, id: { in: selectedIds } },
+      });
+      if (selectedServices.length !== selectedIds.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'An inspection service linked to this booking is missing.');
+      }
+      const orderedServices = selectedIds.map((selectedId) => selectedServices.find((item) => item.id === selectedId)!);
       const invoice = await this.sales.issueInvoice(tx, {
         companyId,
         branchId: dto.branchId ?? booking.branchId,
@@ -714,16 +835,14 @@ export class VehicleService {
         actorUserId: actor.userId,
         notes: `Inspection ${booking.bookingNumber}`,
         issueStock: false,
-        lines: [
-          {
-            productId: null,
-            description: `${booking.service.nameEn} — inspection ${booking.bookingNumber}`,
-            quantity: 10000,
-            unitPriceMinor: booking.service.priceMinor,
-            discountPercentBp: 0,
-            taxPercentBp: booking.service.taxPercentBp,
-          },
-        ],
+        lines: orderedServices.map((service) => ({
+          productId: null,
+          description: `${service.nameEn} — inspection ${booking.bookingNumber}`,
+          quantity: 10000,
+          unitPriceMinor: service.priceMinor,
+          discountPercentBp: 0,
+          taxPercentBp: service.taxPercentBp,
+        })),
       });
       await tx.inspectionReport.update({ where: { bookingId: id }, data: { invoiceId: invoice.id } });
       return invoice;
@@ -868,14 +987,16 @@ function toInspectionBookingDto(b: {
   vehicleId: string;
   customerId: string;
   serviceId: string;
+  serviceIds: string[];
   status: string;
   scheduledAt: Date;
   inspectorUserId: string | null;
   odometer: number | null;
   notes: string | null;
-  vehicle?: { vin: string; make: string; model: string; plateNumber: string | null } | null;
+  vehicle?: { vin: string; make: string; model: string; plateNumber: string | null; modelYear?: number; color?: string | null; mileage?: number } | null;
   service?: { nameEn: string; nameAr: string } | null;
   report?: { status: string; invoiceId: string | null } | null;
+  session?: { id: string } | null;
   _count?: { findings: number };
 }) {
   return {
@@ -886,8 +1007,12 @@ function toInspectionBookingDto(b: {
     make: b.vehicle?.make ?? null,
     model: b.vehicle?.model ?? null,
     plateNumber: b.vehicle?.plateNumber ?? null,
+    modelYear: b.vehicle?.modelYear ?? null,
+    color: b.vehicle?.color ?? null,
+    mileage: b.vehicle?.mileage ?? null,
     customerId: b.customerId,
     serviceId: b.serviceId,
+    serviceIds: b.serviceIds.length ? b.serviceIds : [b.serviceId],
     serviceNameEn: b.service?.nameEn ?? null,
     serviceNameAr: b.service?.nameAr ?? null,
     status: b.status,
@@ -897,6 +1022,7 @@ function toInspectionBookingDto(b: {
     notes: b.notes,
     reportStatus: b.report?.status ?? null,
     invoiceId: b.report?.invoiceId ?? null,
+    sessionId: b.session?.id ?? null,
     findingCount: b._count?.findings,
   };
 }

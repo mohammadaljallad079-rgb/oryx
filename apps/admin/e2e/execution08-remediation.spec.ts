@@ -85,33 +85,21 @@ test.describe('Execution 08 remediation — interface', () => {
     await expect(page.locator('.oryx-modal')).toHaveCount(0);
   });
 
-  test('4. an inspection service shows base price, VAT and the total including VAT', async ({ page }) => {
+  test('4. each approved inspection shows a live base price, VAT and total preview', async ({ page }) => {
     await page.goto('/automotive/inspections');
     await page.getByTestId('inspections-tab-services').click();
-    await page.getByTestId('new-inspection-service').click();
+    await page.getByTestId('replace-approved-services').click();
 
-    await expect(page.getByTestId('service-code')).toHaveAttribute('readonly', '');
-    await page.getByTestId('service-name-en').fill('E08 UI inspection');
-    await page.getByTestId('service-name-ar').fill('فحص واجهة');
-    await page.getByTestId('service-price').fill('5.000');
-    await page.getByTestId('service-tax-rate').fill('10');
-    // The live preview shows the breakdown before saving.
-    await expect(page.getByTestId('preview-vat')).toContainText('0.500');
-    await expect(page.getByTestId('preview-total')).toContainText('5.500');
-    await page.getByTestId('save-service').click();
-
-    const row = page.locator('[data-testid^="service-row-"]').filter({ hasText: 'E08 UI inspection' });
-    await expect(row).toBeVisible({ timeout: 15_000 });
-    const rowId = await row.getAttribute('data-testid');
-    expect(rowId).toBeTruthy();
-    const code = rowId!.replace('service-row-', '');
-    await expect(row).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId(`service-vat-${code}`)).toContainText('0.500');
-    await expect(page.getByTestId(`service-total-${code}`)).toContainText('5.500');
-
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByTestId(`service-delete-${code}`).click();
-    await expect(row).toHaveCount(0, { timeout: 15_000 });
+    // Preview prices without submitting a destructive catalogue replacement:
+    // the approved seven-service workflow is now the source of truth.
+    const area = 'PAINT_BODY';
+    await expect(page.getByTestId(`approved-service-preview-${area}`)).toBeVisible();
+    await page.getByTestId(`approved-service-price-${area}`).fill('5.000');
+    await page.getByTestId(`approved-service-tax-${area}`).fill('10');
+    await expect(page.getByTestId(`approved-service-vat-${area}`)).toContainText('0.500');
+    await expect(page.getByTestId(`approved-service-total-${area}`)).toContainText('5.500');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.oryx-modal')).toHaveCount(0);
   });
 
   test('5. a modal paints its own surface and sits above the page in both themes', async ({ page }) => {

@@ -1497,6 +1497,16 @@ export const api = {
     request<VehicleDocumentOcrResultDto>(`/automotive/vehicles/${id}/documents/ocr`, { method: 'POST', body: form, raw: true }),
   removeVehicleDocument: (id: string, documentId: string) =>
     request<{ removed: boolean }>(`/automotive/vehicles/${id}/documents/${documentId}`, { method: 'DELETE' }),
+  replaceApprovedInspectionServices: (services: Array<{
+    area: string;
+    priceMinor: number;
+    taxPercentBp: number;
+    durationMinutes: number;
+  }>) =>
+    request<{ items: InspectionServiceDto[]; deleted: number; archived: number }>(
+      '/automotive/inspection-services/replace-approved',
+      { method: 'POST', body: { services } },
+    ),
   inspectionServices: (params: { companyId?: string } = {}) =>
     request<Paginated<InspectionServiceDto>>(`/automotive/inspection-services?${toQuery(params)}`),
   createInspectionService: (body: Record<string, unknown>) =>
@@ -1571,6 +1581,25 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, 'document_download_failed', 'The document could not be opened.');
     return URL.createObjectURL(await res.blob());
   },
+  /** Download an authenticated PDF bundle: invoice, report, then vendor scans. */
+  inspectionBundleBlobUrl: async (sessionId: string): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(
+      `${API_BASE}/v1/documents/inspections/${encodeURIComponent(sessionId)}/bundle`,
+      { headers, credentials: 'include' },
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError(res.status, 'inspection_bundle_failed',
+        typeof body?.message === 'string' ? body.message : 'The invoice and report could not be downloaded.');
+    }
+    return URL.createObjectURL(await res.blob());
+  },
+
 
 
   // ---- document attachment actions ----

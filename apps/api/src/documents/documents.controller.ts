@@ -107,6 +107,31 @@ export class DocumentsController {
     return this.documents.issueInspectionReport(sessionId, p, actorFrom(p, req), req);
   }
 
+  /**
+   * Invoice first, then the approved report and uploaded diagnostic PDFs.
+   * Requires both inspection and sales read permissions; company scope is
+   * resolved by DocumentsService and the existing invoice posting is reused.
+   */
+  @Get('inspections/:sessionId/bundle')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.read', 'erp.sales.read')
+  @ApiOperation({ summary: 'Download the inspection invoice and report as one PDF' })
+  async inspectionBundle(
+    @Param('sessionId') sessionId: string,
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Req() req: RequestLike,
+    @Res() res: Response,
+  ) {
+    const { bytes, filename, contentType } = await this.documents.inspectionBundle(
+      sessionId, principal, actorFrom(principal, req), req,
+    );
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', String(bytes.length));
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.status(200).send(bytes);
+  }
+
   // ------------------------------------------------------------- reading
 
   @Get()
