@@ -2251,6 +2251,7 @@ model SalesInvoice {
   customer    Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
   order       SalesOrder?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
   lines       SalesInvoiceLine[]
+  inspectionSession InspectionSession?
   allocations PaymentAllocation[]
   creditNotes CreditNote[]
   webOrders   WebOrder[]
@@ -4589,6 +4590,7 @@ model InspectionSession {
   customer Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
   vehicle  Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   booking  InspectionBooking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  invoice  SalesInvoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   branch   Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   sections       InspectionSectionResult[]
