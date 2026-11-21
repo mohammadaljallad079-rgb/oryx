@@ -1035,6 +1035,25 @@ export class WorkshopService {
 
   async createServiceRequest(dto: CreateServiceRequestDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    if (dto.customerId) {
+      const customer = await this.prisma.customer.findFirst({ where: { id: dto.customerId, companyId } });
+      if (!customer) throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Customer does not belong to this company.');
+    }
+    if (dto.vehicleId) {
+      const vehicle = await this.assertVehicle(companyId, dto.vehicleId);
+      if (dto.customerId && vehicle.customerId !== dto.customerId) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The vehicle must belong to the selected customer.');
+      }
+    }
+    const maintenance = await this.prisma.maintenanceService.findFirst({
+      where: { companyId, code: dto.categoryKey, isActive: true },
+    });
+    if (!maintenance && dto.categoryKey !== 'WORKSHOP') {
+      // Keep the legacy marketplace category workflow intact. The admin UI
+      // only offers maintenance services that exist in this tenant.
+      const known = await this.prisma.serviceCategory.findUnique({ where: { key: dto.categoryKey } });
+      if (!known) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Unknown service category.');
+    }
     const request = await this.posting.withTransaction(async (tx) => {
       const requestNumber = await this.sequences.next(tx, companyId, 'serviceRequest');
       return tx.serviceRequest.create({
