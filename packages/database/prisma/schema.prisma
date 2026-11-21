@@ -5679,6 +5679,8 @@ model BookingSlot {
    * Service catalog id (inspection service, provider listing, …).
    */
   serviceRef         String?
+  /** Ordered services booked in one shared resource/time slot. */
+  serviceRefs        String[]      @default([])
   startsAt           DateTime
   endsAt             DateTime
   /**
