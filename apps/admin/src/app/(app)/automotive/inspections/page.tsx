@@ -1275,16 +1275,16 @@ function CreateBookingModal({
 }: {
   open: boolean;
   vehicles: Array<{ id: string; vin: string; make: string; model: string }>;
-  services: Array<{ id: string; nameEn: string; priceMinor: number; taxPercentBp: number }>;
+  services: Array<{ id: string; nameEn: string; nameAr: string; priceMinor: number; taxPercentBp: number; isActive?: boolean }>;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     vehicleId: '',
-    serviceId: '',
+    serviceIds: [] as string[],
     scheduledAt: new Date().toISOString().slice(0, 16),
     branchId: '',
     odometer: '',
@@ -1294,18 +1294,20 @@ function CreateBookingModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
-    setForm({ vehicleId: '', serviceId: '', scheduledAt: new Date().toISOString().slice(0, 16), branchId: '', odometer: '', notes: '' });
+    setForm({ vehicleId: '', serviceIds: [], scheduledAt: new Date().toISOString().slice(0, 16), branchId: '', odometer: '', notes: '' });
   }, [open]);
 
-  const service = services.find((s) => s.id === form.serviceId);
-  const vatMinor = service ? basisPointsOfMinor(service.priceMinor, service.taxPercentBp) : 0;
+  const chosenServices = services.filter((service) => form.serviceIds.includes(service.id));
+  const amountMinor = chosenServices.reduce((sum, service) => sum + service.priceMinor, 0);
+  const vatMinor = chosenServices.reduce((sum, service) => sum + basisPointsOfMinor(service.priceMinor, service.taxPercentBp), 0);
 
   const submit = async () => {
     setBusy(true); setError(null);
     try {
       await api.createInspectionBooking({
         vehicleId: form.vehicleId,
-        serviceId: form.serviceId,
+        serviceId: form.serviceIds[0],
+        serviceIds: form.serviceIds,
         scheduledAt: new Date(form.scheduledAt).toISOString(),
         ...(form.branchId ? { branchId: form.branchId } : {}),
         ...(form.odometer ? { odometer: Number(form.odometer) } : {}),
@@ -1318,7 +1320,7 @@ function CreateBookingModal({
 
   return (
     <Modal open={open} title={t('erp.automotive.newBooking')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.vehicleId || !form.serviceId || !form.scheduledAt} onClick={submit} data-testid="save-booking">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.vehicleId || form.serviceIds.length === 0 || !form.scheduledAt} onClick={submit} data-testid="save-booking">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.automotive.vehicle')} required>
@@ -1330,15 +1332,23 @@ function CreateBookingModal({
             testId="booking-vehicle"
           />
         </Field>
-        <Field label={t('erp.automotive.service')} required>
-          <EntitySelect
-            catalogue="inspectionService"
-            allowCreate
-            value={form.serviceId || null}
-            onChange={(v) => setForm({ ...form, serviceId: v ?? '' })}
-            placeholder={t('common.select')}
-            testId="booking-service"
-          />
+        <Field label={locale === 'ar' ? 'خدمات الفحص (يمكن اختيار عدة خدمات)' : 'Inspection services (select multiple)'} required>
+          <div className="max-h-52 overflow-auto rounded-xl border border-[var(--border)] p-2" data-testid="booking-services">
+            {services.filter((service) => service.isActive !== false).map((service) => (
+              <label key={service.id} className="flex items-center gap-2 border-b border-[var(--border)] px-2 py-2 last:border-b-0">
+                <input type="checkbox" className="oryx-checkbox" checked={form.serviceIds.includes(service.id)}
+                  onChange={(event) => setForm((current) => ({
+                    ...current,
+                    serviceIds: event.target.checked
+                      ? [...current.serviceIds, service.id]
+                      : current.serviceIds.filter((id) => id !== service.id),
+                  }))}
+                  data-testid={`booking-service-${service.id}`} />
+                <span className="min-w-0 flex-1">{(locale === 'ar' ? service.nameAr : service.nameEn) || service.nameEn}</span>
+                <span className="tabular-nums">{money(service.priceMinor)}</span>
+              </label>
+            ))}
+          </div>
         </Field>
         <Field label={t('erp.automotive.scheduledAt')} required>
           <input type="datetime-local" className="oryx-input oryx-input--date" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} data-testid="booking-date" />
@@ -1361,11 +1371,23 @@ function CreateBookingModal({
           <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="booking-notes" />
         </Field>
       </div>
-      {service ? (
+      {chosenServices.length > 0 ? (
         <div className="mt-3 rounded-xl border border-[var(--border)] p-3 text-sm" data-testid="booking-price-summary">
-          <div className="flex justify-between gap-3"><span>{t('erp.automotive.basePrice')}</span><span className="tabular-nums">{money(service.priceMinor)}</span></div>
-          <div className="mt-1 flex justify-between gap-3"><span>{t('erp.automotive.vatAmount')} ({(service.taxPercentBp / 100).toFixed(2)}%)</span><span className="tabular-nums">{money(vatMinor)}</span></div>
-          <div className="mt-2 flex justify-between gap-3 border-t border-[var(--border)] pt-2 font-bold"><span>{t('erp.automotive.totalInclVat')}</span><span className="tabular-nums">{money(service.priceMinor + vatMinor)}</span></div>
+          {chosenServices.map((service) => (
+            <div key={service.id} className="flex justify-between gap-3 py-1">
+              <span>{(locale === 'ar' ? service.nameAr : service.nameEn) || service.nameEn}</span>
+              <span className="tabular-nums">{money(service.priceMinor)}</span>
+            </div>
+          ))}
+          <div className="mt-1 flex justify-between gap-3 border-t border-[var(--border)] pt-2">
+            <span>{t('erp.automotive.basePrice')}</span><span className="tabular-nums">{money(amountMinor)}</span>
+          </div>
+          <div className="mt-1 flex justify-between gap-3">
+            <span>{t('erp.automotive.vatAmount')}</span><span className="tabular-nums">{money(vatMinor)}</span>
+          </div>
+          <div className="mt-2 flex justify-between gap-3 border-t border-[var(--border)] pt-2 font-bold">
+            <span>{t('erp.automotive.totalInclVat')}</span><span className="tabular-nums">{money(amountMinor + vatMinor)}</span>
+          </div>
         </div>
       ) : null}
     </Modal>
