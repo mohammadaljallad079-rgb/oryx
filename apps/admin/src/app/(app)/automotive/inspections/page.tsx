@@ -275,6 +275,7 @@ function NewJobModal({ onClose, onCreated, initialBooking }: {
   initialBooking?: InspectionBookingDto | null;
 }) {
   const { t, locale } = useUi();
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState(initialBooking?.customerId ?? '');
@@ -357,7 +358,7 @@ function NewJobModal({ onClose, onCreated, initialBooking }: {
     setBusy(true);
     setError(null);
     try {
-      await api.createInspectionSession({
+      const created = await api.createInspectionSession({
         customerId,
         vehicleId,
         selectedTypes: types,
@@ -374,6 +375,7 @@ function NewJobModal({ onClose, onCreated, initialBooking }: {
       });
       await onCreated();
       onClose();
+      router.push(`/automotive/inspections/${created.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -1114,6 +1116,7 @@ function BookingsTab({ canBook, canApprove, canInvoice, onStartInspection }: {
   onStartInspection: (booking: InspectionBookingDto) => void;
 }) {
   const { t, locale } = useUi();
+  const router = useRouter();
   const list = useAsync(() => api.inspectionBookings(), []);
   const vehicles = useAsync(() => api.vehicles(), []);
   const services = useAsync(() => api.inspectionServices(), []);
@@ -1246,7 +1249,15 @@ function BookingsTab({ canBook, canApprove, canInvoice, onStartInspection }: {
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button variant="primary" size="sm" disabled={!selectedBooking}
-            onClick={() => { if (selectedBooking) onStartInspection(selectedBooking); setDetail(null); }}
+            onClick={() => {
+              if (!selectedBooking) return;
+              if (selectedBooking.sessionId) {
+                router.push(`/automotive/inspections/${selectedBooking.sessionId}`);
+              } else {
+                onStartInspection(selectedBooking);
+              }
+              setDetail(null);
+            }}
             data-testid="booking-open-inspections">
             <Icon name="clipboardCheck" size={16} />
             {locale === 'ar' ? 'الانتقال إلى الفحوصات' : 'Open inspections'}
