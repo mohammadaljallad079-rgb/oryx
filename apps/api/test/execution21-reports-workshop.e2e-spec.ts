@@ -170,6 +170,49 @@ describe('Execution 21 — reports catalogue and workshop lifecycle (e2e)', () =
         method: 'PATCH', body: { status: 'COMPLETED' },
       });
       expect(complete.status).toBeLessThan(300);
+
+      const issued = await erp<{ id: string; invoiceNumber: string }>(
+        `/automotive/job-cards/${job.body.id}/invoice`,
+        { method: 'POST', body: {} },
+      );
+      expect(issued.status).toBeLessThan(300);
+      expect(issued.body.id).toBeTruthy();
+      const repeated = await erp<{ id: string; invoiceNumber: string }>(
+        `/automotive/job-cards/${job.body.id}/invoice`,
+        { method: 'POST', body: {} },
+      );
+      expect(repeated.status).toBeLessThan(300);
+      expect(repeated.body.id).toBe(issued.body.id);
+      expect(repeated.body.invoiceNumber).toBe(issued.body.invoiceNumber);
+    });
+
+    it('manages company maintenance services without losing the published catalogue', async () => {
+      const code = `E2E_MAINT_${Date.now().toString().slice(-8)}`;
+      const created = await erp<{ id: string; code: string }>('/automotive/maintenance-services', {
+        method: 'POST',
+        body: {
+          code, nameEn: 'E2E Maintenance Service', nameAr: 'صيانة اختبار',
+          priceMinor: 5500, durationMinutes: 30, isActive: true, isPublished: true,
+        },
+      });
+      expect(created.status).toBe(201);
+      const listed = await erp<Array<{ id: string; code: string }>>('/automotive/maintenance-services');
+      expect(listed.status).toBe(200);
+      expect(listed.body.some((item) => item.code === code)).toBe(true);
+
+      const edited = await erp<{ priceMinor: number }>(
+        `/automotive/maintenance-services/${created.body.id}`,
+        { method: 'PATCH', body: { priceMinor: 6500, isPublished: false } },
+      );
+      expect(edited.status).toBe(200);
+      expect(edited.body.priceMinor).toBe(6500);
+
+      const removed = await erp<{ deleted: boolean }>(
+        `/automotive/maintenance-services/${created.body.id}`,
+        { method: 'DELETE' },
+      );
+      expect(removed.status).toBe(200);
+      expect(removed.body.deleted).toBe(true);
     });
 
     it('exposes a workshop dashboard scoped to the company', async () => {
