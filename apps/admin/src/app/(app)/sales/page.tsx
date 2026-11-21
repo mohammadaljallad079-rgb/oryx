@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -1082,13 +1082,23 @@ function PosSaleModal({
 
   // A new product must be visible immediately in a crowded cashier cart,
   // without moving the whole POS workspace or hiding payment controls.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) {
       previousCartLength.current = 0;
       return;
     }
     if (cart.length > previousCartLength.current && cartListRef.current) {
-      cartListRef.current.scrollTop = cartListRef.current.scrollHeight;
+      const cartElement = cartListRef.current;
+      // Wait for the new row to finish layout (including fonts and responsive
+      // grid sizing) so the last item is actually visible inside the basket.
+      // Scroll only the basket, never the whole cashier dialog.
+      const revealLastItem = () => {
+        cartElement.scrollTop = Math.max(0, cartElement.scrollHeight - cartElement.clientHeight);
+      };
+      revealLastItem();
+      const frame = window.requestAnimationFrame(revealLastItem);
+      previousCartLength.current = cart.length;
+      return () => window.cancelAnimationFrame(frame);
     }
     previousCartLength.current = cart.length;
   }, [cart.length, open]);
