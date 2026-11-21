@@ -41,6 +41,7 @@ export default function InspectionsPage() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('jobs');
+  const [bookingToInspect, setBookingToInspect] = useState<InspectionBookingDto | null>(null);
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'jobs', label: t('inspection.jobs') },
@@ -73,13 +74,15 @@ export default function InspectionsPage() {
         ))}
       </div>
 
-      {tab === 'jobs' ? <JobsTab canWrite={can('erp.inspection.write')} /> : null}
+      {tab === 'jobs' ? <JobsTab canWrite={can('erp.inspection.write')} bookingToInspect={bookingToInspect}
+        onBookingPrepared={() => setBookingToInspect(null)} /> : null}
       {tab === 'vehicles' ? <VehiclesTab canManage={can('erp.vehicle.manage')} /> : null}
       {tab === 'bookings' ? (
         <BookingsTab
           canBook={can('erp.inspection.booking.manage')}
           canApprove={can('erp.inspection.report.approve')}
           canInvoice={can('erp.inspection.invoice')}
+          onStartInspection={(booking) => { setBookingToInspect(booking); setTab('jobs'); }}
         />
       ) : null}
       {tab === 'services' ? <ServicesTab canManage={can('erp.inspection.service.manage')} /> : null}
@@ -94,12 +97,19 @@ export default function InspectionsPage() {
  * by choosing the customer, the vehicle and the inspection types, then opened in
  * the workspace where the sections are filled in.
  */
-function JobsTab({ canWrite }: { canWrite: boolean }) {
+function JobsTab({ canWrite, bookingToInspect, onBookingPrepared }: {
+  canWrite: boolean;
+  bookingToInspect: InspectionBookingDto | null;
+  onBookingPrepared: () => void;
+}) {
   const { t, locale } = useUi();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  useEffect(() => {
+    if (bookingToInspect && canWrite) setOpen(true);
+  }, [bookingToInspect, canWrite]);
   const debounced = useDebounced(search);
   const list = useAsync(() => api.inspectionSessions({ search: debounced || undefined }), [debounced]);
 
@@ -211,7 +221,11 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
         )
       ) : null}
 
-      {open ? <NewJobModal onClose={() => setOpen(false)} onCreated={list.reload} /> : null}
+      {open ? <NewJobModal
+        initialBooking={bookingToInspect}
+        onClose={() => { setOpen(false); onBookingPrepared(); }}
+        onCreated={list.reload}
+      /> : null}
     </div>
   );
 }
@@ -254,12 +268,16 @@ const EMPTY_IDENTITY: JobIdentity = {
  * confirms them rather than retyping them, and can correct any value before the
  * report is issued.
  */
-function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => Promise<void> }) {
+function NewJobModal({ onClose, onCreated, initialBooking }: {
+  onClose: () => void;
+  onCreated: () => Promise<void>;
+  initialBooking?: InspectionBookingDto | null;
+}) {
   const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [customerId, setCustomerId] = useState('');
-  const [vehicleId, setVehicleId] = useState('');
+  const [customerId, setCustomerId] = useState(initialBooking?.customerId ?? '');
+  const [vehicleId, setVehicleId] = useState(initialBooking?.vehicleId ?? '');
   const [types, setTypes] = useState<InspectionTypeKey[]>([]);
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
   const [identity, setIdentity] = useState<JobIdentity>(EMPTY_IDENTITY);
@@ -1087,9 +1105,13 @@ function CreateVehicleModal({
   );
 }
 
-function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; canApprove: boolean; canInvoice: boolean }) {
+function BookingsTab({ canBook, canApprove, canInvoice, onStartInspection }: {
+  canBook: boolean;
+  canApprove: boolean;
+  canInvoice: boolean;
+  onStartInspection: (booking: InspectionBookingDto) => void;
+}) {
   const { t, locale } = useUi();
-  const [showJobs, setShowJobs] = useState(false);
   const list = useAsync(() => api.inspectionBookings(), []);
   const vehicles = useAsync(() => api.vehicles(), []);
   const services = useAsync(() => api.inspectionServices(), []);
@@ -1212,7 +1234,9 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
           ))}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button variant="primary" size="sm" onClick={() => setShowJobs(true)} data-testid="booking-open-inspections">
+          <Button variant="primary" size="sm" disabled={!selectedBooking}
+            onClick={() => { if (selectedBooking) onStartInspection(selectedBooking); setDetail(null); }}
+            data-testid="booking-open-inspections">
             <Icon name="clipboardCheck" size={16} />
             {locale === 'ar' ? 'الانتقال إلى الفحوصات' : 'Open inspections'}
           </Button>
@@ -1236,7 +1260,6 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
           )}
         </div>
       </Modal>
-      {showJobs ? <div role="status" className="px-3 pb-3 text-sm">{locale === 'ar' ? 'افتح تبويب الفحوصات من الأعلى لإنشاء فحص مرتبط بالسيارة.' : 'Open the Inspections tab above to create an inspection for this vehicle.'}</div> : null}
 
       <CreateBookingModal open={open} vehicles={vehicles.data?.items ?? []} services={services.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
