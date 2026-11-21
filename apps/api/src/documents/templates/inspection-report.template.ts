@@ -148,12 +148,13 @@ export function reportWatermark(): string {
  * printed value stays fully legible on top of it.
  */
 export function parkWatermark(issuer: DocumentIssuer): string {
-  const logo = issuer.logoDataUri
-    ? `<img class="rp-park-wm-logo" src="${esc(issuer.logoDataUri)}" alt="">`
-    : oryxLogoMark('58pt', 'rp-park-wm-logo');
-  return `<div class="rp-park-wm" aria-hidden="true">
-    ${logo}
-    <span class="rp-park-wm-text">AUTO PARK</span>
+  // Use exactly the company's configured watermark, never a hardcoded
+  // third-party name or an additional unconfigured mark.
+  if (issuer.documentWatermarkEnabled === false || !issuer.logoDataUri) return '';
+  const size = Math.max(80, Math.min(500, issuer.documentWatermarkSizePt ?? 310));
+  const opacity = Math.max(0, Math.min(1, issuer.documentWatermarkOpacity ?? 0.10));
+  return `<div class="rp-park-wm" aria-hidden="true" style="opacity:${opacity}">
+    <img class="rp-park-wm-logo" src="${esc(issuer.logoDataUri)}" alt="" style="max-width:${size}pt;max-height:${size}pt">
   </div>`;
 }
 
@@ -308,7 +309,6 @@ export function identificationPage(input: InspectionReportInput, chrome: Documen
   const stamp = docStamp(p.inspectedAt);
   return `
   <section class="doc-page">
-    ${reportWatermark()}
     ${parkWatermark(input.issuer)}
     ${reportHeader(chrome.issuer)}
     ${pageTitleBar('تقرير فحص المركبة', 'VEHICLE INSPECTION REPORT')}
@@ -407,9 +407,9 @@ export function inspectionGroupPage(
   // checklist, not as an in-flow figure. An in-flow copy would add its full
   // height to a page that is already complete and push the last checklist onto
   // a sixth sheet.
-  const interiorArt = interior
-    ? `<figure class="interior-art"><img src="${INTERIOR_DIAGRAM_DATA_URI}" alt=""></figure>`
-    : '';
+  // The interior illustration must not overlap the Exterior Car checklist.
+  // It is omitted from this dense data page rather than painted behind text.
+  const interiorArt = '';
 
   // The approved sheet prints a single remarks box in the left column beneath
   // the exterior checklist. It carries the inspection's one optional notes
@@ -715,11 +715,11 @@ export const INSPECTION_REPORT_CSS = `
    * data stays legible on top of it. Positioned in the lower-middle of the sheet
    * so it clears the approved wordmark band (top ~350pt, cover only) and never
    * stacks on top of it. */
-  .rp-park-wm{ position:absolute; left:0; right:0; top:452pt;
+  .rp-park-wm{ position:absolute; left:0; right:0; top:42%;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     gap:8pt; white-space:nowrap; color:#0a1f44; opacity:0.08;
     pointer-events:none; z-index:0; }
-  .rp-park-wm-logo{ display:block; width:auto; max-width:130pt; max-height:56pt;
+  .rp-park-wm-logo{ display:block; width:auto; max-width:310pt; max-height:310pt;
     object-fit:contain; }
   .rp-park-wm svg{ display:block; width:56pt; height:auto; }
   .rp-park-wm-text{ font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif;
@@ -884,10 +884,10 @@ export const INSPECTION_REPORT_CSS = `
   .two-col > *{ flex:1 1 0; min-width:0; }
   .cabin .two-col{ margin-top:5px; }
   .grid{ width:100%; direction:rtl; table-layout:fixed; border-collapse:separate; border-spacing:4px 2px; }
-  .grid > tbody > tr > td{ box-sizing:border-box; width:50%; max-width:50%; vertical-align:top; padding:0; overflow:hidden; }
+  .grid > tbody > tr > td{ box-sizing:border-box; width:50%; max-width:50%; vertical-align:top; padding:0; overflow:visible; }
   .cabin .grid{ border-collapse:separate; page-break-inside:auto; }
   .cabin .grid > tbody > tr{ page-break-inside:avoid; break-inside:avoid; }
-  .cabin .grid > tbody > tr > td{ width:50%; max-width:50%; overflow:hidden; }
+  .cabin .grid > tbody > tr > td{ width:50%; max-width:50%; overflow:visible; }
   /* Keep the exterior checklist and its optional remarks in a separate, bounded
    * table column. The illustrated lower sheet must not clip bilingual rows or
    * let long notes paint over the neighbouring interior checklist. */
@@ -941,7 +941,7 @@ export const INSPECTION_REPORT_CSS = `
   .items .c-res{ text-align:center; vertical-align:middle; white-space:nowrap; }
   .items .c-res .mark{ vertical-align:middle; }
   .cabin .itable{ position:relative; z-index:1; background:#fff; }
-  .cabin .grp{ min-width:0; overflow:hidden; }
+  .cabin .grp{ min-width:0; overflow:visible; }
   .cabin .items{ width:100%; max-width:100%; table-layout:fixed; }
   .cabin .items th,.cabin .items td{ word-break:normal; overflow-wrap:anywhere; }
   .cabin .items thead{ display:table-header-group; }
