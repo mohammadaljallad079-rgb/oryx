@@ -910,7 +910,7 @@ function AttachmentsPanel({
 
   const upload = async (files: File[]) => {
     if (files.length === 0) return;
-    const limit = 12 * 1024 * 1024;
+    const limit = 200 * 1024 * 1024;
     const supported = files.every((file) =>
       file.type === 'application/pdf' || file.type.startsWith('image/'));
     if (!supported) {
@@ -919,8 +919,8 @@ function AttachmentsPanel({
     }
     if (files.some((file) => file.size > limit)) {
       onError(locale === 'ar'
-        ? 'حجم الملف يتجاوز 12 ميغابايت. قم بتصغيره قبل الرفع.'
-        : 'File exceeds the 12 MB upload limit. Please reduce the file size.');
+        ? 'حجم الملف يتجاوز 200 ميغابايت. قم بتصغيره قبل الرفع.'
+        : 'File exceeds the 200 MB upload limit. Please reduce the file size.');
       return;
     }
     setBusy(true);
@@ -990,7 +990,7 @@ function AttachmentsPanel({
             data-testid="attachment-input"
           />
           <p className="oryx-muted m-0 text-xs">
-            {locale === 'ar' ? 'صور وملفات PDF، حتى 12 ميغابايت لكل ملف. يمكن اختيار عدة ملفات.' : 'Images and PDF files, up to 12 MB each. Multiple files supported.'}
+            {locale === 'ar' ? 'صور وملفات PDF، حتى 200 ميغابايت لكل ملف. يمكن اختيار عدة ملفات.' : 'Images and PDF files, up to 200 MB each. Multiple files supported.'}
           </p>
         </div>
       ) : null}
