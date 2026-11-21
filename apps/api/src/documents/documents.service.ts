@@ -30,6 +30,7 @@ import {
 } from './pdf/pdf-renderer.service';
 import { QrService } from './pdf/qr.service';
 import { MediaStorageService } from '../cms/media-storage.service';
+import { InspectionService } from '../automotive/inspection.service';
 import { renderInspectionReportHtml } from './templates/report-html';
 import { renderOfficialFinancialHtml } from './templates/official-financial.template';
 import { footerTemplate, officialFooterTemplate, reportFooterTemplate } from './templates/chrome';
@@ -73,6 +74,7 @@ export class DocumentsService {
     private readonly mediaStorage: MediaStorageService,
     private readonly renderer: PdfRendererService,
     private readonly qr: QrService,
+    private readonly inspections: InspectionService,
   ) {}
 
   // ------------------------------------------------------------------ issuing
@@ -203,23 +205,16 @@ export class DocumentsService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const session = await this.prisma.inspectionSession.findFirst({
       where: { id: sessionId, companyId },
-      select: { id: true, bookingId: true, jobNumber: true, status: true },
+      select: { id: true, jobNumber: true, status: true },
     });
     if (!session) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');
     if (session.status !== 'APPROVED') {
       throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Approve the inspection before issuing its final PDF.');
     }
-    if (!session.bookingId) {
-      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This inspection is not linked to an inspection booking; invoice it before requesting a combined PDF.');
-    }
-    const booking = await this.prisma.inspectionBooking.findFirst({
-      where: { id: session.bookingId, companyId },
-      include: { report: { select: { invoiceId: true } } },
-    });
-    const invoiceId = booking?.report?.invoiceId;
-    if (!invoiceId) {
-      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Issue the inspection sales invoice first, then download the combined report.');
-    }
+    // Direct inspection invoice link replaces the legacy booking/report path.
+    // For approved legacy inspections this call safely backfills or reuses the
+    // existing invoice, and refuses to guess prices if services are missing.
+    const invoiceId = await this.inspections.ensureInvoice(session.id, principal, actor);
     let invoiceDocument = await this.prisma.officialDocument.findFirst({
       where: { companyId, type: 'SALES_INVOICE', sourceType: 'SalesInvoice', sourceId: invoiceId, status: 'ISSUED' },
       orderBy: { version: 'desc' },

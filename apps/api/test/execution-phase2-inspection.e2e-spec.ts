@@ -31,6 +31,7 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
   let otherCompanyId = '';
   let customerId = '';
   let vehicleId = '';
+  let billedServiceId = '';
   let otherVehicleId = '';
   let otherCustomerId = '';
 
@@ -60,6 +61,13 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
     await prisma.inspectionItemResult.deleteMany({ where: { sessionId: { in: sessionIds } } });
     await prisma.inspectionSectionResult.deleteMany({ where: { sessionId: { in: sessionIds } } });
     await prisma.inspectionSession.deleteMany({ where: { id: { in: sessionIds } } });
+    await prisma.journalLine.deleteMany({ where: { entry: { companyId: { in: companyIds } } } });
+    await prisma.journalEntry.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.salesInvoiceLine.deleteMany({ where: { invoice: { companyId: { in: companyIds } } } });
+    await prisma.salesInvoice.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.fiscalPeriod.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.fiscalYear.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.account.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.inspectionBooking.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.vehicle.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.customer.deleteMany({ where: { companyId: { in: companyIds } } });
@@ -131,6 +139,43 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
       },
     });
     vehicleId = vehicle.id;
+    // Approval now posts a real sales invoice, so this test tenant needs
+    // a real priced service and the minimum valid accounting configuration.
+    const billing = await prisma.inspectionService.create({
+      data: {
+        companyId,
+        code: `${PREFIX}-BILLING`,
+        nameEn: 'Vehicle inspection test service',
+        nameAr: 'خدمة فحص اختبارية',
+        priceMinor: 25000,
+        taxPercentBp: 0,
+      },
+    });
+    billedServiceId = billing.id;
+    await prisma.account.createMany({
+      data: [
+        { companyId, code: `${PREFIX}-AR`, nameEn: 'Accounts Receivable',
+          nameAr: 'الذمم المدينة', type: 'ASSET', normalBalance: 'DEBIT', systemRole: 'AR_CONTROL' },
+        { companyId, code: `${PREFIX}-REV`, nameEn: 'Inspection Revenue',
+          nameAr: 'إيرادات الفحص', type: 'REVENUE', normalBalance: 'CREDIT', systemRole: 'SALES_REVENUE' },
+      ],
+    });
+    await prisma.fiscalYear.create({
+      data: {
+        companyId, code: `${PREFIX}-FY-INS`,
+        startDate: new Date('2026-01-01T00:00:00.000Z'),
+        endDate: new Date('2026-12-31T23:59:59.999Z'),
+        periods: {
+          create: {
+            companyId, periodNumber: 1, nameEn: 'Inspection billing',
+            nameAr: 'فترة فوترة الفحص', status: 'OPEN',
+            startDate: new Date('2026-01-01T00:00:00.000Z'),
+            endDate: new Date('2026-12-31T23:59:59.999Z'),
+          },
+        },
+      },
+    });
+
 
     const otherCustomer = await prisma.customer.create({
       data: { companyId, code: `${PREFIX}-CUST2`, nameEn: 'EP2 Second', nameAr: 'ثاني' },
@@ -181,7 +226,8 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
       ctx.base,
       company,
       '/automotive/inspections',
-      { method: 'POST', token, body: { customerId: customer, vehicleId: vehicle, selectedAreas: areas } },
+      { method: 'POST', token, body: { customerId: customer, vehicleId: vehicle, selectedAreas: areas,
+          ...(company === companyId ? { billingServiceIds: [billedServiceId] } : {}) } },
     );
     if (res.status !== 201) throw new Error(`create failed: ${res.status} ${JSON.stringify(res.body)}`);
     return res.body;

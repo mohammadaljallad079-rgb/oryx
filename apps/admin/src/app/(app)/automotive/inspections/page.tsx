@@ -281,6 +281,8 @@ function NewJobModal({ onClose, onCreated, initialBooking }: {
   const [customerId, setCustomerId] = useState(initialBooking?.customerId ?? '');
   const [vehicleId, setVehicleId] = useState(initialBooking?.vehicleId ?? '');
   const [types, setTypes] = useState<InspectionTypeKey[]>([]);
+  const [billingServiceIds, setBillingServiceIds] = useState<string[]>([]);
+  const servicesForBilling = useAsync(() => api.inspectionServices(), []);
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
   const [identity, setIdentity] = useState<JobIdentity>(EMPTY_IDENTITY);
   const customers = useAsync(() => api.salesCustomers(), []);
@@ -355,6 +357,10 @@ function NewJobModal({ onClose, onCreated, initialBooking }: {
       setError(t('inspection.selectTypesHint'));
       return;
     }
+    if (!initialBooking && billingServiceIds.length === 0) {
+      setError(locale === 'ar' ? 'اختر خدمة فحص مسعّرة واحدة على الأقل لإصدار الفاتورة.' : 'Choose at least one priced inspection service for invoicing.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -362,7 +368,7 @@ function NewJobModal({ onClose, onCreated, initialBooking }: {
         customerId,
         vehicleId,
         selectedTypes: types,
-        ...(initialBooking?.id ? { bookingId: initialBooking.id } : {}),
+        ...(initialBooking?.id ? { bookingId: initialBooking.id } : { billingServiceIds }),
         ...(identity.customerName.trim() ? { customerName: identity.customerName.trim() } : {}),
         ...(identity.contactNumber.trim() ? { contactNumber: identity.contactNumber.trim() } : {}),
         ...(identity.plateNumber.trim() ? { plateNumber: identity.plateNumber.trim() } : {}),
@@ -511,6 +517,25 @@ function NewJobModal({ onClose, onCreated, initialBooking }: {
           </div>
           <p className="oryx-faint mt-1 text-[11.5px]">{t('inspection.selectTypesHint')}</p>
         </div>
+        {!initialBooking ? (
+          <div data-testid="job-billing-services">
+            <span className="oryx-label">{locale === 'ar' ? 'خدمات الفحص على الفاتورة' : 'Invoice services'}</span>
+            <p className="oryx-faint text-xs">{locale === 'ar'
+              ? 'اختر الخدمات بأسعارها المعتمدة؛ سيصدر النظام فاتورتها عند اعتماد الفحص.'
+              : 'Choose the priced services. The invoice is issued on approval.'}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(servicesForBilling.data?.items ?? []).filter((service: InspectionServiceDto) => service.isActive && service.priceMinor > 0).map((service: InspectionServiceDto) => (
+                <label key={service.id} className="flex items-center gap-2 rounded-lg border border-[var(--border)] p-3">
+                  <input type="checkbox" className="oryx-checkbox" checked={billingServiceIds.includes(service.id)}
+                    onChange={(event) => setBillingServiceIds(current =>
+                      event.target.checked ? [...current, service.id] : current.filter(id => id !== service.id))} />
+                  <span>{locale === 'ar' ? service.nameAr || service.nameEn : service.nameEn || service.nameAr} — {money(service.priceMinor)}</span>
+                </label>
+              ))}
+            </div>
+            {servicesForBilling.error ? <ErrorBanner message={servicesForBilling.error} /> : null}
+          </div>
+        ) : null}
       </div>
 
       <CreateVehicleModal

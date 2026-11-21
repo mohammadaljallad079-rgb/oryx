@@ -29,6 +29,7 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
   let otherCompanyId = '';
   let customerId = '';
   let vehicleId = '';
+  let billedServiceId = '';
 
   let issuerToken = '';
   let otherTenantToken = '';
@@ -65,6 +66,7 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
     await prisma.fiscalYear.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.warehouse.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.account.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.inspectionService.deleteMany({ where: { companyId: { in: companyIds } } });
     // Credit notes and supplier invoices are children of the customer, supplier
     // and product rows below, so they must be removed before them.
     await prisma.creditNoteLine.deleteMany({ where: { creditNote: { companyId: { in: companyIds } } } });
@@ -167,6 +169,43 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       },
     });
     vehicleId = vehicle.id;
+    // Approval now posts a real sales invoice, so this test tenant needs
+    // a real priced service and the minimum valid accounting configuration.
+    const billing = await prisma.inspectionService.create({
+      data: {
+        companyId,
+        code: `${PREFIX}-BILLING`,
+        nameEn: 'Vehicle inspection test service',
+        nameAr: 'خدمة فحص اختبارية',
+        priceMinor: 25000,
+        taxPercentBp: 0,
+      },
+    });
+    billedServiceId = billing.id;
+    await prisma.account.createMany({
+      data: [
+        { companyId, code: `${PREFIX}-AR`, nameEn: 'Accounts Receivable',
+          nameAr: 'الذمم المدينة', type: 'ASSET', normalBalance: 'DEBIT', systemRole: 'AR_CONTROL' },
+        { companyId, code: `${PREFIX}-REV`, nameEn: 'Inspection Revenue',
+          nameAr: 'إيرادات الفحص', type: 'REVENUE', normalBalance: 'CREDIT', systemRole: 'SALES_REVENUE' },
+      ],
+    });
+    await prisma.fiscalYear.create({
+      data: {
+        companyId, code: `${PREFIX}-FY-INS`,
+        startDate: new Date('2026-01-01T00:00:00.000Z'),
+        endDate: new Date('2026-12-31T23:59:59.999Z'),
+        periods: {
+          create: {
+            companyId, periodNumber: 1, nameEn: 'Inspection billing',
+            nameAr: 'فترة فوترة الفحص', status: 'OPEN',
+            startDate: new Date('2026-01-01T00:00:00.000Z'),
+            endDate: new Date('2026-12-31T23:59:59.999Z'),
+          },
+        },
+      },
+    });
+
 
     issuerToken = await createStaff(issuerEmail, companyId, [
       'erp.inspection.read',
@@ -213,7 +252,7 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       ctx.base,
       companyId,
       '/automotive/inspections',
-      { method: 'POST', token: issuerToken, body: { customerId, vehicleId, selectedAreas: areas } },
+      { method: 'POST', token: issuerToken, body: { customerId, vehicleId, selectedAreas: areas, billingServiceIds: [billedServiceId] } },
     );
     expect(created.status).toBe(201);
     const sessionId = created.body.id;
@@ -285,7 +324,7 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
     const created = await companyCall<{ id: string }>(ctx.base, companyId, '/automotive/inspections', {
       method: 'POST',
       token: issuerToken,
-      body: { customerId, vehicleId, selectedAreas: areas },
+      body: { customerId, vehicleId, selectedAreas: areas, billingServiceIds: [billedServiceId] },
     });
     expect(created.status).toBe(201);
     const sessionId = created.body.id;

@@ -1639,6 +1639,8 @@ export const api = {
     request<InspectionSessionDto>('/automotive/inspections', { method: 'POST', body }),
   updateInspectionSession: (id: string, body: Record<string, unknown>) =>
     request<InspectionSessionDto>(`/automotive/inspections/${id}`, { method: 'PATCH', body }),
+  setInspectionBillingServices: (id: string, billingServiceIds: string[]) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/billing-services`, { method: 'POST', body: { billingServiceIds } }),
   deleteInspectionSession: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/automotive/inspections/${id}`, { method: 'DELETE' }),
   inspectionProgress: (id: string) => request<InspectionProgressDto>(`/automotive/inspections/${id}/progress`),

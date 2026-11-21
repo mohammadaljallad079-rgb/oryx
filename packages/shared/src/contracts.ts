@@ -2657,6 +2657,8 @@ export interface InspectionSessionDto extends InspectionSessionSummaryDto {
   odometer: number | null;
   branchId: string | null;
   bookingId: string | null;
+  invoiceId?: string | null;
+  billingServiceIds?: string[];
   generalRemarks: string | null;
   interiorRemarks: string | null;
   exteriorRemarks: string | null;

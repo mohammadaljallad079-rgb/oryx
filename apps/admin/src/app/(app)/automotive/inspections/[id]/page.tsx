@@ -9,6 +9,7 @@ import type {
   InspectionItemResultDto,
   InspectionResultValue,
   InspectionAttachmentDto,
+  InspectionServiceDto,
 } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -36,7 +37,7 @@ const GROUP_PAGE_AREAS = sectionsForReportPage(4).map((s) => s.key);
  * is what keeps a paint-only job from asking about the engine.
  */
 export default function InspectionWorkspacePage() {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const { can } = useAuth();
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -50,7 +51,22 @@ export default function InspectionWorkspacePage() {
   const [issueError, setIssueError] = useState<string | null>(null);
   const [issuing, setIssuing] = useState(false);
   const [bundleLoading, setBundleLoading] = useState(false);
+  const [billingOpen, setBillingOpen] = useState(false);
+  const [billingServices, setBillingServices] = useState<InspectionServiceDto[]>([]);
+  const [selectedBillingIds, setSelectedBillingIds] = useState<string[]>([]);
+  const [billingSaving, setBillingSaving] = useState(false);
   const [docsKey, setDocsKey] = useState(0);
+
+  useEffect(() => {
+    if (!billingOpen) return;
+    let active = true;
+    void api.inspectionServices().then(result => {
+      if (active) setBillingServices(result.items.filter(item => item.isActive && item.priceMinor > 0));
+    }).catch(err => {
+      if (active) setError(err instanceof Error ? err.message : t('common.error'));
+    });
+    return () => { active = false; };
+  }, [billingOpen, t]);
 
   const canWrite = can('erp.inspection.write');
   const canApprove = can('erp.inspection.report.approve');
@@ -110,7 +126,13 @@ export default function InspectionWorkspacePage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={session.status} label={t(`inspection.status.${session.status}`)} />
-            {session.status === 'APPROVED' && session.bookingId && can('erp.sales.read') && can('erp.inspection.read') ? (
+            {!session.bookingId && !session.invoiceId && ['PENDING_REVIEW', 'APPROVED'].includes(session.status) && canApprove ? (
+              <Button onClick={() => { setSelectedBillingIds(session.billingServiceIds ?? []); setBillingOpen(true); }}
+                data-testid="inspection-set-billing-services">
+                {locale === 'ar' ? 'تحديد خدمات الفاتورة' : 'Set invoice services'}
+              </Button>
+            ) : null}
+            {session.status === 'APPROVED' && can('erp.sales.read') && can('erp.inspection.read') ? (
               <Button disabled={bundleLoading} data-testid="inspection-download-bundle" onClick={async () => {
                 setBundleLoading(true);
                 setError(null);
@@ -142,6 +164,39 @@ export default function InspectionWorkspacePage() {
       />
 
       {error ? <ErrorBanner message={error} /> : null}
+      {billingOpen ? (
+        <Modal open title={locale === 'ar' ? 'خدمات الفحص للفاتورة' : 'Inspection invoice services'}
+          onClose={() => setBillingOpen(false)}
+          footer={<>
+            <Button onClick={() => setBillingOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" disabled={billingSaving || selectedBillingIds.length === 0}
+              data-testid="inspection-save-billing-services"
+              onClick={async () => {
+                setBillingSaving(true);
+                setError(null);
+                try {
+                  const updated = await api.setInspectionBillingServices(id, selectedBillingIds);
+                  applySession(updated);
+                  setBillingOpen(false);
+                } catch (err) { setError(err instanceof Error ? err.message : t('common.error')); }
+                finally { setBillingSaving(false); }
+              }}>{billingSaving ? t('common.loading') : t('common.save')}</Button>
+          </>}>
+          <p className="oryx-faint text-xs">{locale === 'ar'
+            ? 'حدد الخدمات والأسعار الفعلية قبل إصدار الفاتورة. لا تُقبل خدمات بلا سعر.'
+            : 'Select actual priced services before invoicing. Unpriced services cannot be billed.'}</p>
+          <div className="flex flex-col gap-2">
+            {billingServices.map(service => (
+              <label key={service.id} className="flex items-center gap-2 rounded-lg border border-[var(--border)] p-3">
+                <input className="oryx-checkbox" type="checkbox" checked={selectedBillingIds.includes(service.id)}
+                  onChange={event => setSelectedBillingIds(current => event.target.checked
+                    ? [...current, service.id] : current.filter(value => value !== service.id))} />
+                <span>{locale === 'ar' ? service.nameAr || service.nameEn : service.nameEn || service.nameAr} — {service.priceMinor / 1000} BHD</span>
+              </label>
+            ))}
+          </div>
+        </Modal>
+      ) : null}
 
       <IdentityCard session={session} />
 

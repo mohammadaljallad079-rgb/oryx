@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ErpCommonModule } from '../common/erp-common.module';
 import { CmsModule } from '../cms/cms.module';
+import { AutomotiveModule } from '../automotive/automotive.module';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { DocumentStorageService } from './document-storage.service';
@@ -20,7 +21,7 @@ import { ReportPdfService } from './report-pdf.service';
  * is merged into an issued inspection report.
  */
 @Module({
-  imports: [ErpCommonModule, CmsModule],
+  imports: [ErpCommonModule, CmsModule, AutomotiveModule],
   controllers: [DocumentsController],
   providers: [DocumentsService, DocumentStorageService, DocumentFontService, PdfRendererService, ReportPdfService],
   exports: [DocumentsService, PdfRendererService, DocumentFontService, ReportPdfService],

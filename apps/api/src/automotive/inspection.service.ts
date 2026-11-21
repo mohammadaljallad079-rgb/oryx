@@ -16,7 +16,8 @@ import {
 } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
-import { DocumentSequenceService } from '../common/document-sequence.service';
+import { DocumentSequenceService, type Tx } from '../common/document-sequence.service';
+import { SalesService } from '../sales/sales.service';
 import { ErpContextService } from '../common/erp-context.service';
 import { MediaStorageService, sniffDocumentMime } from '../cms/media-storage.service';
 import { badRequest, conflict, ERROR_CODES, notFound } from '../common/errors';
@@ -74,6 +75,7 @@ export class InspectionService {
     private readonly sequences: DocumentSequenceService,
     private readonly context: ErpContextService,
     private readonly storage: MediaStorageService,
+    private readonly sales: SalesService,
   ) {}
 
   // ------------------------------------------------------------------ helpers
@@ -260,6 +262,7 @@ export class InspectionService {
           companyId,
           jobNumber,
           bookingId: dto.bookingId ?? null,
+          billingServiceIds: dto.billingServiceIds ?? [],
           customerId: customer.id,
           vehicleId: vehicle.id,
           branchId: dto.branchId ?? null,
@@ -328,6 +331,7 @@ export class InspectionService {
         ...(dto.color !== undefined ? { color: dto.color } : {}),
         ...(dto.vin !== undefined ? { vin: dto.vin } : {}),
         ...(dto.branchId !== undefined ? { branchId: dto.branchId } : {}),
+        ...(dto.billingServiceIds !== undefined ? { billingServiceIds: dto.billingServiceIds } : {}),
         ...(areas ? { selectedAreas: areas as never } : {}),
         ...(dto.generalRemarks !== undefined ? { generalRemarks: dto.generalRemarks } : {}),
         ...(dto.interiorRemarks !== undefined ? { interiorRemarks: dto.interiorRemarks } : {}),
@@ -789,27 +793,191 @@ export class InspectionService {
     return this.get(id, principal);
   }
 
-  /** Approve or return a submitted inspection. */
-  async review(id: string, dto: ReviewInspectionDto, principal: RequestPrincipal, actor: ActorContext) {
-    const { companyId } = await this.context.resolveCompanyScope(principal);
-    const session = await this.requireSession(id, companyId);
-    if (!REVIEWABLE.includes(session.status)) {
-      throw conflict(
-        ERROR_CODES.RESOURCE_CONFLICT,
-        `Only an inspection awaiting review can be decided; this one is ${session.status}.`,
-      );
+  /**
+   * Create exactly one sales invoice per inspection, in the same database
+   * transaction that holds the session row lock. Retry/parallel download and
+   * review calls return the existing posted invoice instead of billing again.
+   * The legacy booking report link is checked before making a new invoice.
+   */
+  private async invoiceInTransaction(tx: Tx, id: string, companyId: string, actor: ActorContext) {
+    // An UPDATE takes a PostgreSQL row lock until commit; no other request can
+    // pass this gate and create a second invoice for this session concurrently.
+    const session = await tx.inspectionSession.update({
+      where: { id },
+      data: { updatedAt: new Date() },
+    });
+    if (session.companyId !== companyId) {
+      throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');
+    }
+    if (session.invoiceId) {
+      const invoice = await tx.salesInvoice.findFirst({
+        where: { id: session.invoiceId, companyId },
+        select: { id: true, status: true },
+      });
+      if (!invoice || invoice.status === 'DRAFT' || invoice.status === 'VOID') {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Linked inspection invoice is missing or is not posted; reconcile accounting first.');
+      }
+      return invoice.id;
     }
 
-    const approve = dto.decision === 'APPROVE';
-    const updated = await this.prisma.inspectionSession.update({
-      where: { id },
-      data: {
-        status: approve ? 'APPROVED' : 'REJECTED',
-        reviewedById: actor.userId,
-        reviewedAt: new Date(),
-        reviewNotes: dto.notes ?? null,
-      },
+    if (session.bookingId) {
+      const oldReport = await tx.inspectionReport.findFirst({
+        where: { companyId, bookingId: session.bookingId, invoiceId: { not: null } },
+      });
+      if (oldReport?.invoiceId) {
+        const oldInvoice = await tx.salesInvoice.findFirst({
+          where: { id: oldReport.invoiceId, companyId },
+          select: { id: true, status: true, customerId: true },
+        });
+        if (!oldInvoice || oldInvoice.customerId !== session.customerId ||
+            oldInvoice.status === 'VOID' || oldInvoice.status === 'DRAFT') {
+          throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Legacy inspection invoice needs accounting reconciliation before reissue.');
+        }
+        await tx.inspectionSession.update({ where: { id }, data: { invoiceId: oldInvoice.id } });
+        return oldInvoice.id;
+      }
+    }
+
+    const booking = session.bookingId
+      ? await tx.inspectionBooking.findFirst({
+          where: { id: session.bookingId, companyId },
+          select: { serviceId: true, serviceIds: true },
+        })
+      : null;
+    if (session.bookingId && !booking) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Inspection booking could not be resolved for invoicing.');
+    }
+    const serviceIds = [...new Set(booking
+      ? (booking.serviceIds.length ? booking.serviceIds : [booking.serviceId])
+      : session.billingServiceIds)];
+    if (!serviceIds.length) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT,
+        'No priced inspection services are selected. Choose the billed services before approving or downloading this inspection.');
+    }
+    const services = await tx.inspectionService.findMany({
+      where: { companyId, id: { in: serviceIds } },
+      select: { id: true, nameEn: true, nameAr: true, priceMinor: true, taxPercentBp: true },
     });
+    if (services.length !== serviceIds.length || services.some(service => service.priceMinor <= 0)) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT,
+        'An inspection service is missing or has no approved positive price. Correct service pricing before invoicing.');
+    }
+    const byId = new Map(services.map(service => [service.id, service]));
+    const lines = serviceIds.map(serviceId => {
+      const service = byId.get(serviceId)!;
+      return {
+        productId: null,
+        description: service.nameEn || service.nameAr,
+        quantity: 10000, // The ERP's four-decimal quantity scale: 1.0000
+        unitPriceMinor: service.priceMinor,
+        taxPercentBp: service.taxPercentBp,
+      };
+    });
+    const invoice = await this.sales.issueInvoice(tx, {
+      companyId,
+      branchId: session.branchId,
+      customerId: session.customerId,
+      entryDate: new Date(),
+      sourceType: 'INSPECTION_INVOICE',
+      sourceId: session.id,
+      actorUserId: actor.userId,
+      notes: `Inspection ${session.jobNumber}`,
+      issueStock: false,
+      lines,
+    });
+    await tx.inspectionSession.update({ where: { id }, data: { invoiceId: invoice.id } });
+    if (session.bookingId) {
+      // Keep the old booking-report consumers compatible without making a
+      // booking/report record a prerequisite for generating an invoice.
+      await tx.inspectionReport.updateMany({
+        where: { companyId, bookingId: session.bookingId, invoiceId: null },
+        data: { invoiceId: invoice.id },
+      });
+    }
+    return invoice.id;
+  }
+
+  /**
+   * An authorized approver may supply prices for an older, unbooked session
+   * that predates the service-selection form. The invoice remains immutable
+   * once issued; this changes no inspection findings or accounting records.
+   */
+  async setBillingServices(id: string, serviceIds: string[], principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const uniqueIds = [...new Set(serviceIds)];
+    if (!uniqueIds.length || uniqueIds.length > 20) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Choose between one and twenty inspection services.');
+    }
+    await this.prisma.$transaction(async tx => {
+      const session = await tx.inspectionSession.update({ where: { id }, data: { updatedAt: new Date() } });
+      if (session.companyId !== companyId) {
+        throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');
+      }
+      if (session.bookingId) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'A booked inspection must use its booked services.');
+      }
+      if (session.invoiceId) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'A billed inspection cannot change its invoice services.');
+      }
+      const services = await tx.inspectionService.findMany({
+        where: { companyId, id: { in: uniqueIds }, isActive: true, priceMinor: { gt: 0 } },
+        select: { id: true },
+      });
+      if (services.length !== uniqueIds.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'All billing services must exist, be active and have approved positive prices.');
+      }
+      await tx.inspectionSession.update({ where: { id }, data: { billingServiceIds: uniqueIds } });
+    }, { timeout: 30000 });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId,
+      action: 'inspection.billing_services_set',
+      targetType: 'INSPECTION_SESSION', targetId: id,
+      summary: 'Selected priced services for an unbilled inspection',
+      metadata: { serviceIds: uniqueIds },
+    });
+    return this.get(id, principal);
+  }
+
+  /** Repair a previously-approved inspection or reuse its invoice on download. */
+  async ensureInvoice(id: string, principal: RequestPrincipal, actor: ActorContext): Promise<string> {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const existing = await this.requireSession(id, companyId);
+    if (existing.status !== 'APPROVED') {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Approve the inspection before invoicing.');
+    }
+    return this.prisma.$transaction(
+      tx => this.invoiceInTransaction(tx, id, companyId, actor),
+      { timeout: 30000 },
+    );
+  }
+
+  /** Approve (and post the invoice atomically) or return an inspection. */
+  async review(id: string, dto: ReviewInspectionDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.requireSession(id, companyId);
+    const approve = dto.decision === 'APPROVE';
+    const updated = await this.prisma.$transaction(async tx => {
+      // Lock and recheck the state inside the transaction: two approvers may
+      // otherwise both observe PENDING_REVIEW and issue two invoices.
+      const locked = await tx.inspectionSession.update({
+        where: { id },
+        data: { updatedAt: new Date() },
+      });
+      if (locked.companyId !== companyId || !REVIEWABLE.includes(locked.status)) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT,
+          `Only an inspection awaiting review can be decided; this one is ${locked.status}.`);
+      }
+      if (approve) await this.invoiceInTransaction(tx, id, companyId, actor);
+      return tx.inspectionSession.update({
+        where: { id },
+        data: {
+          status: approve ? 'APPROVED' : 'REJECTED',
+          reviewedById: actor.userId,
+          reviewedAt: new Date(),
+          reviewNotes: dto.notes ?? null,
+        },
+      });
+    }, { timeout: 30000 });
     await this.audit.record({
       actorUserId: actor.userId,
       companyId,
@@ -817,7 +985,7 @@ export class InspectionService {
       targetType: 'INSPECTION_SESSION',
       targetId: id,
       summary: approve
-        ? `Approved inspection ${updated.jobNumber}`
+        ? `Approved and invoiced inspection ${updated.jobNumber}`
         : `Returned inspection ${updated.jobNumber} for correction`,
       metadata: dto.notes ? { notes: dto.notes } : null,
     });
@@ -1087,6 +1255,8 @@ function toSessionDto(
     color: string | null;
     branchId: string | null;
     bookingId: string | null;
+    invoiceId: string | null;
+    billingServiceIds: string[];
     odometer: number | null;
     generalRemarks: string | null;
     interiorRemarks: string | null;
@@ -1133,6 +1303,8 @@ function toSessionDto(
     color: s.color,
     branchId: s.branchId,
     bookingId: s.bookingId,
+    invoiceId: s.invoiceId,
+    billingServiceIds: s.billingServiceIds,
     odometer: s.odometer,
     generalRemarks: s.generalRemarks,
     interiorRemarks: s.interiorRemarks,
