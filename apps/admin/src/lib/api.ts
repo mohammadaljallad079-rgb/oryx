@@ -1705,7 +1705,7 @@ export const api = {
   approveEstimate: (id: string) => request<Record<string, unknown>>(`/automotive/estimates/${id}/approve`, { method: 'POST', body: {} }),
   rejectEstimate: (id: string) => request<Record<string, unknown>>(`/automotive/estimates/${id}/reject`, { method: 'POST', body: {} }),
   invoiceJobCard: (id: string, body: Record<string, unknown> = {}) =>
-    request<{ invoiceNumber: string; totalMinor: number }>(`/automotive/job-cards/${id}/invoice`, { method: 'POST', body }),
+    request<{ id: string; invoiceNumber: string; totalMinor: number }>(`/automotive/job-cards/${id}/invoice`, { method: 'POST', body }),
   partReservations: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<PartsReservationDto>>(`/automotive/reservations?${toQuery(params)}`),
   createPartReservation: (body: Record<string, unknown>) =>
