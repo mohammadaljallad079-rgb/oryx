@@ -75,14 +75,14 @@ describe('Execution 21 — reports catalogue and workshop lifecycle (e2e)', () =
       expect(created.status).toBe(201);
       const jobId = created.body.id;
 
-      // An estimate balances in minor units and is required before completion.
+      // Saved service and part work items calculate exact totals and require no approval.
       const estimate = await erp<{ id: string; subtotalMinor: number; taxMinor: number; totalMinor: number }>(
         `/automotive/job-cards/${jobId}/estimates`,
         {
           method: 'POST',
           body: {
             lines: [
-              { type: 'LABOUR', description: 'Diagnostics', quantity: 10000, unitPriceMinor: 25000, taxPercentBp: 1000 },
+              { type: 'SERVICE', description: 'Diagnostics', quantity: 10000, unitPriceMinor: 25000, taxPercentBp: 1000 },
               { type: 'PART', description: 'Engine mount', quantity: 10000, unitPriceMinor: 45000, taxPercentBp: 1000 },
             ],
           },
@@ -94,13 +94,10 @@ describe('Execution 21 — reports catalogue and workshop lifecycle (e2e)', () =
       expect(estimate.body.totalMinor).toBe(77000);
       expect(estimate.body.subtotalMinor + estimate.body.taxMinor).toBe(estimate.body.totalMinor);
 
-      const approved = await erp(`/automotive/estimates/${estimate.body.id}/approve`, { method: 'POST', body: {} });
-      expect(approved.status).toBeLessThan(300);
-
       const patch = (status: string) =>
         erp<{ status?: string }>(`/automotive/job-cards/${jobId}`, { method: 'PATCH', body: { status } });
 
-      for (const status of ['AWAITING_APPROVAL', 'APPROVED', 'IN_PROGRESS', 'COMPLETED']) {
+      for (const status of ['IN_PROGRESS', 'COMPLETED']) {
         const res = await patch(status);
         expect(res.status).toBeLessThan(300);
       }
