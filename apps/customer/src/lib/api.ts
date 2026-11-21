@@ -1173,6 +1173,16 @@ export const publicApi = {
     }
     return publicGet<ProviderDetail>(`/marketplace/providers/${id}`);
   },
+  /** Published maintenance services from the company-owned admin catalogue. */
+  storefrontMaintenanceServices: (): Promise<StorefrontService[]> =>
+    IS_STATIC_PREVIEW
+      ? Promise.resolve([
+          { key: 'OIL_CHANGE', nameEn: 'Engine Oil & Filter', nameAr: 'تغيير زيت المحرك والفلتر', descriptionEn: 'Engine oil and filter service', descriptionAr: 'صيانة زيت المحرك والفلتر', image: '/media/hero-maintenance.jpg', durationMinutes: 45, priceMinor: 12000, branchIds: [] },
+          { key: 'BRAKE_SERVICE', nameEn: 'Brake System Service', nameAr: 'صيانة نظام الفرامل', descriptionEn: 'Brake inspection and service', descriptionAr: 'فحص وصيانة الفرامل', image: '/media/about-workshop.jpg', durationMinutes: 90, priceMinor: 18000, branchIds: [] },
+          { key: 'AC_SERVICE', nameEn: 'A/C Service', nameAr: 'صيانة المكيف', descriptionEn: 'A/C diagnostics and servicing', descriptionAr: 'فحص وصيانة المكيف', image: '/media/workshop-artdeco.jpg', durationMinutes: 75, priceMinor: 15000, branchIds: [] },
+          { key: 'ENGINE_DIAG', nameEn: 'Engine Diagnostics', nameAr: 'تشخيص أعطال المحرك', descriptionEn: 'Electronic engine diagnostics', descriptionAr: 'فحص أعطال المحرك', image: '/media/hero-maintenance.jpg', durationMinutes: 60, priceMinor: 10000, branchIds: [] },
+        ])
+      : publicGet<StorefrontService[]>('/storefront/maintenance-services'),
   /** Real ORYX Auto services shared with the operations booking engine. */
   storefrontServices: (): Promise<StorefrontService[]> =>
     IS_STATIC_PREVIEW
