@@ -77,7 +77,7 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     const lineAccount = (i: number) => page.getByTestId(`journal-line-account-${i}`);
     const pickAccount = async (i: number, index: number) => {
       await lineAccount(i).locator('button').click();
-      const options = lineAccount(i).locator('[role="option"]');
+      const options = page.getByRole('listbox').locator('[role="option"]');
       await expect.poll(async () => options.count(), { timeout: 20_000 }).toBeGreaterThan(index);
       await options.nth(index).click();
     };
