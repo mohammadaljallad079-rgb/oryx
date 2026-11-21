@@ -118,7 +118,7 @@ function reportHeader(issuer: DocumentIssuer): string {
       <span class="rh-tag-ar">خبراء فحص المركبات</span>
       <span class="rh-tag-en">VEHICLE INSPECTION EXPERTS</span>
     </div>
-    ${documentQualityBadge('rh-badge')}
+    <span class="doc-quality-badge rh-badge">${documentQualityBadge()}</span>
   </header>`;
 }
 
@@ -732,7 +732,15 @@ export const INSPECTION_REPORT_CSS = `
     padding-bottom:4px; margin-bottom:2px; position:relative; }
   /* The reference prints a 22pt circled tick at the top-right of every page
    * header (measured x557-579, y29-51), the identity "quality assured" mark. */
-  .rh-badge{ position:absolute; right:0.3pt; top:12pt; width:24pt; height:24pt; }
+  /* Reuse the exact financial-document certification badge markup and sizing. */
+  .report-head .doc-quality-badge.rh-badge{
+    position:absolute; right:0.3pt; top:12pt;
+    display:inline-flex; align-items:center; justify-content:center;
+    width:22pt; height:22pt; flex:0 0 auto;
+  }
+  .report-head .doc-quality-badge.rh-badge svg{
+    display:block; width:22pt; height:22pt;
+  }
   .rh-left{ display:flex; align-items:center; gap:9px; }
   /* The approved lockup prints the mark across x16-213pt (41.8pt tall). The
    * bundled logo is a full mark+wordmark lockup, so its printed height is set
