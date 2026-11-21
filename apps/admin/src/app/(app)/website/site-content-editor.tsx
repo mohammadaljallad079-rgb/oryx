@@ -147,6 +147,15 @@ export function SiteContentEditor() {
     setBusy(true);
     setError(null);
     try {
+      // Visibility is shared between Arabic and English. Update both stored
+      // locale documents, retaining all other copy from the other locale.
+      const otherLocale: Locale = locale === 'ar' ? 'en' : 'ar';
+      const other = await api.siteContent(otherLocale);
+      const otherDoc = resolveSiteContent(otherLocale, other.data);
+      await api.upsertSiteContent(otherLocale, {
+        ...otherDoc,
+        sectionVisibility: doc.sectionVisibility,
+      });
       const dto = await api.upsertSiteContent(locale, doc);
       setDoc(resolveSiteContent(locale, dto.data));
       setSaved(true);
@@ -452,6 +461,33 @@ export function SiteContentEditor() {
                 </Field>
               </div>
             </div>
+          ))}
+        </div>
+      </Panel>
+
+      {/* Public website storefront sections, separate from homepage text blocks. */}
+      <Panel title={locale === 'ar' ? 'إظهار وإخفاء أقسام الموقع' : 'Website section visibility'}>
+        <p className="oryx-muted text-[12.5px]">
+          {locale === 'ar'
+            ? 'عطّل أي قسم لإخفائه من قوائم الموقع والصفحة الرئيسية. الإعداد موحّد للعربية والإنجليزية.'
+            : 'Turn off a section to hide it from the site navigation and homepage in both languages.'}
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {([
+            ['inspections', 'الفحوصات الفنية', 'Technical inspections'],
+            ['maintenance', 'خدمات الصيانة', 'Maintenance services'],
+            ['products', 'المنتجات', 'Products'],
+            ['spare_parts', 'قطع الغيار', 'Spare parts'],
+          ] as const).map(([key, labelAr, labelEn]) => (
+            <label key={key} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] p-3">
+              <span>{locale === 'ar' ? labelAr : labelEn}</span>
+              <input
+                type="checkbox"
+                checked={doc.sectionVisibility[key] !== false}
+                onChange={(event) => patch((draft) => { draft.sectionVisibility[key] = event.target.checked; })}
+                data-testid={`site-visibility-${key}`}
+              />
+            </label>
           ))}
         </div>
       </Panel>

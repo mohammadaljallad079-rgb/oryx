@@ -46,6 +46,24 @@ describe('site content — approved defaults', () => {
 });
 
 describe('site content — merge over defaults', () => {
+  it('defaults every storefront section to visible in both languages', () => {
+    for (const locale of ['ar', 'en'] as const) {
+      const visibility = resolveSiteContent(locale, null).sectionVisibility;
+      expect(Object.keys(visibility).sort()).toEqual(STOREFRONT_SECTIONS.map((s) => s.key).sort());
+      expect(Object.values(visibility).every(Boolean)).toBe(true);
+    }
+  });
+
+  it('preserves hidden section flags when merging an old partial CMS document', () => {
+    const resolved = resolveSiteContent('ar', {
+      sectionVisibility: { inspections: false, spare_parts: false },
+    });
+    expect(resolved.sectionVisibility.inspections).toBe(false);
+    expect(resolved.sectionVisibility.spare_parts).toBe(false);
+    expect(resolved.sectionVisibility.products).toBe(true);
+    expect(resolved.sectionVisibility.maintenance).toBe(true);
+  });
+
   it('returns the full defaults when nothing is stored', () => {
     expect(resolveSiteContent('ar', null)).toEqual(DEFAULT_SITE_CONTENT.ar);
   });

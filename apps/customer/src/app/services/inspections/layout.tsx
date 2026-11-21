@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SectionAvailability } from '@/components/section-availability';
 import { SITE_URL } from '@/lib/structured-data';
 
 export const metadata: Metadata = {
@@ -14,5 +15,5 @@ export const metadata: Metadata = {
 };
 
 export default function InspectionsLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <SectionAvailability section="inspections">{children}</SectionAvailability>;
 }

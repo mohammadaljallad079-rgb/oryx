@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SectionAvailability } from '@/components/section-availability';
 import { JsonLd } from '@/components/json-ld';
 import {
   SITE_URL,
@@ -43,7 +44,7 @@ export default async function ProductsListLayout({ children }: { children: React
       {page && page.items.length > 0 && (
         <JsonLd data={productListJsonLd(page.items, `${SITE_URL}/products`)} />
       )}
-      {children}
+      <SectionAvailability section="products">{children}</SectionAvailability>
     </>
   );
 }
