@@ -109,6 +109,69 @@ describe('Execution 21 — reports catalogue and workshop lifecycle (e2e)', () =
       expect(illegal.status).toBeGreaterThanOrEqual(400);
     });
 
+    it('saves and revises multiple service and part items without a separate approval', async () => {
+      const vehicles = await erp<{ items: Array<{ id: string }> }>('/automotive/vehicles?pageSize=1');
+      if (!vehicles.body.items.length) return;
+      const job = await erp<{ id: string }>('/automotive/job-cards', {
+        method: 'POST',
+        body: { vehicleId: vehicles.body.items[0].id, complaint: 'Multiple work items test' },
+      });
+      expect(job.status).toBe(201);
+
+      const save = (lines: Array<Record<string, unknown>>) =>
+        erp<{ lines: Array<{ description: string }>; totalMinor: number }>(
+          `/automotive/job-cards/${job.body.id}/work-items`,
+          { method: 'PUT', body: { lines } },
+        );
+      const line = (type: 'SERVICE' | 'PART', description: string, price: number) =>
+        ({ type, description, quantity: 10000, unitPriceMinor: price, taxPercentBp: 0 });
+
+      const initial = await save([
+        line('SERVICE', 'Oil change', 10000),
+        line('PART', 'Oil filter', 4000),
+        line('SERVICE', 'Diagnostics', 6000),
+      ]);
+      expect(initial.status).toBeLessThan(300);
+      expect(initial.body.lines).toHaveLength(3);
+      expect(initial.body.totalMinor).toBe(20000);
+
+      const updated = await save([
+        line('SERVICE', 'Oil change', 10000),
+        line('PART', 'Oil filter', 4000),
+        line('SERVICE', 'Diagnostics', 6000),
+        line('PART', 'Replacement gasket', 3000),
+      ]);
+      expect(updated.status).toBeLessThan(300);
+      expect(updated.body.lines).toHaveLength(4);
+      expect(updated.body.totalMinor).toBe(23000);
+
+      const remove = await save([
+        line('SERVICE', 'Oil change', 10000),
+        line('SERVICE', 'Diagnostics', 6000),
+        line('PART', 'Replacement gasket', 3000),
+      ]);
+      expect(remove.status).toBeLessThan(300);
+      expect(remove.body.lines).toHaveLength(3);
+      expect(remove.body.totalMinor).toBe(19000);
+
+      const reopened = await erp<{ estimates: Array<{ lines: Array<{ description: string }> }> }>(
+        `/automotive/job-cards/${job.body.id}`,
+      );
+      expect(reopened.status).toBe(200);
+      expect(reopened.body.estimates[0].lines).toHaveLength(3);
+      expect(reopened.body.estimates[0].lines.map((l) => l.description))
+        .not.toContain('Oil filter');
+
+      const begin = await erp(`/automotive/job-cards/${job.body.id}`, {
+        method: 'PATCH', body: { status: 'IN_PROGRESS' },
+      });
+      expect(begin.status).toBeLessThan(300);
+      const complete = await erp(`/automotive/job-cards/${job.body.id}`, {
+        method: 'PATCH', body: { status: 'COMPLETED' },
+      });
+      expect(complete.status).toBeLessThan(300);
+    });
+
     it('exposes a workshop dashboard scoped to the company', async () => {
       const dashboard = await erp<{ activeBays: number; openJobCards: number }>('/automotive/workshop/dashboard');
       expect(dashboard.status).toBe(200);
