@@ -2060,6 +2060,7 @@ export interface InspectionBookingDto {
   odometer: number | null;
   reportStatus: string | null;
   invoiceId: string | null;
+  sessionId?: string | null;
   findingCount?: number;
 }
 
