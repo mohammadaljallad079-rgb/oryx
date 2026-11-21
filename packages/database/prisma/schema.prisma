@@ -683,6 +683,7 @@ model Company {
   @@index([type])
   @@index([status])
   @@index([parentCompanyId])
+  maintenanceServices MaintenanceService[]
 }
 
 /**
@@ -4770,6 +4771,31 @@ model WorkshopBay {
   branch  Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@unique([companyId, code])
+}
+
+/** Company-owned vehicle maintenance services published to the customer website/app. */
+model MaintenanceService {
+  id                String   @id @default(cuid())
+  companyId         String
+  code              String
+  nameEn            String
+  nameAr            String
+  descriptionEn     String?
+  descriptionAr     String?
+  priceMinor        Int      @default(0)
+  durationMinutes   Int      @default(60)
+  imageUrl          String?
+  branchIds         String[] @default([])
+  isActive          Boolean  @default(true)
+  isPublished       Boolean  @default(true)
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, code])
+  @@index([companyId, isActive, isPublished])
 }
 
 model MaintenanceBooking {
