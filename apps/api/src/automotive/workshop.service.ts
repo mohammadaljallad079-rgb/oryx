@@ -792,7 +792,7 @@ export class WorkshopService {
     const result = await this.posting.withTransaction(async (tx) => {
       // Serialise double-clicks and concurrent requests for the same job across
       // API instances. The financial document must never be posted twice.
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('oryx-workshop-invoice'), hashtext(${id}))`;
+      await tx.$queryRaw`SELECT 1::int AS locked FROM pg_advisory_xact_lock(hashtext('oryx-workshop-invoice'), hashtext(${id}))`;
       const job = await tx.jobCard.findFirst({
         where: { id, companyId },
         include: { labour: true, estimates: { include: { lines: true }, where: { status: { in: ['APPROVED', 'SENT'] } }, orderBy: { createdAt: 'desc' }, take: 1 }, reservations: { include: { lines: true } } },
