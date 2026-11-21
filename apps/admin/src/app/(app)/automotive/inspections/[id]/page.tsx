@@ -49,6 +49,7 @@ export default function InspectionWorkspacePage() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [issueError, setIssueError] = useState<string | null>(null);
   const [issuing, setIssuing] = useState(false);
+  const [bundleLoading, setBundleLoading] = useState(false);
   const [docsKey, setDocsKey] = useState(0);
 
   const canWrite = can('erp.inspection.write');
@@ -109,6 +110,29 @@ export default function InspectionWorkspacePage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={session.status} label={t(`inspection.status.${session.status}`)} />
+            {session.status === 'APPROVED' && session.bookingId && can('erp.sales.read') && can('erp.inspection.read') ? (
+              <Button disabled={bundleLoading} data-testid="inspection-download-bundle" onClick={async () => {
+                setBundleLoading(true);
+                setError(null);
+                try {
+                  const url = await api.inspectionBundleBlobUrl(id);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${session.jobNumber}-invoice-and-inspection.pdf`;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : t('common.error'));
+                } finally {
+                  setBundleLoading(false);
+                }
+              }}>
+                <Icon name="fileText" size={14} />
+                {bundleLoading ? t('common.loading') : 'Invoice + Inspection PDF'}
+              </Button>
+            ) : null}
             <Button onClick={load} data-testid="inspection-refresh">
               <Icon name="refresh" size={14} />
               {t('common.refresh')}
