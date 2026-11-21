@@ -1642,12 +1642,18 @@ function ApprovedServicesModal({
               </Field>
               <Field label={locale === 'ar' ? 'الضريبة %' : 'Tax %'}>
                 <input className="oryx-input" type="number" min="0" max="100" step="0.01" required
-                  value={row.tax} onChange={(event) => update(index, 'tax', event.target.value)} />
+                  value={row.tax} onChange={(event) => update(index, 'tax', event.target.value)}
+                  data-testid={`approved-service-tax-${row.area}`} />
               </Field>
               <Field label={locale === 'ar' ? 'المدة (دقيقة)' : 'Minutes'}>
                 <input className="oryx-input" type="number" min="1" step="1" required
                   value={row.duration} onChange={(event) => update(index, 'duration', event.target.value)} />
               </Field>
+              <div className="sm:col-span-4 flex flex-wrap gap-x-5 gap-y-1 text-sm" data-testid={`approved-service-preview-${row.area}`}>
+                <span>{t('erp.automotive.basePrice')}: {money(Number(row.price) > 0 ? toMinorInput(row.price) : 0)}</span>
+                <span>{t('erp.automotive.vatAmount')}: <strong data-testid={`approved-service-vat-${row.area}`}>{money(basisPointsOfMinor(Number(row.price) > 0 ? toMinorInput(row.price) : 0, Math.round((Number(row.tax) || 0) * 100)))}</strong></span>
+                <span>{t('erp.automotive.totalInclVat')}: <strong data-testid={`approved-service-total-${row.area}`}>{money((Number(row.price) > 0 ? toMinorInput(row.price) : 0) + basisPointsOfMinor(Number(row.price) > 0 ? toMinorInput(row.price) : 0, Math.round((Number(row.tax) || 0) * 100)))}</strong></span>
+              </div>
             </div>
           );
         })}
