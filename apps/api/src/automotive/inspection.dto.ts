@@ -60,6 +60,8 @@ export class CreateInspectionSessionDto {
   @IsString() @MinLength(1) customerId!: string;
   @IsString() @MinLength(1) vehicleId!: string;
   @IsOptional() @IsString() bookingId?: string;
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @IsString({ each: true })
+  billingServiceIds?: string[];
   @IsOptional() @IsString() branchId?: string;
 
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(4) @IsIn(TYPE_KEYS, { each: true })
@@ -98,6 +100,8 @@ export class UpdateInspectionSessionDto {
   @IsOptional() @IsString() @MaxLength(40) color?: string;
   @IsOptional() @IsString() @MaxLength(40) vin?: string;
   @IsOptional() @IsString() branchId?: string;
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @IsString({ each: true })
+  billingServiceIds?: string[];
 
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(4) @IsIn(TYPE_KEYS, { each: true })
   selectedTypes?: string[];
