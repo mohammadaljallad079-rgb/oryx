@@ -348,6 +348,21 @@ function BookingModal({
   }
 
   const status = String(booking?.status ?? '');
+  const customer = booking?.customerAccount as Record<string, unknown> | null | undefined;
+  const vehicle = booking?.vehicle as Record<string, unknown> | null | undefined;
+  const resource = booking?.resource as Record<string, unknown> | null | undefined;
+  const serviceRefs = Array.isArray(booking?.services)
+    ? booking.services.map((service) => {
+        if (typeof service === 'string') return service;
+        if (service && typeof service === 'object') {
+          const row = service as Record<string, unknown>;
+          return String(row.nameAr ?? row.nameEn ?? row.name ?? row.serviceRef ?? row.id ?? '—');
+        }
+        return '—';
+      }).join('، ')
+    : String(booking?.serviceRef ?? '—');
+  const showValue = (value: unknown): string =>
+    value === null || value === undefined || value === '' ? '—' : String(value);
 
   return (
     <Modal open={open} title={String(booking?.bookingType ?? t('common.loading'))} onClose={onClose}>
@@ -356,11 +371,20 @@ function BookingModal({
       {error ? <ErrorBanner message={error} /> : null}
       {booking ? (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="booking-full-details">
             <Detail label={t('common.status')} value={status} />
             <Detail label={t('erp.booking.when')} value={new Date(String(booking.startsAt)).toLocaleString()} />
             <Detail label={t('erp.booking.duration')} value={`${String(booking.durationMinutes)} ${t('erp.customerPlatform.minutes')}`} />
-            <Detail label={t('erp.booking.serviceRef')} value={String(booking.serviceRef ?? '—')} />
+            <Detail label={t('erp.booking.serviceRef')} value={serviceRefs} />
+            <Detail label="Customer / اسم العميل" value={showValue(customer?.fullName ?? booking.customerName)} />
+            <Detail label="Phone / الهاتف" value={showValue(customer?.phone ?? booking.customerPhone ?? booking.phone)} />
+            <Detail label="Email / البريد" value={showValue(customer?.email ?? booking.customerEmail)} />
+            <Detail label="Vehicle / السيارة" value={[vehicle?.make, vehicle?.model].filter(Boolean).join(' ') || '—'} />
+            <Detail label="Year / السنة" value={showValue(vehicle?.year ?? booking.vehicleYear)} />
+            <Detail label="Plate / اللوحة" value={showValue(vehicle?.plateNumber ?? booking.plateNumber)} />
+            <Detail label="VIN / رقم الهيكل" value={showValue(vehicle?.vin ?? booking.vin)} />
+            <Detail label="Resource / المورد" value={showValue(resource?.nameAr ?? resource?.nameEn)} />
+            <Detail label="Notes / الملاحظات" value={showValue(booking.notes ?? booking.customerNotes)} />
           </div>
           {canManage ? (
             <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
