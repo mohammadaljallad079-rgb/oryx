@@ -43,8 +43,8 @@ test.describe('Execution 23 evidence', () => {
 
       await page.goto('/automotive/inspections');
       await page.getByTestId('inspections-tab-services').click();
-      await page.getByTestId('new-inspection-service').click();
-      await expect(page.getByTestId('service-price')).toBeVisible();
+      await page.getByTestId('replace-approved-services').click();
+      await expect(page.getByTestId('approved-service-price-PAINT_BODY')).toBeVisible();
       await page.screenshot({ path: `${OUT}/modal-inspection-service-${theme}.png` });
       await closeModal(page);
     });
