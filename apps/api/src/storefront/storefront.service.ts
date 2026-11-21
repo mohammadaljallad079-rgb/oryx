@@ -13,7 +13,6 @@ import {
 } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
-import { TenantCompanyService } from '../common/tenant-company.service';
 import { ERROR_CODES, badRequest, conflict, notFound } from '../common/errors';
 import { computeDocumentTotals } from '../common/document-totals';
 
@@ -54,7 +53,6 @@ export class StorefrontService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly tenants: TenantCompanyService,
   ) {}
 
   // ------------------------------------------------------------ presentation
@@ -93,23 +91,22 @@ export class StorefrontService {
   }
 
   /**
-   * Resolve the storefront tenant.
-   *
-   * The public website is the storefront for one trading company, named by
-   * `STOREFRONT_COMPANY_CODE` (default ORYX-AUTO). Resolving "the oldest
-   * customer-facing company" is wrong here: the internal holding entity also
-   * keeps booking resources and would win the tie, so the tenant is named
-   * explicitly and only falls back to consumer resolution when that company is
-   * absent — a fresh install that has not seeded the automotive tenant yet.
+   * The public ORYX storefront is strictly company-scoped.
+   * Never fall back to another tenant: an absent or suspended ORYX-AUTO
+   * company must fail closed rather than exposing unrelated stock, customers,
+   * branches or bookings through the public website.
    */
   private async companyId(): Promise<string> {
-    const code = process.env.STOREFRONT_COMPANY_CODE ?? 'ORYX-AUTO';
+    const code = 'ORYX-AUTO';
     const company = await this.prisma.company.findFirst({
       where: { code, status: 'ACTIVE' },
       select: { id: true },
     });
-    if (company) return company.id;
-    return this.tenants.resolveForCustomer(null);
+    if (!company) {
+      this.logger.error('Public storefront unavailable: active ORYX-AUTO company is missing.');
+      throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'ORYX Auto Services storefront company is not configured.');
+    }
+    return company.id;
   }
 
   /** Category metadata joined with the live product count per aisle. */
