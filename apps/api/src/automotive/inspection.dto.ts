@@ -217,3 +217,9 @@ export class ReviewInspectionDto {
   @IsIn(['APPROVE', 'REJECT']) decision!: 'APPROVE' | 'REJECT';
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
 }
+
+/** Correct missing service selection on an older, unbilled inspection. */
+export class SetInspectionBillingServicesDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @IsString({ each: true })
+  billingServiceIds!: string[];
+}
