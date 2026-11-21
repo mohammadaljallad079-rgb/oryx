@@ -435,6 +435,7 @@ export interface StorefrontProduct {
 }
 
 export interface StorefrontService {
+  companyId?: string;
   key: string;
   nameEn: string;
   nameAr: string;
@@ -879,6 +880,7 @@ export const customerApi = {
       : request<{ items: ServiceRequestRecord[]; total: number }>('/customer/marketplace/requests?pageSize=50'),
   createServiceRequest: (body: {
     categoryKey: string;
+    companyId?: string;
     description?: string;
     vehicleId?: string;
   }) =>
