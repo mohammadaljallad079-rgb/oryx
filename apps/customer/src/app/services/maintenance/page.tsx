@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { customerApi } from '@/lib/api';
+import { useCustomerAuth } from '@/lib/auth-context';
 import { useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { publicApi, resolveImage, type StorefrontService } from '@/lib/api';
@@ -20,6 +22,27 @@ import { Icon } from '@/components/icons';
  */
 export default function MaintenancePage() {
   const { t, locale } = useUi();
+  const { isAuthenticated } = useCustomerAuth();
+  const [submitting, setSubmitting] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<string[]>([]);
+  const [requestError, setRequestError] = useState<string | null>(null);
+
+  const requestService = async (service: StorefrontService) => {
+    setSubmitting(service.key);
+    setRequestError(null);
+    try {
+      await customerApi.createServiceRequest({
+        companyId: service.companyId,
+        categoryKey: service.key,
+        description: locale === 'ar' ? service.nameAr : service.nameEn,
+      });
+      setSubmitted((items) => [...items, service.key]);
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : t('common.error'));
+    } finally {
+      setSubmitting(null);
+    }
+  };
   const [services, setServices] = useState<StorefrontService[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -56,6 +79,7 @@ export default function MaintenancePage() {
         art="/media/hero-maintenance.jpg"
       />
 
+      {requestError ? <p role="alert" className="oryx-muted" data-testid="maintenance-request-error">{requestError}</p> : null}
       {loading ? (
         <LoadingPanel rows={4} />
       ) : error ? (
@@ -76,7 +100,7 @@ export default function MaintenancePage() {
           {services.map((service) => {
             const name = (locale === 'ar' ? service.nameAr : service.nameEn) || service.nameEn;
             const description = locale === 'ar' ? service.descriptionAr : service.descriptionEn;
-            const bookingHref = `/bookings?category=${encodeURIComponent(service.key)}`;
+
             const image = resolveImage(service.image) ?? service.image;
             return (
               <Card key={service.key} className="oryx-product-card" data-testid="maintenance-card">
@@ -100,10 +124,24 @@ export default function MaintenancePage() {
                     ) : (
                       <span className="oryx-muted">{t('inspection.priceOnRequest')}</span>
                     )}
-                    <Link href={bookingHref} className="oryx-btn oryx-btn-sm oryx-btn-primary">
-                      <Icon name="calendar" size={15} />
-                      {t('maintenance.book')}
-                    </Link>
+                    {isAuthenticated ? (
+                      <button className="oryx-btn oryx-btn-sm oryx-btn-primary" type="button"
+                        disabled={submitting !== null || submitted.includes(service.key)}
+                        data-testid={`request-maintenance-${service.key}`}
+                        onClick={() => void requestService(service)}>
+                        <Icon name="calendar" size={15} />
+                        {submitted.includes(service.key)
+                          ? (locale === 'ar' ? 'تم إرسال الطلب' : 'Request sent')
+                          : submitting === service.key
+                            ? t('common.loading')
+                            : (locale === 'ar' ? 'طلب خدمة الصيانة' : 'Request maintenance')}
+                      </button>
+                    ) : (
+                      <Link href="/login" className="oryx-btn oryx-btn-sm oryx-btn-primary">
+                        <Icon name="calendar" size={15} />
+                        {t('maintenance.book')}
+                      </Link>
+                    )}
                   </div>
                 </div>
               </Card>
