@@ -21,6 +21,8 @@ export interface CreateBookingInput {
   resourceId?: string | null;
   bookingType: 'INSPECTION' | 'MAINTENANCE' | 'PROVIDER_SERVICE';
   serviceRef?: string | null;
+  /** Every service in this booking; one resource and slot are reserved. */
+  serviceRefs?: string[];
   startsAt: Date;
   durationMinutes: number;
   customerAccountId?: string | null;
@@ -341,6 +343,7 @@ export class BookingService {
           bookingType: input.bookingType,
           status,
           serviceRef: input.serviceRef ?? null,
+          serviceRefs: input.serviceRefs?.length ? [...new Set(input.serviceRefs)] : input.serviceRef ? [input.serviceRef] : [],
           startsAt,
           endsAt,
           durationMinutes: input.durationMinutes,
