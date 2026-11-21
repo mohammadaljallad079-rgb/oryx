@@ -682,10 +682,10 @@ function EditProductModal({
           <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="edit-product-barcode" />
         </Field>
         <Field label={t('erp.inventory.category')}>
-          <input className="oryx-input" list="edit-product-category-options" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="edit-product-category" />
-          <datalist id="edit-product-category-options">
-            {(categoryOptions.data?.items ?? ['Spare Parts']).map((name) => <option key={name} value={name} />)}
-          </datalist>
+          <select className="oryx-select" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="edit-product-category">
+            <option value="">{locale === 'ar' ? 'اختر التصنيف' : 'Select category'}</option>
+            {[...new Set([...(categoryOptions.data?.items ?? []), ...(form.category ? [form.category] : [])])].map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
         </Field>
         <Field label={t('erp.inventory.reorderLevel')}>
           <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="edit-product-reorder-level" />
