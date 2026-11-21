@@ -30,6 +30,7 @@ import {
   CreateInspectionSessionDto,
   InspectionListQueryDto,
   ReviewInspectionDto,
+  SetInspectionBillingServicesDto,
   SaveBodyMarkersDto,
   SaveChassisRegionsDto,
   SaveInspectionSectionDto,
@@ -232,6 +233,19 @@ export class InspectionController {
     @Req() req: RequestLike,
   ) {
     return this.inspections.review(id, dto, p, actorFrom(p, req));
+  }
+
+  @Post(':id/billing-services')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.report.approve')
+  @ApiOperation({ summary: 'Set priced billing services for an older unbilled inspection' })
+  setBillingServices(
+    @Param('id') id: string,
+    @Body() dto: SetInspectionBillingServicesDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.inspections.setBillingServices(id, dto.billingServiceIds, p, actorFrom(p, req));
   }
 
   @Post(':id/cancel')
