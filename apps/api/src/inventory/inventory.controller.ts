@@ -88,6 +88,34 @@ export class InventoryController {
     return this.inventory.productCategories(p, companyId);
   }
 
+  @Get('product-categories/manage')
+  @RequireAnyPermission('erp.inventory.read', 'erp.inventory.item.manage')
+  @ApiOperation({ summary: 'List managed product categories and their product counts' })
+  managedProductCategories(@CurrentPrincipal() p: RequestPrincipal) {
+    return this.inventory.listProductCategoryRecords(p);
+  }
+
+  @Post('product-categories')
+  @RequirePermissions('erp.inventory.item.manage')
+  @ApiOperation({ summary: 'Create a reusable product category' })
+  createProductCategory(@Body() body: { name: string }, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inventory.createProductCategory(body.name, p, actorFrom(p, req));
+  }
+
+  @Patch('product-categories/:id')
+  @RequirePermissions('erp.inventory.item.manage')
+  @ApiOperation({ summary: 'Rename category and all linked products' })
+  renameProductCategory(@Param('id') id: string, @Body() body: { name: string }, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inventory.renameProductCategory(id, body.name, p, actorFrom(p, req));
+  }
+
+  @Delete('product-categories/:id')
+  @RequirePermissions('erp.inventory.item.manage')
+  @ApiOperation({ summary: 'Delete unused product category' })
+  deleteProductCategory(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inventory.deleteProductCategory(id, p, actorFrom(p, req));
+  }
+
   @Post('products')
   @RequireAnyPermission('erp.inventory.item.manage', 'erp.sales.catalog.manage')
   @ApiOperation({ summary: 'Create a product or service' })
@@ -184,8 +212,12 @@ export class InventoryController {
   @Get('reorder-alerts')
   @RequireAnyPermission('erp.inventory.read', 'erp.inventory.valuation.read')
   @ApiOperation({ summary: 'Products at or below their reorder level' })
-  reorderAlerts(@Query('companyId') companyId: string | undefined, @CurrentPrincipal() p: RequestPrincipal) {
-    return this.inventory.reorderAlerts(p, companyId);
+  reorderAlerts(
+    @Query('companyId') companyId: string | undefined,
+    @Query('warehouseId') warehouseId: string | undefined,
+    @CurrentPrincipal() p: RequestPrincipal,
+  ) {
+    return this.inventory.reorderAlerts(p, companyId, warehouseId);
   }
 
   /**

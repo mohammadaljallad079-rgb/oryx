@@ -1095,6 +1095,105 @@ describe('ORYX ERP core (e2e)', () => {
       expect(poApproved.body.status).toBe('APPROVED');
     });
 
+    it('rejects duplicate purchase-order product lines before creating a document', async () => {
+      const duplicate = await erp<{ code: string }>('/purchasing/orders', {
+        method: 'POST',
+        body: {
+          supplierId,
+          warehouseId,
+          orderDate: '2026-06-01',
+          lines: [
+            { productId, description: 'Widget A', quantity: 10000, unitCostMinor: 6000 },
+            { productId, description: 'Widget B', quantity: 10000, unitCostMinor: 6000 },
+          ],
+        },
+      });
+      expect(duplicate.status).toBe(400);
+      expect(duplicate.body.code).toBe('request.validation_failed');
+    });
+
+    it('prevents a requisition with duplicate products from becoming an ambiguous purchase order', async () => {
+      const req = await erp<{ id: string }>('/purchasing/requisitions', {
+        method: 'POST',
+        body: {
+          supplierId,
+          lines: [
+            { productId, description: 'Widget A', quantity: 10000, estimatedUnitCostMinor: 6000 },
+            { productId, description: 'Widget B', quantity: 10000, estimatedUnitCostMinor: 6000 },
+          ],
+        },
+      });
+      expect(req.status).toBe(201);
+      const approved = await erp<{ status: string }>(`/purchasing/requisitions/${req.body.id}/approve`, {
+        method: 'POST',
+        body: {},
+      });
+      expect(approved.body.status).toBe('APPROVED');
+      const convert = await erp<{ code: string }>(`/purchasing/requisitions/${req.body.id}/convert`, {
+        method: 'POST',
+        body: { supplierId },
+      });
+      expect(convert.status).toBe(400);
+      expect(convert.body.code).toBe('request.validation_failed');
+    });
+
+    it('rejects repeated product lines on receipts without changing stock or PO allocation', async () => {
+      const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      const duplicated = await erp<{ code: string }>('/purchasing/receipts', {
+        method: 'POST',
+        body: {
+          purchaseOrderId: orderId,
+          warehouseId,
+          receivedAt: new Date().toISOString(),
+          lines: [
+            { productId, quantity: 30000, unitCostMinor: 6000 },
+            { productId, quantity: 30000, unitCostMinor: 6000 },
+          ],
+        },
+      });
+      expect(duplicated.status).toBe(400);
+      expect(duplicated.body.code).toBe('request.validation_failed');
+      const after = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      expect(after.quantity).toBe(before.quantity);
+    });
+
+    it('rejects supplier-invoice and purchase-return links to a different supplier', async () => {
+      const other = await erp<{ id: string }>('/purchasing/suppliers', {
+        method: 'POST',
+        body: { nameEn: 'Other Supplier', nameAr: 'مورد آخر' },
+      });
+      expect(other.status).toBe(201);
+      const invoice = await erp<{ code: string }>('/purchasing/supplier-invoices', {
+        method: 'POST',
+        body: {
+          supplierId: other.body.id,
+          purchaseOrderId: orderId,
+          supplierInvoiceNumber: 'WRONG-SUPPLIER-PO',
+          invoiceDate: '2026-06-01',
+          lines: [{ productId, description: 'Widget', quantity: 10000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(invoice.status).toBe(400);
+      expect(invoice.body.code).toBe('request.validation_failed');
+
+      const ret = await erp<{ code: string }>('/purchasing/returns', {
+        method: 'POST',
+        body: {
+          supplierId: other.body.id,
+          purchaseOrderId: orderId,
+          warehouseId,
+          returnDate: '2026-06-01',
+          lines: [{ productId, description: 'Widget', quantity: 10000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(ret.status).toBe(400);
+      expect(ret.body.code).toBe('request.validation_failed');
+    });
+
     it('receives goods, increasing stock at the ordered cost', async () => {
       const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
         where: { warehouseId_productId: { warehouseId, productId } },
@@ -1148,6 +1247,110 @@ describe('ORYX ERP core (e2e)', () => {
       expect(after.quantity).toBe(before.quantity);
     });
 
+    it('limits PO-linked supplier invoices to quantities actually received and not previously invoiced', async () => {
+      const order = await erp<{ id: string }>('/purchasing/orders', {
+        method: 'POST',
+        body: {
+          supplierId,
+          warehouseId,
+          approve: true,
+          orderDate: '2026-06-01',
+          lines: [{ productId, description: 'Partial receipt invoice test', quantity: 50000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(order.status).toBe(201);
+      const receipt = await erp('/purchasing/receipts', {
+        method: 'POST',
+        body: {
+          purchaseOrderId: order.body.id,
+          warehouseId,
+          receivedAt: new Date().toISOString(),
+          lines: [{ productId, quantity: 20000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(receipt.status).toBe(201);
+
+      const invoiceBody = (number: string, quantity: number) => ({
+        supplierId,
+        purchaseOrderId: order.body.id,
+        supplierInvoiceNumber: number,
+        invoiceDate: '2026-06-01',
+        lines: [{ productId, description: 'Partial receipt invoice test', quantity, unitCostMinor: 6000 }],
+      });
+      const excessive = await erp<{ code: string }>('/purchasing/supplier-invoices', {
+        method: 'POST', body: invoiceBody('PARTIAL-TOO-MUCH', 50000),
+      });
+      expect(excessive.status).toBe(400);
+      expect(excessive.body.code).toBe('purchasing.over_receipt');
+
+      const invoiced = await erp<{ id: string; status: string; journalEntryId: string | null }>('/purchasing/supplier-invoices', {
+        method: 'POST', body: invoiceBody('PARTIAL-OK-1', 20000),
+      });
+      expect(invoiced.status).toBe(201);
+      expect(invoiced.body.status).toBe('POSTED');
+      // Goods receipt has accrued the same net amount and no VAT is charged,
+      // so invoicing should not generate an unbalanced zero-value journal.
+      expect(invoiced.body.journalEntryId).toBeNull();
+      expect(await ctx.prisma.journalEntry.count({
+        where: { sourceType: 'SUPPLIER_INVOICE', sourceId: invoiced.body.id },
+      })).toBe(0);
+
+      const replayQuantity = await erp<{ code: string }>('/purchasing/supplier-invoices', {
+        method: 'POST', body: invoiceBody('PARTIAL-TOO-MUCH-2', 10000),
+      });
+      expect(replayQuantity.status).toBe(400);
+      expect(replayQuantity.body.code).toBe('purchasing.over_receipt');
+    });
+
+    it('posts a supplier-invoice price difference without revaluing received stock', async () => {
+      const order = await erp<{ id: string }>('/purchasing/orders', {
+        method: 'POST',
+        body: {
+          supplierId,
+          warehouseId,
+          approve: true,
+          orderDate: '2026-06-01',
+          lines: [{ productId, description: 'Variance test item', quantity: 10000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(order.status).toBe(201);
+      const receipt = await erp('/purchasing/receipts', {
+        method: 'POST',
+        body: {
+          purchaseOrderId: order.body.id,
+          warehouseId,
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(receipt.status).toBe(201);
+      const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+
+      const invoice = await erp<{ id: string; journalEntryId: string }>('/purchasing/supplier-invoices', {
+        method: 'POST',
+        body: {
+          supplierId,
+          purchaseOrderId: order.body.id,
+          supplierInvoiceNumber: 'VARIANCE-TEST-1',
+          invoiceDate: '2026-06-01',
+          lines: [{ productId, description: 'Variance test item', quantity: 10000, unitCostMinor: 7200 }],
+        },
+      });
+      expect(invoice.status).toBe(201);
+      const journal = await ctx.prisma.journalEntry.findUniqueOrThrow({
+        where: { id: invoice.body.journalEntryId },
+        include: { lines: true },
+      });
+      expect(journal.lines.reduce((sum, line) => sum + line.debitMinor, 0)).toBe(1200);
+      expect(journal.lines.reduce((sum, line) => sum + line.creditMinor, 0)).toBe(1200);
+      const after = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      expect(after.quantity).toBe(before.quantity);
+      expect(after.averageCostMinor).toBe(before.averageCostMinor);
+    });
+
     it('records a supplier invoice and pays it', async () => {
       const invoice = await erp<{ id: string; invoiceNumber: string; totalMinor: number; status: string }>(
         '/purchasing/supplier-invoices',
@@ -1181,6 +1384,35 @@ describe('ORYX ERP core (e2e)', () => {
         },
       });
       expect(payment.status).toBe(201);
+    });
+
+    it('rejects a replayed supplier invoice without creating a second payable journal', async () => {
+      const before = await ctx.prisma.supplierInvoice.count({
+        where: { supplierId, supplierInvoiceNumber: 'SUP-INV-1' },
+      });
+      expect(before).toBe(1);
+
+      const duplicate = await erp<{ code: string }>('/purchasing/supplier-invoices', {
+        method: 'POST',
+        body: {
+          supplierId,
+          purchaseOrderId: orderId,
+          supplierInvoiceNumber: 'SUP-INV-1',
+          invoiceDate: '2026-06-01',
+          lines: [{ productId, description: 'Widget', quantity: 50000, unitCostMinor: 6000, taxPercentBp: 1500 }],
+        },
+      });
+      expect(duplicate.status).toBe(409);
+      expect(duplicate.body.code).toBe('resource.conflict');
+
+      const after = await ctx.prisma.supplierInvoice.count({
+        where: { supplierId, supplierInvoiceNumber: 'SUP-INV-1' },
+      });
+      expect(after).toBe(before);
+      const journals = await ctx.prisma.journalEntry.count({
+        where: { sourceType: 'SUPPLIER_INVOICE', sourceId: supplierInvoiceId },
+      });
+      expect(journals).toBe(1);
     });
 
     it('returns goods to the supplier, reversing the payable and reducing stock', async () => {

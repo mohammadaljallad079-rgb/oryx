@@ -137,12 +137,12 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await page.getByTestId('new-job-card').click();
     await page.getByTestId('job-card-customer').locator('button').first().click();
     await page
-      .getByTestId('job-card-customer')
+      .getByRole('listbox')
       .locator('[role="option"]', { hasText: customerName })
       .first()
       .click();
     await page.getByTestId('job-vehicle').locator('button').first().click();
-    await page.getByTestId('job-vehicle').locator('[role="option"]', { hasText: vin }).first().click();
+    await page.getByRole('listbox').locator('[role="option"]', { hasText: vin }).first().click();
     await page.getByTestId('job-complaint').fill('Inline create verification');
     await page.getByTestId('save-job-card').click();
 

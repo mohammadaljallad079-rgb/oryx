@@ -85,6 +85,16 @@ describe('document chrome', () => {
     });
   });
 
+  describe('official footer signature spacing', () => {
+    it('keeps the center lockup clear of the customer signature box', () => {
+      const html = officialFooterTemplate(issuer);
+      expect(html).toContain('flex:0 0 74pt');
+      expect(html).toContain('margin-inline-start:8pt;');
+      expect(html).toContain('Customer Signature');
+      expect(html).toContain('Authorized Stamp &amp; Signature');
+    });
+  });
+
   describe('officialFooterTemplate', () => {
     it('prints English-only page numbering with Chromium placeholders', () => {
       const html = officialFooterTemplate(issuer);

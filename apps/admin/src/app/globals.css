@@ -1338,6 +1338,35 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   -webkit-overflow-scrolling: touch;
 }
 
+.oryx-table-container {
+  min-width: 0;
+  position: relative;
+}
+
+.oryx-table-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+}
+
+.oryx-table-scroll-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  width: 100%;
+  height: 18px;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  scrollbar-width: auto;
+  overscroll-behavior-x: contain;
+}
+
+.oryx-table-scroll-dock::-webkit-scrollbar,
+.oryx-table-scroll::-webkit-scrollbar {
+  height: 14px;
+}
+
 .oryx-table-scroll:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: -2px;
@@ -1786,6 +1815,36 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   border: 1px solid var(--border);
   border-radius: 18px;
   box-shadow: var(--shadow-modal);
+}
+
+/* Company and branch entry forms: use available viewport space without
+   hiding the title, close control or save actions when fields are numerous. */
+.oryx-modal.oryx-modal--form {
+  width: min(940px, 100%);
+  max-width: 100%;
+  max-height: min(92dvh, 950px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.oryx-modal--form > div:first-child,
+.oryx-modal--form > div:last-child {
+  flex-shrink: 0;
+}
+.oryx-modal--form > div:nth-child(2) {
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.oryx-modal-close { color: var(--text); cursor: pointer; }
+.oryx-modal-close:hover { background: var(--bg); }
+@media (max-width: 640px) {
+  .oryx-modal-backdrop:has(.oryx-modal--form) { padding: 8px; }
+  .oryx-modal.oryx-modal--form { max-height: calc(100dvh - 16px); border-radius: 12px; }
+  .oryx-modal--form > div:first-child,
+  .oryx-modal--form > div:last-child { padding-inline: 12px; }
+  .oryx-modal--form > div:nth-child(2) { padding-inline: 12px; }
 }
 
 /*

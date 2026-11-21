@@ -514,7 +514,7 @@ function itemsTable(
         : 'غير متوفر<span class="ltr">N/A</span>';
   return `
   <div class="itable avoid-break">
-    <table class="items">
+    <table class="items ${withNa ? 'items--three-results' : 'items--two-results'}">
       <thead>
         <tr>
           <th class="c-item">${esc(titleAr)}<span class="ltr">${esc(titleEn)}</span></th>
@@ -549,7 +549,7 @@ function itemsTable(
  */
 function noFindingsNote(noFindings: boolean): string {
   if (!noFindings) return '';
-  return `<div class="no-findings">لا يوجد ما يستدعي الملاحظة<span class="ltr">Nothing to report</span></div>`;
+  return `<div class="no-findings"><span class="no-findings-ar" dir="rtl">لا يوجد ما يستدعي الملاحظة</span><span class="no-findings-en" dir="ltr">Nothing to report</span></div>`;
 }
 
 /**
@@ -838,7 +838,7 @@ export const INSPECTION_REPORT_CSS = `
   /* The approved cover prints the vehicle photograph as a wide band across the
    * middle of the page, bleeding past the side margins. Measured from the
    * reference: the band spans y184-549 of an 842pt sheet, i.e. 365pt tall. */
-  .vphoto{ --vphoto-h:250px; position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
+  .vphoto{ --vphoto-h:275px; position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
   /* The approved cover bleeds the photograph to the paper edges. A negative
    * margin, or a wider in-flow box, enlarges the printable area and shifts every
    * other element on the sheet sideways. The band is therefore painted with an
@@ -847,8 +847,8 @@ export const INSPECTION_REPORT_CSS = `
    * the page. */
   .vphoto--bleed{ margin-inline:0; border-radius:0; border-inline:none; height:var(--vphoto-h); }
   .vphoto--bleed .vphoto-img{ position:absolute; top:0; inset-inline:-12mm;
-    width:calc(100% + 24mm); height:var(--vphoto-h); object-fit:cover; }
-  .vphoto-img{ width:100%; height:var(--vphoto-h); object-fit:cover; display:block; }
+    width:calc(100% + 24mm); height:var(--vphoto-h); object-fit:contain; }
+  .vphoto-img{ width:100%; height:var(--vphoto-h); object-fit:contain; display:block; }
   /* With no attached photograph the cover keeps the reference's blank band
    * (y184-549) empty: no illustration, no placeholder text. The band is drawn at
    * the reference's height so the vehicle information and the terms block land
@@ -872,7 +872,7 @@ export const INSPECTION_REPORT_CSS = `
    * cards: the Arabic column on the right at 8pt and the English column on the
    * left at 6pt (measured y524-660 of page 1). The banner is forced LTR so the
    * English always leads on the left regardless of the document direction. */
-  .terms{ margin-top:10px; }
+  .terms{ margin-top:16px; }
   .terms-banner{ display:flex; direction:ltr; align-items:center; justify-content:space-between;
     background:#0f2b48; color:#fff; padding:3px 10px; font-size:10pt; font-weight:700; }
   .terms-banner-en{ text-align:left; }
@@ -906,8 +906,8 @@ export const INSPECTION_REPORT_CSS = `
   .two-col{ display:flex; gap:10px; align-items:flex-start; }
   .two-col > *{ flex:1 1 0; min-width:0; }
   .cabin .two-col{ margin-top:5px; }
-  .grid{ table-layout:fixed; border-collapse:separate; border-spacing:4px 2px; }
-  .grid > tbody > tr > td{ width:50%; vertical-align:top; padding:0; }
+  .grid{ width:100%; direction:rtl; table-layout:fixed; border-collapse:separate; border-spacing:4px 2px; }
+  .grid > tbody > tr > td{ box-sizing:border-box; width:50%; max-width:50%; vertical-align:top; padding:0; }
   /* The approved form paints the interior fittings drawing as a faint
    * background behind the lower-left (exterior) checklist, at 250x163pt (333px
    * at Chromium's 96dpi/72pt ratio). It is out of flow, so it neither adds page
@@ -921,10 +921,10 @@ export const INSPECTION_REPORT_CSS = `
    * paint/chassis and other document layouts retain their approved sizes. */
   .cabin .grp{ margin-top:2px; }
   .cabin .grid{ border-spacing:3px 1px; }
-  .cabin .items td{ padding:1px 4px; line-height:1.1; }
+  .cabin .items td{ padding:2px 4px; line-height:1.22; }
   .cabin .items thead th{ padding:2px 4px; line-height:1.05; }
-  .cabin .item-ar{ font-size:6.6pt; line-height:1.02; }
-  .cabin .item-en{ font-size:5.5pt; line-height:1.02; }
+  .cabin .item-ar{ font-size:6.6pt; line-height:1.15; }
+  .cabin .item-en{ font-size:5.5pt; line-height:1.16; }
   .cabin .items .sec-remarks{ margin-top:2px; }
   .cabin .itable > .sec-remarks{
     margin-top:2px; padding:2px 5px; font-size:6.5pt; line-height:1.1;
@@ -935,6 +935,27 @@ export const INSPECTION_REPORT_CSS = `
   .itable{ border:1px solid #334e68; border-top:none; }
   .itable-head{ background:#1b375a; color:#fff; font-size:9pt; font-weight:700; padding:3px 9px; border-bottom:1px solid #334e68; }
   .itable-head .ltr{ margin-inline-start:7px; font-size:7.6pt; color:#cbd5e1; font-weight:400; }
+  /* Bilingual checklists must own their columns. Without fixed layout the three
+   * result columns squeeze the Arabic/English labels into overlapping cells. */
+  .items{ width:100%; table-layout:fixed; border-collapse:collapse; direction:rtl; background:#fff; }
+  .items tbody tr{ break-inside:avoid; page-break-inside:avoid; }
+  .items tbody td{ height:auto; min-height:20px; }
+  .items--three-results .c-item{ width:64%; }
+  .items--three-results .c-res{ width:12%; }
+  .items--two-results .c-item{ width:64%; }
+  .items--two-results .c-res{ width:18%; }
+  .items th,.items td{ box-sizing:border-box; overflow-wrap:anywhere; }
+  .items .item-ar,.items .item-en{ white-space:normal; overflow-wrap:anywhere; unicode-bidi:isolate; }
+  .items .item-ar{ direction:rtl; text-align:right; }
+  .items .item-en{ direction:ltr; text-align:left; }
+  .items .c-res{ text-align:center; vertical-align:middle; white-space:nowrap; }
+  .items .c-res .mark{ vertical-align:middle; }
+  .cabin .itable{ position:relative; z-index:1; background:#fff; }
+  .cabin .items tbody td{ background:#fff; }
+  .cabin .no-findings{ position:relative; z-index:2; clear:both; background:#fff; padding:5px 6px; font-size:7pt; line-height:1.35; min-height:26px; text-align:center; }
+  .no-findings-ar,.no-findings-en{ display:block; width:100%; white-space:normal; overflow-wrap:anywhere; unicode-bidi:isolate; }
+  .no-findings-ar{ direction:rtl; }
+  .no-findings-en{ direction:ltr; margin-top:2px; }
   .items th,.items td{ border-bottom:1px solid var(--line); border-inline-end:1px solid var(--line); padding:3px 5px; font-size:7.2pt; line-height:1.28; vertical-align:middle; }
   /* The checklist heading is the table's own header row: navy bar, white text,
    * the bilingual title in the item column and the Pass/Fail/N-A labels over the
@@ -943,13 +964,13 @@ export const INSPECTION_REPORT_CSS = `
     border-bottom:1px solid #334e68; padding:3px 5px; }
   .items thead th .ltr{ display:block; font-size:6.2pt; font-weight:400; color:#cbd5e1; }
   .items thead th.c-item{ text-align:start; }
-  .items thead th.c-item .ltr{ display:inline; margin-inline-start:6px; }
+  .items thead th.c-item .ltr{ display:block; margin:2px 0 0; text-align:left; direction:ltr; unicode-bidi:isolate; }
   .items th:last-child,.items td:last-child{ border-inline-end:none; }
   .items tr:last-child td{ border-bottom:none; }
-  .c-item{ width:33%; }
+  .c-item{ width:64%; }
   .c-res{ text-align:center; }
-  .item-ar{ display:block; font-size:7.1pt; line-height:1.04; color:var(--ink); }
-  .item-en{ display:block; font-size:5.9pt; line-height:1.04; color:var(--muted); }
+  .item-ar{ display:block; font-size:7.1pt; line-height:1.18; color:var(--ink); unicode-bidi:isolate; }
+  .item-en{ display:block; font-size:5.9pt; line-height:1.2; margin-top:2px; color:var(--muted); unicode-bidi:isolate; }
   .rm{ display:inline-flex; align-items:center; justify-content:center; font-size:7pt; font-weight:700; }
   .rm-pass{ color:var(--ok); } .rm-fail{ color:var(--bad); } .rm-na{ color:var(--muted); } .rm-unset{ color:#c3c9d2; }
   .mark{ display:inline-block; vertical-align:-2px; }

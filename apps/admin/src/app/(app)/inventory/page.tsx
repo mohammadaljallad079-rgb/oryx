@@ -35,9 +35,9 @@ import type {
   WarehouseDto,
 } from '@oryx/shared';
 
-type Tab = 'dashboard' | 'valuation' | 'products' | 'spare-parts' | 'warehouses' | 'movements' | 'transfers' | 'adjustments' | 'reorder';
+type Tab = 'dashboard' | 'valuation' | 'products' | 'spare-parts' | 'warehouses' | 'movements' | 'categories' | 'adjustments' | 'reorder';
 
-const TAB_KEYS = ['dashboard', 'valuation', 'products', 'spare-parts', 'warehouses', 'movements', 'transfers', 'adjustments', 'reorder'] as const;
+const TAB_KEYS = ['dashboard', 'valuation', 'products', 'spare-parts', 'warehouses', 'movements', 'categories', 'adjustments', 'reorder'] as const;
 
 export default function InventoryPage() {
   return (
@@ -55,7 +55,6 @@ function InventoryInner() {
   const canItem = can('erp.inventory.item.manage');
   const canWarehouse = can('erp.inventory.warehouse.manage');
   const canMove = can('erp.inventory.movement.manage');
-  const canTransfer = can('erp.inventory.transfer.manage');
   const canAdjust = can('erp.inventory.adjustment.manage');
 
   const tabs: Array<{ key: Tab; label: string }> = [
@@ -65,7 +64,7 @@ function InventoryInner() {
     { key: 'spare-parts', label: locale === 'ar' ? 'قطع الغيار' : 'Spare parts' },
     { key: 'warehouses', label: t('erp.inventory.warehouses') },
     { key: 'movements', label: t('erp.inventory.movements') },
-    { key: 'transfers', label: t('erp.inventory.transfers') },
+    { key: 'categories', label: locale === 'ar' ? 'تصنيفات المنتجات' : 'Product categories' },
     { key: 'adjustments', label: t('erp.inventory.adjustments') },
     { key: 'reorder', label: t('erp.inventory.reorder') },
   ];
@@ -101,7 +100,7 @@ function InventoryInner() {
       {tab === 'spare-parts' ? <ProductsTab canManage={canItem} sparePartsOnly /> : null}
       {tab === 'warehouses' ? <WarehousesTab canManage={canWarehouse} /> : null}
       {tab === 'movements' ? <MovementsTab canManage={canMove} /> : null}
-      {tab === 'transfers' ? <TransfersTab canManage={canTransfer} /> : null}
+      {tab === 'categories' ? <ProductCategoriesTab canManage={canItem} /> : null}
       {tab === 'adjustments' ? <AdjustmentsTab canManage={canAdjust} /> : null}
       {tab === 'reorder' ? <ReorderTab /> : null}
     </div>
@@ -449,6 +448,7 @@ function ProductsTab({ canManage, sparePartsOnly = false }: { canManage: boolean
               <th>{t('erp.inventory.barcode')}</th>
               <th>{t('erp.inventory.category')}</th>
               <th>{t('erp.inventory.unit')}</th>
+              <th>{t('erp.inventory.totalQty')}</th>
               <th>{t('erp.inventory.salesPrice')}</th>
               <th>{t('erp.inventory.costPrice')}</th>
               <th>{t('erp.inventory.taxRate')}</th>
@@ -469,6 +469,9 @@ function ProductsTab({ canManage, sparePartsOnly = false }: { canManage: boolean
                 </td>
                 <td className="text-[12.5px]">{p.category ?? '—'}</td>
                 <td className="text-[12.5px]">{p.unit}</td>
+                <td className="tabular-nums text-[12.5px]" data-testid={`product-on-hand-${p.sku}`}>
+                  {p.trackStock && p.type !== 'SERVICE' ? qty(p.onHandQuantity ?? 0) : '—'}
+                </td>
                 <td className="tabular-nums text-[12.5px]">{money(p.salesPriceMinor)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(p.costPriceMinor)}</td>
                 <td className="text-[12.5px]">{(p.taxRateBp / 100).toFixed(2)}%</td>
@@ -563,7 +566,8 @@ function EditProductModal({
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [productImage, setProductImage] = useState<File | null>(null);
+  const [productImages, setProductImages] = useState<File[]>([]);
+  const categoryOptions = useAsync(() => api.productCategories(), []);
   const [form, setForm] = useState({
     nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15', isActive: true,
     barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
@@ -572,7 +576,7 @@ function EditProductModal({
   useEffect(() => {
     if (!product) return;
     setError(null);
-    setProductImage(null);
+    setProductImages([]);
     setForm({
       nameEn: product.nameEn,
       nameAr: product.nameAr,
@@ -609,13 +613,13 @@ function EditProductModal({
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
       });
-      if (productImage) {
+      for (const image of productImages) {
         const imageData = new FormData();
-        imageData.append('file', productImage);
+        imageData.append('file', image);
         imageData.append('altEn', form.nameEn.trim() || form.nameAr.trim());
         imageData.append('altAr', form.nameAr.trim() || form.nameEn.trim());
         await api.uploadProductImage(product.id, imageData);
-        setProductImage(null);
+        setProductImages((pending) => pending.filter((candidate) => candidate !== image));
       }
       await onSaved();
     } catch (e) {
@@ -666,7 +670,10 @@ function EditProductModal({
           <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="edit-product-barcode" />
         </Field>
         <Field label={t('erp.inventory.category')}>
-          <input className="oryx-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="edit-product-category" />
+          <input className="oryx-input" list="edit-product-category-options" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="edit-product-category" />
+          <datalist id="edit-product-category-options">
+            {(categoryOptions.data?.items ?? ['Spare Parts']).map((name) => <option key={name} value={name} />)}
+          </datalist>
         </Field>
         <Field label={t('erp.inventory.reorderLevel')}>
           <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="edit-product-reorder-level" />
@@ -677,11 +684,28 @@ function EditProductModal({
       </div>
       <div className="mt-4 rounded-xl border border-[var(--border)] p-3" data-testid="edit-product-inline-image">
         <Field label={t('erp.inventory.images')}>
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif"
+          <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif"
             className="oryx-input" data-testid="edit-product-inline-image-file"
-            onChange={(e) => setProductImage(e.target.files?.[0] ?? null)} />
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              setProductImages((pending) => [...pending, ...files]);
+              e.target.value = '';
+            }} />
         </Field>
-        {productImage ? <p className="oryx-muted m-0 mt-2 text-xs">{productImage.name}</p> : null}
+        {productImages.length > 0 ? (
+          <ul className="mt-2 flex flex-col gap-1">
+            {productImages.map((image, index) => (
+              <li key={`${image.name}-${image.lastModified}-${index}`} className="flex items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 truncate">{image.name}</span>
+                <button type="button" className="oryx-btn oryx-btn--ghost"
+                  aria-label={`Remove ${image.name}`}
+                  onClick={() => setProductImages((pending) => pending.filter((_, i) => i !== index))}>
+                  <Icon name="close" size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
       <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
         <input
@@ -729,9 +753,7 @@ function ProductImagesModal({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [altEn, setAltEn] = useState('');
-  const [altAr, setAltAr] = useState('');
+
 
   const load = useCallback(async () => {
     if (!product) return;
@@ -750,32 +772,8 @@ function ProductImagesModal({
     if (product) void load();
     else {
       setImages([]);
-      setFile(null);
-      setAltEn('');
-      setAltAr('');
     }
   }, [product, load]);
-
-  async function upload() {
-    if (!product || !file) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      if (altEn) form.append('altEn', altEn);
-      if (altAr) form.append('altAr', altAr);
-      await api.uploadProductImage(product.id, form);
-      setFile(null);
-      setAltEn('');
-      setAltAr('');
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function promote(imageId: string) {
     if (!product) return;
@@ -839,32 +837,6 @@ function ProductImagesModal({
           ))}
         </div>
       )}
-      {canManage ? (
-        <div className="border-t border-[var(--border)] pt-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={t('erp.inventory.file')}>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/avif"
-                className="oryx-input"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                data-testid="product-image-file"
-              />
-            </Field>
-            <Field label={`${t('common.name')} (EN)`}>
-              <input className="oryx-input" value={altEn} onChange={(e) => setAltEn(e.target.value)} data-testid="product-image-alt-en" />
-            </Field>
-            <Field label={`${t('common.name')} (AR)`}>
-              <input className="oryx-input" value={altAr} onChange={(e) => setAltAr(e.target.value)} data-testid="product-image-alt-ar" />
-            </Field>
-          </div>
-          <div className="mt-3 flex justify-end">
-            <Button variant="primary" size="sm" disabled={busy || !file} onClick={() => void upload()} data-testid="upload-product-image">
-              {busy ? t('common.loading') : t('erp.inventory.uploadImage')}
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </Modal>
   );
 }
@@ -1146,6 +1118,93 @@ function RecordMovementModal({
   );
 }
 
+function ProductCategoriesTab({ canManage }: { canManage: boolean }) {
+  const { t, locale } = useUi();
+  const categories = useAsync(() => api.managedProductCategories(), []);
+  const allCategories = useAsync(() => api.productCategories(), []);
+  const [name, setName] = useState('');
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    const next = name.trim();
+    if (!next) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (editing) await api.renameProductCategory(editing.id, next);
+      else await api.createProductCategory(next);
+      setEditing(null);
+      setName('');
+      await Promise.all([categories.reload(), allCategories.reload()]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
+        <p className="oryx-panel-title m-0">{locale === 'ar' ? 'تصنيفات المنتجات وقطع الغيار' : 'Product and spare-parts categories'}</p>
+      </div>
+      {canManage ? (
+        <div className="flex flex-wrap items-end gap-3 border-b border-[var(--border)] p-4">
+          <Field label={editing ? (locale === 'ar' ? 'تعديل التصنيف' : 'Rename category') : (locale === 'ar' ? 'تصنيف جديد' : 'New category')}>
+            <input className="oryx-input" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} data-testid="category-name" placeholder={locale === 'ar' ? 'مثال: قطع غيار' : 'e.g. Spare Parts'} />
+          </Field>
+          <Button variant="primary" disabled={busy || !name.trim()} onClick={() => void save()} data-testid="save-product-category">
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+          {editing ? <Button onClick={() => { setEditing(null); setName(''); }}>{t('common.cancel')}</Button> : null}
+        </div>
+      ) : null}
+      {error ? <ErrorBanner message={error} /> : null}
+      {categories.error ? <ErrorBanner message={categories.error} onRetry={categories.reload} /> : null}
+      {categories.loading ? <Skeleton height={100} /> : (
+        <TableShell>
+          <thead><tr><th>{locale === 'ar' ? 'التصنيف' : 'Category'}</th><th>{locale === 'ar' ? 'عدد المنتجات' : 'Products'}</th><th>{t('common.actions')}</th></tr></thead>
+          <tbody>
+            {(categories.data?.items ?? []).map((item) => (
+              <tr key={item.id} data-testid={`category-row-${item.id}`}>
+                <td>{item.name}</td>
+                <td className="tabular-nums">{item.productCount}</td>
+                <td>
+                  {canManage ? <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => { setEditing({ id: item.id, name: item.name }); setName(item.name); }} data-testid={`edit-category-${item.id}`}>{t('common.edit')}</Button>
+                    <Button size="sm" variant="danger" onClick={async () => {
+                      if (!window.confirm(t('common.deleteConfirm'))) return;
+                      try {
+                        await api.deleteProductCategory(item.id);
+                        await Promise.all([categories.reload(), allCategories.reload()]);
+                      } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
+                    }} data-testid={`delete-category-${item.id}`}>{t('common.delete')}</Button>
+                  </div> : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
+      )}
+      <p className="oryx-muted p-4 text-xs">
+        {locale === 'ar'
+          ? 'التصنيفات مرتبطة بالمنتجات وقطع الغيار. إعادة تسمية تصنيف مسجل تحدّث المنتجات المرتبطة به؛ لا يمكن حذف تصنيف مستخدم.'
+          : 'Categories connect products and spare parts. Renaming a managed category updates linked products; categories in use cannot be deleted.'}
+      </p>
+      {(allCategories.data?.items ?? []).filter((name) => !(categories.data?.items ?? []).some((item) => item.name === name)).length > 0 ? (
+        <div className="px-4 pb-4 text-xs">
+          {locale === 'ar' ? 'تصنيفات موجودة في المنتجات (يمكن تسجيلها هنا لإدارتها): ' : 'Existing product categories (register to manage): '}
+          {(allCategories.data?.items ?? []).filter((name) => !(categories.data?.items ?? []).some((item) => item.name === name)).join('، ')}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+// Keep the legacy transfer UI available for future audit/history access; not part of the current tabs.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TransfersTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.stockTransfers(), []);
@@ -1201,13 +1260,51 @@ function TransfersTab({ canManage }: { canManage: boolean }) {
 }
 
 function AdjustmentsTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warehouseId, setWarehouseId] = useState('');
+  const [productId, setProductId] = useState('');
+  const [reason, setReason] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [direction, setDirection] = useState<'add' | 'subtract'>('add');
   const list = useAsync(() => api.stockAdjustments(), []);
+  const warehouses = useAsync(() => api.warehouses(), []);
+  const products = useAsync(() => api.products({ pageSize: 500 }), []);
+
+  const create = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const magnitude = toQuantityInput(quantity);
+      if (!warehouseId || !productId || reason.trim().length < 2 || magnitude <= 0) {
+        throw new Error(locale === 'ar' ? 'اختر المستودع والمنتج وأدخل كمية موجبة وسببًا للتسوية.' : 'Choose a warehouse, product, positive quantity and reason.');
+      }
+      await api.createStockAdjustment({
+        warehouseId,
+        reason: reason.trim(),
+        lines: [{ productId, quantityDelta: direction === 'add' ? magnitude : -magnitude }],
+      });
+      setOpen(false);
+      setProductId('');
+      setQuantity('1');
+      setReason('');
+      await list.reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Card>
-      <div className="border-b border-[var(--border)] p-4">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.inventory.adjustments')}</p>
+        {canManage ? <Button variant="primary" size="sm" onClick={() => { setError(null); setOpen(true); }} data-testid="new-stock-adjustment">
+          <Icon name="plus" size={16} />{locale === 'ar' ? 'تسوية جديدة' : 'New adjustment'}
+        </Button> : null}
       </div>
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={120} /></div> : (list.data?.items.length ?? 0) === 0 ? (
@@ -1248,18 +1345,85 @@ function AdjustmentsTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
+      <Modal
+        open={open}
+        size="form"
+        title={locale === 'ar' ? 'تسوية مخزون جديدة' : 'New stock adjustment'}
+        onClose={() => { if (!busy) setOpen(false); }}
+        footer={<>
+          <Button onClick={() => setOpen(false)} disabled={busy}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={busy || !warehouseId || !productId || !reason.trim() || !quantity.trim()} onClick={() => void create()} data-testid="save-stock-adjustment">
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </>}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('erp.inventory.warehouse')} required>
+            <EntityPicker
+              value={warehouseId || null}
+              options={(warehouses.data?.items ?? []).filter((w) => w.isActive).map((w) => ({ value: w.id, label: locale === 'ar' ? w.nameAr || w.nameEn : w.nameEn || w.nameAr }))}
+              onChange={(id) => setWarehouseId(id ?? '')}
+              placeholder={t('common.select')}
+              testId="adjustment-warehouse"
+            />
+          </Field>
+          <Field label={t('erp.inventory.products')} required>
+            <EntityPicker
+              value={productId || null}
+              options={(products.data?.items ?? []).filter((p) => p.trackStock && p.type === 'PRODUCT').map((p) => ({ value: p.id, label: `${p.sku} — ${locale === 'ar' ? p.nameAr || p.nameEn : p.nameEn || p.nameAr}` }))}
+              onChange={(id) => setProductId(id ?? '')}
+              placeholder={t('common.select')}
+              testId="adjustment-product"
+            />
+          </Field>
+          <Field label={locale === 'ar' ? 'نوع التسوية' : 'Adjustment direction'}>
+            <select className="oryx-select" value={direction} onChange={(e) => setDirection(e.target.value as typeof direction)} data-testid="adjustment-direction">
+              <option value="add">{locale === 'ar' ? 'زيادة الرصيد' : 'Increase stock'}</option>
+              <option value="subtract">{locale === 'ar' ? 'تخفيض الرصيد' : 'Decrease stock'}</option>
+            </select>
+          </Field>
+          <Field label={locale === 'ar' ? 'الكمية' : 'Quantity'} required>
+            <input type="number" min="0.0001" step="0.0001" className="oryx-input" value={quantity} onChange={(e) => setQuantity(e.target.value)} data-testid="adjustment-quantity" />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label={t('erp.inventory.reason')} required>
+              <textarea className="oryx-input oryx-textarea" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} data-testid="adjustment-reason" />
+            </Field>
+          </div>
+        </div>
+        <p className="oryx-muted text-xs">{locale === 'ar' ? 'تُحفظ التسوية كمسودة، ثم تُرحّل من القائمة بعد مراجعتها.' : 'The adjustment is saved as draft; post it from the list after review.'}</p>
+        {error ? <ErrorBanner message={error} /> : null}
+      </Modal>
     </Card>
   );
 }
 
 function ReorderTab() {
-  const { t } = useUi();
-  const alerts = useAsync<{ items: ReorderAlertDto[] }>(() => api.reorderAlerts(), []);
+  const { t, locale } = useUi();
+  const [warehouseId, setWarehouseId] = useState('');
+  const warehouses = useAsync(() => api.warehouses(), []);
+  const alerts = useAsync<{ items: ReorderAlertDto[] }>(
+    () => api.reorderAlerts({ warehouseId: warehouseId || undefined }),
+    [warehouseId],
+  );
 
   return (
     <Card>
-      <div className="border-b border-[var(--border)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.inventory.reorder')}</p>
+        <label className="min-w-[210px]">
+          <span className="oryx-label">{t('erp.inventory.warehouse')}</span>
+          <select className="oryx-select" value={warehouseId}
+            onChange={(event) => setWarehouseId(event.target.value)}
+            data-testid="reorder-warehouse-filter">
+            <option value="">{locale === 'ar' ? 'جميع المستودعات' : 'All warehouses'}</option>
+            {(warehouses.data?.items ?? []).map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {locale === 'ar' ? warehouse.nameAr || warehouse.nameEn : warehouse.nameEn || warehouse.nameAr}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       {alerts.error ? <div className="p-4"><ErrorBanner message={alerts.error} onRetry={alerts.reload} /></div> : null}
       {alerts.loading ? <div className="p-4"><Skeleton height={120} /></div> : (alerts.data?.items.length ?? 0) === 0 ? (

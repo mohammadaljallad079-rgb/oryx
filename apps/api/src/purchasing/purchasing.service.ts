@@ -301,6 +301,13 @@ export class PurchasingService {
         unitCostMinor: l.estimatedUnitCostMinor,
         taxPercentBp: 0,
       }));
+      // Conversion writes purchase-order lines without going through createOrder.
+      // Apply the same product uniqueness rule so later receipt allocations
+      // cannot silently update the first matching line twice.
+      const lineProducts = lineInputs.flatMap((line) => line.productId ? [line.productId] : []);
+      if (new Set(lineProducts).size !== lineProducts.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Combine repeated products before converting the requisition.');
+      }
       const totals = computePurchaseTotals(lineInputs);
       const orderNumber = await this.sequences.next(tx, companyId, 'purchaseOrder');
       const order = await tx.purchaseOrder.create({
@@ -386,6 +393,13 @@ export class PurchasingService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     await this.assertSupplier(companyId, dto.supplierId);
     if (dto.warehouseId) await this.assertWarehouse(companyId, dto.warehouseId);
+
+    // Receipt allocation is keyed by productId. Duplicate product lines on
+    // one PO would make quantityReceived ambiguous and permit over-receipt.
+    const orderProducts = dto.lines.flatMap((line) => line.productId ? [line.productId] : []);
+    if (new Set(orderProducts).size !== orderProducts.length) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Combine repeated products into one purchase-order line.');
+    }
 
     const companyCurrency = await this.context.companyCurrency(companyId);
     const totals = computePurchaseTotals(dto.lines);
@@ -495,6 +509,13 @@ export class PurchasingService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
     const result = await this.posting.withTransaction(async (tx) => {
+      // Serialise receipt allocation per order. Without this lock, concurrent
+      // transactions may both read the same remaining quantity and over-receive.
+      await tx.$queryRawUnsafe(
+        'SELECT id FROM "PurchaseOrder" WHERE id = $1 AND "companyId" = $2 FOR UPDATE',
+        dto.purchaseOrderId,
+        companyId,
+      );
       const order = await tx.purchaseOrder.findFirst({
         where: { id: dto.purchaseOrderId, companyId },
         include: { lines: true },
@@ -514,6 +535,12 @@ export class PurchasingService {
       // An explicit line is capped at what the order still owes, so a retried or
       // duplicated receipt cannot move stock (and accrue AP) twice for the same
       // ordered quantity.
+      if (dto.lines) {
+        const ids = dto.lines.map((line) => line.productId);
+        if (new Set(ids).size !== ids.length) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A goods receipt cannot repeat the same product in separate lines.');
+        }
+      }
       const receiptLines = dto.lines
         ? dto.lines.map((l) => {
             const orderLine = order.lines.find((ol) => ol.productId === l.productId);
@@ -694,17 +721,104 @@ export class PurchasingService {
 
     const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
+      // Serialise invoices for this supplier before checking the external invoice
+      // number. A browser retry or simultaneous requests must not accrue AP
+      // and VAT twice for the same supplier document.
+      await tx.$queryRawUnsafe(
+        'SELECT id FROM "Supplier" WHERE id = $1 AND "companyId" = $2 FOR UPDATE',
+        dto.supplierId,
+        companyId,
+      );
+      const externalNumber = dto.supplierInvoiceNumber?.trim();
+      if (externalNumber) {
+        const existing = await tx.supplierInvoice.findFirst({
+          where: { companyId, supplierId: dto.supplierId, supplierInvoiceNumber: externalNumber },
+          select: { id: true },
+        });
+        if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This supplier invoice number was already recorded for this supplier.');
+      }
+      // A direct invoice may receive physical goods only into an explicitly
+      // selected warehouse. Linked invoices never receive goods a second time.
+      if (!dto.purchaseOrderId && dto.post !== false && dto.lines.some((line) => line.productId)) {
+        if (!dto.warehouseId) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Choose a warehouse to receive stock for a direct supplier invoice.');
+        }
+        await this.assertWarehouse(companyId, dto.warehouseId);
+      }
       const totals = computePurchaseTotals(dto.lines);
       const invoiceDate = new Date(dto.invoiceDate);
       const invoiceNumber = await this.sequences.next(tx, companyId, 'supplierInvoice');
 
-      // Already received against the PO? Then only VAT remains to accrue.
+      // Value already accrued at actual goods receipt costs; invoice/receipt
+      // price differences must go to purchase price variance, not inventory.
       let alreadyAccrued = 0;
       if (dto.purchaseOrderId) {
         const order = await tx.purchaseOrder.findFirst({ where: { id: dto.purchaseOrderId, companyId } });
         if (!order) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase order not found.');
-        const receipts = await tx.goodsReceipt.findMany({ where: { purchaseOrderId: order.id, status: 'POSTED' } });
-        if (receipts.length > 0) alreadyAccrued = totals.subtotalMinor;
+        if (order.supplierId !== dto.supplierId) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Supplier invoice supplier must match the purchase order.');
+        }
+        // Match invoice lines against quantities actually received, subtracting
+        // earlier posted invoices. A partial receipt cannot justify an invoice
+        // for the entire order, and successive invoices cannot bill one receipt
+        // allocation twice. Standalone invoices remain available without a PO.
+        const receipts = await tx.goodsReceipt.findMany({
+          where: { purchaseOrderId: order.id, status: 'POSTED' },
+          include: { lines: true },
+        });
+        const priorInvoices = await tx.supplierInvoice.findMany({
+          where: { purchaseOrderId: order.id, companyId, status: 'POSTED' },
+          include: { lines: true },
+        });
+        const receivedByProduct = new Map<string, number>();
+        for (const receipt of receipts) {
+          for (const line of receipt.lines) {
+            receivedByProduct.set(line.productId, (receivedByProduct.get(line.productId) ?? 0) + line.quantity);
+          }
+        }
+        const billedByProduct = new Map<string, number>();
+        for (const previous of priorInvoices) {
+          for (const line of previous.lines) {
+            if (!line.productId) continue;
+            billedByProduct.set(line.productId, (billedByProduct.get(line.productId) ?? 0) + line.quantity);
+          }
+        }
+        const requestedByProduct = new Map<string, number>();
+        for (const line of dto.lines) {
+          if (!line.productId) continue;
+          requestedByProduct.set(line.productId, (requestedByProduct.get(line.productId) ?? 0) + line.quantity);
+        }
+        for (const [productId, requested] of requestedByProduct) {
+          const available = (receivedByProduct.get(productId) ?? 0) - (billedByProduct.get(productId) ?? 0);
+          if (requested > available) {
+            throw badRequest(
+              ERROR_CODES.OVER_RECEIPT,
+              'Supplier invoice quantity exceeds received and not-yet-invoiced stock.',
+              { productId, requested, available: Math.max(0, available) },
+            );
+          }
+        }
+        // Assign each invoice quantity to the oldest unbilled receipt lines.
+        // The goods receipt accrued AP at its own unit cost, which may differ
+        // from the supplier's later invoice price. Do not revalue physical stock.
+        for (const [productId, quantity] of requestedByProduct) {
+          let skipPrior = billedByProduct.get(productId) ?? 0;
+          let unbilled = quantity;
+          const receiptLines = receipts
+            .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime())
+            .flatMap((receipt) => receipt.lines.filter((line) => line.productId === productId));
+          for (const line of receiptLines) {
+            const skipped = Math.min(skipPrior, line.quantity);
+            skipPrior -= skipped;
+            const available = line.quantity - skipped;
+            const matched = Math.min(unbilled, available);
+            if (matched > 0) {
+              alreadyAccrued += lineAmountMinor(matched, line.unitCostMinor);
+              unbilled -= matched;
+            }
+            if (unbilled === 0) break;
+          }
+        }
       }
 
       const supplier = await tx.supplier.findFirst({ where: { id: dto.supplierId, companyId } });
@@ -717,7 +831,7 @@ export class PurchasingService {
           companyId,
           branchId: dto.branchId ?? null,
           invoiceNumber,
-          supplierInvoiceNumber: dto.supplierInvoiceNumber,
+          supplierInvoiceNumber: externalNumber || `AUTO-${invoiceNumber}`,
           supplierId: dto.supplierId,
           purchaseOrderId: dto.purchaseOrderId ?? null,
           status: 'DRAFT',
@@ -746,37 +860,76 @@ export class PurchasingService {
         include: { supplier: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
       });
 
+      if (dto.post !== false && !dto.purchaseOrderId && dto.warehouseId) {
+        // An unlinked direct invoice is both the receiving document and the AP
+        // invoice. Record stock movements exactly once inside the same transaction.
+        for (const line of dto.lines) {
+          if (!line.productId) continue;
+          await this.inventory.recordMovement(tx, {
+            companyId,
+            branchId: invoice.branchId,
+            warehouseId: dto.warehouseId,
+            productId: line.productId,
+            movementType: 'RECEIPT',
+            source: 'SUPPLIER_INVOICE',
+            sourceId: invoice.id,
+            quantity: line.quantity,
+            unitCostMinor: line.unitCostMinor,
+            occurredAt: invoiceDate,
+            actorUserId: actor.userId,
+          });
+        }
+      }
+
       if (dto.post !== false) {
         const apAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AP_CONTROL);
         const inventoryAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.INVENTORY);
         const vatInput = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.VAT_INPUT);
-        const expenseAccount = inventoryAccount;
-        // Only the part not already accrued by a goods receipt increases the
-        // payable; the VAT is always accrued by the invoice.
-        const netToAccrue = totals.subtotalMinor - alreadyAccrued;
+        // Non-stock invoice lines follow the existing expense/inventory
+        // accrual policy. For received products, separate the price difference
+        // from inventory so the stock ledger continues to match its valuation.
+        const serviceAccrual = sumMinor(dto.lines
+          .filter((line) => !line.productId)
+          .map((line) => lineAmountMinor(line.quantity, line.unitCostMinor)));
+        const receivedProductInvoiced = totals.subtotalMinor - serviceAccrual;
+        const priceVariance = dto.purchaseOrderId ? receivedProductInvoiced - alreadyAccrued : 0;
+        const netToAccrue = dto.purchaseOrderId ? serviceAccrual + priceVariance : totals.subtotalMinor;
         const apIncrease = netToAccrue + totals.taxMinor;
-
-        const journalLines: PostingLine[] = [{ accountId: apAccount, credit: apIncrease }];
-        if (netToAccrue !== 0) {
-          journalLines.push({ accountId: expenseAccount, debit: netToAccrue });
+        const journalLines: PostingLine[] = [];
+        if (apIncrease > 0) journalLines.push({ accountId: apAccount, credit: apIncrease });
+        if (apIncrease < 0) journalLines.push({ accountId: apAccount, debit: -apIncrease });
+        const inventoryAccrual = dto.purchaseOrderId ? serviceAccrual : totals.subtotalMinor;
+        if (inventoryAccrual > 0) journalLines.push({ accountId: inventoryAccount, debit: inventoryAccrual });
+        if (priceVariance !== 0) {
+          const varianceAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.PURCHASE_PRICE_VARIANCE);
+          journalLines.push(priceVariance > 0
+            ? { accountId: varianceAccount, debit: priceVariance }
+            : { accountId: varianceAccount, credit: -priceVariance });
         }
-        if (totals.taxMinor > 0) {
-          journalLines.push({ accountId: vatInput, debit: totals.taxMinor });
+        if (totals.taxMinor > 0) journalLines.push({ accountId: vatInput, debit: totals.taxMinor });
+        // A fully accrued receipt with no VAT needs no second journal. Mark
+        // the invoice posted rather than trying to create a zero-value entry.
+        if (apIncrease === 0 && netToAccrue === 0 && totals.taxMinor === 0) {
+          await tx.supplierInvoice.update({
+            where: { id: invoice.id },
+            data: { status: 'POSTED', postedAt: new Date() },
+          });
+        } else {
+          const journal = await this.posting.postJournal(tx, {
+            companyId,
+            branchId: invoice.branchId,
+            entryDate: invoiceDate,
+            memo: `Supplier invoice ${invoiceNumber}`,
+            sourceType: 'SUPPLIER_INVOICE',
+            sourceId: invoice.id,
+            actorUserId: actor.userId,
+            lines: journalLines,
+          });
+          await tx.supplierInvoice.update({
+            where: { id: invoice.id },
+            data: { status: 'POSTED', journalEntryId: journal.id, postedAt: new Date() },
+          });
         }
-        const journal = await this.posting.postJournal(tx, {
-          companyId,
-          branchId: invoice.branchId,
-          entryDate: invoiceDate,
-          memo: `Supplier invoice ${invoiceNumber}`,
-          sourceType: 'SUPPLIER_INVOICE',
-          sourceId: invoice.id,
-          actorUserId: actor.userId,
-          lines: journalLines,
-        });
-        await tx.supplierInvoice.update({
-          where: { id: invoice.id },
-          data: { status: 'POSTED', journalEntryId: journal.id, postedAt: new Date() },
-        });
       }
 
       const fresh = await tx.supplierInvoice.findUniqueOrThrow({
@@ -832,6 +985,16 @@ export class PurchasingService {
     const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       await this.assertWarehouseTx(tx, companyId, dto.warehouseId);
+      if (dto.purchaseOrderId) {
+        const order = await tx.purchaseOrder.findFirst({
+          where: { id: dto.purchaseOrderId, companyId },
+          select: { supplierId: true },
+        });
+        if (!order) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase order not found.');
+        if (order.supplierId !== dto.supplierId) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Purchase return supplier must match the purchase order.');
+        }
+      }
       const totals = computePurchaseTotals(dto.lines);
       const returnDate = new Date(dto.returnDate);
       const returnNumber = await this.sequences.next(tx, companyId, 'purchaseReturn');

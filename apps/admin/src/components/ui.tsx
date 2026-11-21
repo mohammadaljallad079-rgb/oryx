@@ -146,7 +146,7 @@ export function Modal({
    * panels and a five-column item table to mirror the printed page, and `pos`
    * for a true edge-to-edge terminal that owns the whole viewport.
    */
-  size?: 'default' | 'full' | 'document' | 'pos';
+  size?: 'default' | 'form' | 'full' | 'document' | 'pos';
 }) {
   const { t } = useUi();
   const idRef = useRef<symbol>(Symbol('oryx-modal'));
@@ -237,7 +237,9 @@ export function Modal({
         className={`oryx-modal ${
           size === 'full'
             ? 'oryx-modal--full'
-            : size === 'document'
+            : size === 'form'
+              ? 'oryx-modal--form'
+              : size === 'document'
               ? 'oryx-modal--document'
               : size === 'pos'
                 ? 'oryx-modal--pos'
@@ -253,12 +255,12 @@ export function Modal({
           <h2 className="m-0 text-[16px] font-bold">{title}</h2>
           <button
             type="button"
-            className="oryx-btn oryx-btn--ghost flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] shadow-sm hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
+            className="oryx-modal-close flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] shadow-sm hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
             onClick={onClose}
             title={t('common.closeLabel')}
             aria-label={t('common.closeLabel')}
           >
-            <Icon name="close" size={24} />
+            <span aria-hidden="true" className="text-[28px] font-semibold leading-none">&times;</span>
           </button>
         </div>
         <div className={size === 'pos' ? 'flex min-h-0 flex-1 flex-col' : 'px-5 py-4'}>{children}</div>
@@ -331,20 +333,61 @@ export function Skeleton({ height = 16, width = '100%' }: { height?: number; wid
 }
 
 export function TableShell({ children, label }: { children: ReactNode; label?: string }) {
+  const tableRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const [scrollWidth, setScrollWidth] = useState(0);
+  const [isWide, setIsWide] = useState(false);
+
+  // Keep a visible, sticky horizontal scrollbar at the bottom of a long table
+  // even when its real scrollbar is below the viewport.
+  useEffect(() => {
+    const table = tableRef.current;
+    const dock = dockRef.current;
+    if (!table || !dock) return;
+    const measure = () => {
+      setScrollWidth(table.scrollWidth);
+      setIsWide(table.scrollWidth > table.clientWidth + 2);
+    };
+    const fromTable = () => { dock.scrollLeft = table.scrollLeft; };
+    const fromDock = () => { table.scrollLeft = dock.scrollLeft; };
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(table);
+    const inner = table.querySelector('table');
+    if (inner) observer?.observe(inner);
+    window.addEventListener('resize', measure);
+    table.addEventListener('scroll', fromTable, { passive: true });
+    dock.addEventListener('scroll', fromDock, { passive: true });
+    measure();
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      table.removeEventListener('scroll', fromTable);
+      dock.removeEventListener('scroll', fromDock);
+    };
+  }, [children]);
+
   return (
-    // The scroll container is the shell itself rather than a bare wrapper: it
-    // keeps the horizontal scrollbar inside the card and lets a narrow viewport
-    // pan the table instead of clipping its rightmost columns. `role="region"`
-    // plus a label keeps the scrollable area reachable by keyboard and
-    // announced by a screen reader.
-    <div
-      className="oryx-table-scroll"
-      data-testid="table-scroll"
-      role="region"
-      aria-label={label}
-      tabIndex={0}
-    >
-      <table className="oryx-table">{children}</table>
+    <div className="oryx-table-container">
+      <div
+        ref={tableRef}
+        className="oryx-table-scroll"
+        data-testid="table-scroll"
+        role="region"
+        aria-label={label}
+        tabIndex={0}
+      >
+        <table className="oryx-table">{children}</table>
+      </div>
+      <div
+        ref={dockRef}
+        className="oryx-table-scroll-dock"
+        data-testid="table-scroll-bottom"
+        aria-label={label ?? 'Horizontal table navigation'}
+        tabIndex={isWide ? 0 : -1}
+        style={{ display: isWide ? undefined : 'none' }}
+      >
+        <div style={{ width: scrollWidth, height: 1 }} aria-hidden="true" />
+      </div>
     </div>
   );
 }
@@ -519,11 +562,39 @@ export function SearchableSelect({
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 280 });
+
+  // The menu must escape modal scroll containers; render it at viewport level
+  // and flip above the field when the bottom edge would clip the options.
+  useIsomorphicLayoutEffect(() => {
+    if (!open) return;
+    const position = () => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const below = window.innerHeight - rect.bottom - 12;
+      const above = rect.top - 12;
+      const maxHeight = Math.max(120, Math.min(320, Math.max(below, above)));
+      setPopoverPosition({
+        top: below >= 180 || below >= above ? rect.bottom + 4 : Math.max(8, rect.top - maxHeight - 4),
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8)),
+        width: Math.min(rect.width, window.innerWidth - 16),
+        maxHeight,
+      });
+    };
+    position();
+    window.addEventListener('resize', position);
+    window.addEventListener('scroll', position, true);
+    return () => {
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onDocClick = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(e.target as Node) && !popoverRef.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
@@ -569,9 +640,11 @@ export function SearchableSelect({
         </span>
         <Icon name="chevronDown" size={14} />
       </button>
-      {open ? (
+      {open && typeof document !== 'undefined' ? createPortal(
         <div
-          className="oryx-popover absolute z-30 mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg"
+          ref={popoverRef}
+          className="oryx-popover fixed overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg"
+          style={{ zIndex: 9999, top: popoverPosition.top, left: popoverPosition.left, width: popoverPosition.width, maxHeight: popoverPosition.maxHeight }}
           role="listbox"
         >
           <input
@@ -585,7 +658,7 @@ export function SearchableSelect({
             placeholder={placeholder}
             data-testid={testId ? `${testId}-search` : undefined}
           />
-          <div className="max-h-56 overflow-y-auto">
+          <div className="overflow-y-auto" style={{ maxHeight: Math.max(75, popoverPosition.maxHeight - 64) }}>
             {emptyLabel !== undefined ? (
               <button
                 type="button"
@@ -644,7 +717,8 @@ export function SearchableSelect({
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
       {createOpen && create ? (
         <Modal

@@ -334,7 +334,9 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
 
     await page.getByTestId('remarks-COMPUTER_UNIT').fill('Computer scan examined; no fault entry required.');
     await page.getByTestId('save-section-COMPUTER_UNIT').click();
-    await expect(page.getByTestId('inspection-submit')).toBeEnabled();
+    // Saving the last selected computer-unit inspection now submits the complete
+    // job for approval automatically; a manual Submit action is no longer needed.
+    await expect(page.getByTestId('inspection-review-open')).toBeVisible();
     await page.reload();
     await expect(page.getByTestId('remarks-COMPUTER_UNIT')).toHaveValue('Computer scan examined; no fault entry required.');
   });

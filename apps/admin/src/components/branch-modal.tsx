@@ -87,6 +87,7 @@ export function CreateBranchModal({
     <Modal
       open={open}
       title={t('branches.new')}
+      size="form"
       onClose={onClose}
       footer={
         <>
@@ -180,7 +181,7 @@ export function CreateBranchModal({
             value={form.responsibleUserId || null}
             options={users.map((user) => ({
               value: user.id,
-              label: (locale === 'ar' ? user.fullNameAr : user.fullNameEn) || user.email,
+              label: (locale === 'ar' ? user.fullNameAr || user.fullNameEn : user.fullNameEn || user.fullNameAr) || user.email,
               hint: user.email,
             }))}
             onChange={(value) => setForm((prev) => ({ ...prev, responsibleUserId: value ?? '' }))}

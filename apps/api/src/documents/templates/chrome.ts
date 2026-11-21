@@ -227,7 +227,7 @@ function brandBand(issuer: DocumentIssuer, signatureWatermark = true): string {
       <div style="font-size:5.6pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;margin-top:3pt;">شكراً لثقتكم بنا.</div>
       <div style="font-size:5.6pt;color:#64748b;">Thank you for your trust.</div>
     </div>
-    <div style="${box}">
+    <div style="${box}margin-inline-start:8pt;">
       <span style="${label}">Customer Signature</span>
       <span style="${labelAr}">توقيع العميل</span>
     </div>

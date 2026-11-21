@@ -204,7 +204,8 @@ export async function pickOption(
 ): Promise<void> {
   const root = page.getByTestId(testId);
   const trigger = root.locator('button[aria-haspopup="listbox"]');
-  const list = root.locator('[role="listbox"]');
+  // SearchableSelect renders its dropdown through a portal on document.body.
+  const list = page.getByRole('listbox');
   // The catalogue re-fetches on every query change, so an open popover can
   // replace its option nodes between the visibility check and the click. Retry
   // the whole open-and-pick a few times; a selection that landed detaches the
@@ -214,7 +215,7 @@ export async function pickOption(
     await expect(list).toBeVisible();
     // A prior query may still filter the list; clear it only when it holds a
     // term, since re-filling an empty box still re-fetches and re-renders.
-    const search = root.locator(`[data-testid="${testId}-search"]`);
+    const search = page.getByTestId(`${testId}-search`);
     if ((await search.count()) && (await search.inputValue()) !== '') {
       await search.fill('');
     }
@@ -253,10 +254,11 @@ export async function pickOption(
 export async function searchableOptionCount(page: Page, testId: string): Promise<number> {
   const root = page.getByTestId(testId);
   const trigger = root.locator('button[aria-haspopup="listbox"]');
-  const list = root.locator('[role="listbox"]');
+  // SearchableSelect renders its dropdown through a portal on document.body.
+  const list = page.getByRole('listbox');
   await trigger.click();
   await expect(list).toBeVisible();
-  const search = root.locator(`[data-testid="${testId}-search"]`);
+  const search = page.getByTestId(`${testId}-search`);
   if ((await search.count()) && (await search.inputValue()) !== '') {
     await search.fill('');
   }

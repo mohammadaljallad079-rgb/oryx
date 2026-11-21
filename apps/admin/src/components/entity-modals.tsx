@@ -6,6 +6,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAuth } from '@/lib/auth-context';
 import { toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Button, ErrorBanner, Field, Modal } from '@/components/ui';
+import { Icon } from '@/components/icons';
 import { EntityPicker } from '@/components/inline-create';
 import { PendingAttachments, uploadPendingAttachments } from '@/components/document-print';
 import { CustomerModal } from '@/components/customer-modal';
@@ -195,33 +196,64 @@ export function ProductModal({
   onSaved?: (saved: ProductDto) => void;
   defaultCategory?: string;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const { can } = useAuth();
+  const canOpenStock = can('erp.inventory.movement.manage');
+  const [warehouseOptions, setWarehouseOptions] = useState<Array<{ id: string; code: string; nameEn: string; nameAr: string }>>([]);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>(['Spare Parts']);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [productImage, setProductImage] = useState<File | null>(null);
+  const [productImages, setProductImages] = useState<File[]>([]);
   // Save the product id immediately, so retrying a failed image upload cannot
   // create a duplicate product or assign another automatic SKU.
   const [createdProduct, setCreatedProduct] = useState<ProductDto | null>(null);
   const [form, setForm] = useState({
     sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
     barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
+    openingQuantity: '0', openingWarehouseId: '',
   });
 
   useEffect(() => {
     if (!open) return;
     setError(null);
-    setProductImage(null);
+    setProductImages([]);
     setCreatedProduct(null);
     setForm({
       sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
       barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
+      openingQuantity: '0', openingWarehouseId: '',
     });
   }, [open, defaultCategory]);
+
+  useEffect(() => {
+    if (!open || !canOpenStock) return;
+    let live = true;
+    void api.warehouses().then((result) => {
+      if (live) setWarehouseOptions(result.items.filter((warehouse) => warehouse.isActive));
+    }).catch(() => {
+      if (live) setWarehouseOptions([]);
+    });
+    return () => { live = false; };
+  }, [open, canOpenStock]);
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void api.productCategories().then((result) => {
+      if (live) setCategoryOptions(result.items);
+    }).catch(() => { if (live) setCategoryOptions(['Spare Parts']); });
+    return () => { live = false; };
+  }, [open]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
+      const openingQuantity = toQuantityInput(form.openingQuantity);
+      if (openingQuantity > 0 && (!canOpenStock || !form.trackStock || !form.openingWarehouseId)) {
+        setError(locale === 'ar' ? 'اختر المستودع للكمية الافتتاحية.' : 'Select a warehouse for opening stock.');
+        return;
+      }
       const saved = createdProduct ?? await api.createProduct({
         sku: form.sku,
         nameEn: form.nameEn.trim() || form.nameAr.trim(),
@@ -236,15 +268,18 @@ export function ProductModal({
         reorderLevel: toQuantityInput(form.reorderLevel),
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
+        ...(canOpenStock && openingQuantity > 0
+          ? { openingQuantity, openingWarehouseId: form.openingWarehouseId }
+          : {}),
       });
       setCreatedProduct(saved);
-      if (productImage) {
+      for (const image of productImages) {
         const imageData = new FormData();
-        imageData.append('file', productImage);
+        imageData.append('file', image);
         imageData.append('altEn', form.nameEn.trim() || form.nameAr.trim());
         imageData.append('altAr', form.nameAr.trim() || form.nameEn.trim());
         await api.uploadProductImage(saved.id, imageData);
-        setProductImage(null);
+        setProductImages((pending) => pending.filter((candidate) => candidate !== image));
       }
       await onCreated();
       onSaved?.(saved);
@@ -298,7 +333,10 @@ export function ProductModal({
           <input className="oryx-input" value={form.barcode} onChange={(e) => setForm((prev) => ({ ...prev, barcode: e.target.value }))} data-testid="product-barcode" />
         </Field>
         <Field label={t('erp.inventory.category')}>
-          <input className="oryx-input" value={form.category} onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))} data-testid="product-category" />
+          <input className="oryx-input" list="new-product-category-options" value={form.category} onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))} data-testid="product-category" />
+          <datalist id="new-product-category-options">
+            {categoryOptions.map((name) => <option key={name} value={name} />)}
+          </datalist>
         </Field>
         <Field label={t('erp.inventory.reorderLevel')}>
           <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm((prev) => ({ ...prev, reorderLevel: e.target.value }))} data-testid="product-reorder-level" />
@@ -307,13 +345,53 @@ export function ProductModal({
           <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm((prev) => ({ ...prev, reorderQuantity: e.target.value }))} />
         </Field>
       </div>
+      {canOpenStock && form.trackStock ? (
+        <div className="mt-4 grid gap-3 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-2"
+          data-testid="product-opening-stock">
+          <Field label={locale === 'ar' ? 'الكمية الافتتاحية' : 'Opening stock quantity'}>
+            <input className="oryx-input" type="number" min="0" step="0.0001"
+              value={form.openingQuantity}
+              onChange={(event) => setForm((prev) => ({ ...prev, openingQuantity: event.target.value }))}
+              data-testid="product-opening-quantity" />
+          </Field>
+          <Field label={t('erp.inventory.warehouse')} required={Number(form.openingQuantity) > 0}>
+            <select className="oryx-select" value={form.openingWarehouseId}
+              onChange={(event) => setForm((prev) => ({ ...prev, openingWarehouseId: event.target.value }))}
+              data-testid="product-opening-warehouse">
+              <option value="">{t('common.select')}</option>
+              {warehouseOptions.map((warehouse) => (
+                <option key={warehouse.id} value={warehouse.id}>
+                  {warehouse.code} — {locale === 'ar' ? warehouse.nameAr || warehouse.nameEn : warehouse.nameEn}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      ) : null}
       <div className="mt-4 rounded-xl border border-[var(--border)] p-3" data-testid="product-inline-image">
         <Field label={t('erp.inventory.images')}>
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif"
+          <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif"
             className="oryx-input" data-testid="product-inline-image-file"
-            onChange={(e) => setProductImage(e.target.files?.[0] ?? null)} />
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              setProductImages((pending) => [...pending, ...files]);
+              e.target.value = '';
+            }} />
         </Field>
-        {productImage ? <p className="oryx-muted m-0 mt-2 text-xs">{productImage.name}</p> : null}
+        {productImages.length > 0 ? (
+          <ul className="mt-2 flex flex-col gap-1">
+            {productImages.map((image, index) => (
+              <li key={`${image.name}-${image.lastModified}-${index}`} className="flex items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 truncate">{image.name}</span>
+                <button type="button" className="oryx-btn oryx-btn--ghost"
+                  aria-label={`Remove ${image.name}`}
+                  onClick={() => setProductImages((pending) => pending.filter((_, i) => i !== index))}>
+                  <Icon name="close" size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {createdProduct ? <p className="oryx-muted m-0 mt-2 text-xs">
           {t('erp.inventory.sku')}: {createdProduct.sku}
         </p> : null}

@@ -329,10 +329,16 @@ export class CreateSupplierInvoiceDto {
   @IsString()
   supplierId!: string;
 
+  /** External vendor reference; ORYX assigns the internal invoice number. */
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(60)
-  supplierInvoiceNumber!: string;
+  supplierInvoiceNumber?: string;
+
+  /** Warehouse for direct-invoice receipt (no purchase order). */
+  @IsOptional()
+  @IsString()
+  warehouseId?: string;
 
   @IsOptional()
   @IsString()

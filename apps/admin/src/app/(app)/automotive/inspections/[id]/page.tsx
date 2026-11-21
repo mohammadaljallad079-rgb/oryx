@@ -110,7 +110,7 @@ export default function InspectionWorkspacePage() {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={session.status} label={t(`inspection.status.${session.status}`)} />
             <Button onClick={load} data-testid="inspection-refresh">
-              <Icon name="search" size={14} />
+              <Icon name="refresh" size={14} />
               {t('common.refresh')}
             </Button>
           </div>
@@ -673,15 +673,25 @@ function SectionEditor({
     setResults((prev) => ({ ...prev, [itemKey]: { itemKey, result, note: prev[itemKey]?.note ?? null } }));
 
   const saveItems = () =>
-    run(() =>
-      api.saveInspectionSection(sessionId, area, {
+    run(async () => {
+      const saved = await api.saveInspectionSection(sessionId, area, {
         remarks,
         noFindings,
         items: spec.items.map(
           (item) => results[item.key] ?? { itemKey: item.key, result: 'UNSET' as InspectionResultValue, note: null },
         ),
-      }),
-    );
+      });
+      // The computer-unit form is notes-only. When the operator saves the final
+      // completed section, submit it for review as part of this same action.
+      // Keep the saved draft if other selected inspection areas are incomplete.
+      if (spec.kind === 'DIAGNOSTIC') {
+        const latest = await api.inspectionProgress(sessionId);
+        if (latest.complete && ['DRAFT', 'IN_PROGRESS', 'REJECTED'].includes(saved.status)) {
+          return api.submitInspectionSession(sessionId);
+        }
+      }
+      return saved;
+    });
 
   // One Save persists BOTH the diagram and its notes; previously the diagram
   // actions silently dropped remarks and the printed PDF could not show them.

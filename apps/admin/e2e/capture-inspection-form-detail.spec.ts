@@ -49,19 +49,18 @@ test.describe('Execution 20 — inspection input form (close-up)', () => {
       await expect(page.getByTestId('job-customer-search')).toBeVisible();
       await page.getByTestId('job-customer-search').fill('نور');
       await page.waitForTimeout(300);
-      await shotEl(page.getByTestId('job-customer').locator('[role="listbox"]'), `form-04-customer-search-ar-${theme}`);
+      await shotEl(page.getByRole('listbox'), `form-04-customer-search-ar-${theme}`);
       await page.getByTestId('job-customer-search').fill('');
       await page.waitForTimeout(200);
 
       // The inline create dialog the "+ add" action opens: the full customer
       // form, not a reduced stub.
       await page.getByTestId('job-customer-create').click();
-      // This picker intentionally uses the compact catalogue-create form rather
-      // than nesting the full standalone customer editor inside the inspection
-      // form. Assert its actual fields and capture the complete inline dialog.
-      await expect(page.getByTestId('job-customer-create-code')).toBeVisible();
-      await expect(page.getByTestId('job-customer-create-nameEn')).toBeVisible();
-      await expect(page.getByTestId('job-customer-create-nameAr')).toBeVisible();
+      // The inspection now uses the canonical full CustomerModal, including its
+      // automatic code and bilingual fields, not a reduced inline stub.
+      await expect(page.getByTestId('customer-code')).toBeVisible();
+      await expect(page.getByTestId('customer-name-en')).toBeVisible();
+      await expect(page.getByTestId('customer-name-ar')).toBeVisible();
       await shotEl(page.locator('.oryx-modal').last(), `form-05-inline-customer-create-ar-${theme}`);
     });
   }
@@ -75,7 +74,7 @@ test.describe('Execution 20 — inspection input form (close-up)', () => {
     await expect(page.getByTestId('job-types')).toBeVisible();
     // A vehicle can only be added against a chosen customer, so select one first.
     await page.getByTestId('job-customer').locator('button').first().click();
-    await page.getByTestId('job-customer').locator('[role="option"]').first().click();
+    await page.getByRole('listbox').locator('[role="option"]').first().click();
     await page.waitForTimeout(400);
     await page.getByTestId('job-add-vehicle').click();
     await page.waitForTimeout(600);

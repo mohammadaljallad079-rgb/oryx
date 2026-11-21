@@ -659,6 +659,49 @@ describe('inspection report branding watermark', () => {
   });
 });
 
+describe('exterior inspection PDF table layout regression', () => {
+  it('keeps the exterior checklist inside a fixed-width three-result table and retains the correct no-findings statement', () => {
+    const exterior: InspectionReportSection = {
+      ...interiorSection,
+      area: 'EXTERIOR',
+      labelAr: 'خارجية السيارة',
+      labelEn: 'Exterior Car',
+      noFindings: true,
+      remarks: null,
+    };
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: {
+        ...payload,
+        selectedAreas: ['EXTERIOR'],
+        sections: [exterior],
+      },
+      documentNumber: 'VR-EXTERIOR',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    const exteriorStart = html.indexOf('<table class="items items--three-results">');
+    const exteriorEnd = html.indexOf('</table>', exteriorStart);
+    const exteriorTable = exteriorStart >= 0 && exteriorEnd > exteriorStart ? html.slice(exteriorStart, exteriorEnd + 8) : '';
+    expect(exteriorTable).not.toBe('');
+    expect(exteriorTable).toContain('خارجية السيارة');
+    expect(exteriorTable).toContain('Exterior Car');
+    expect(html).toContain('لا يوجد ما يستدعي الملاحظة');
+    expect(html).toContain('Nothing to report');
+    // The approved statement stays directly below, never over the result rows.
+    expect(html.indexOf('<div class="no-findings"><span class="no-findings-ar" dir="rtl">لا يوجد ما يستدعي الملاحظة', exteriorEnd)).toBeGreaterThan(exteriorEnd);
+    // Prevent auto-sized Arabic/English columns or see-through artwork from
+    // corrupting the exterior table in Chromium's PDF rendering.
+    expect(html).toContain('.items{ width:100%; table-layout:fixed; border-collapse:collapse; direction:rtl; background:#fff; }');
+    expect(html).toContain('.items--three-results .c-item{ width:64%; }');
+    expect(html).toContain('.items--three-results .c-res{ width:12%; }');
+    expect(html).toContain('.cabin .itable{ position:relative; z-index:1; background:#fff; }');
+    expect(html).toContain('.cabin .no-findings{ position:relative; z-index:2; clear:both; background:#fff;');
+  });
+});
+
 describe('vehicle inspection notes regressions', () => {
   const renderWith = (sections: InspectionReportSection[]) => renderInspectionReportHtml({
     issuer,
