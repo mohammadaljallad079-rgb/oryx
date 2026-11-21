@@ -582,6 +582,7 @@ export class StorefrontService {
     const branches = await this.branches();
     const eligible = new Set(branches.map((b) => b.id));
     return services.map((service) => ({
+      companyId,
       key: service.code,
       id: service.id,
       nameEn: service.nameEn,
