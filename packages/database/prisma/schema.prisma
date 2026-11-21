@@ -4541,6 +4541,10 @@ model InspectionSession {
   jobNumber       String
   /// The scheduling record, when the inspection came from a booking.
   bookingId       String?                 @unique
+  /// Selected billable services for an inspection created without a booking.
+  billingServiceIds String[]              @default([])
+  /// The one posted sales invoice for this inspection, independent of booking.
+  invoiceId       String?                 @unique
   customerId      String
   vehicleId       String
   branchId        String?
