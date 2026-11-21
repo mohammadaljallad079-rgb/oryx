@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -353,7 +353,7 @@ interface JobCardDetail {
     subtotalMinor: number;
     taxMinor: number;
     totalMinor: number;
-    lines: Array<{ id: string; type: string; description: string; quantity: number; unitPriceMinor: number; lineTotalMinor: number }>;
+    lines: Array<{ id: string; type: string; productId: string | null; description: string; quantity: number; unitPriceMinor: number; taxPercentBp: number; lineTotalMinor: number }>;
   }>;
   reservations?: Array<{
     id: string;
@@ -493,7 +493,7 @@ function JobCardDetailModal({
           <div>
             <div className="flex items-center justify-between gap-2">
               <span className="oryx-label m-0">{locale === 'ar' ? 'بنود العمل (خدمات وقطع)' : 'Work items (services and parts)'}</span>
-              {canEstimate ? (
+              {canEstimate && !['COMPLETED', 'INVOICED', 'CANCELLED'].includes(job.status) ? (
                 <Button size="sm" onClick={() => setEstimateOpen(true)} data-testid="new-estimate">
                   <Icon name="plus" size={14} />
                   {t('erp.automotive.ws.addLine')}
@@ -655,6 +655,7 @@ function JobCardDetailModal({
           <CreateEstimateModal
             open={estimateOpen}
             jobId={job.id}
+            initialLines={latestEstimate?.lines ?? []}
             onClose={() => setEstimateOpen(false)}
             onCreated={refresh}
           />
@@ -682,11 +683,13 @@ function emptyLine(): EstimateLineDraft {
 function CreateEstimateModal({
   open,
   jobId,
+  initialLines,
   onClose,
   onCreated,
 }: {
   open: boolean;
   jobId: string;
+  initialLines: NonNullable<JobCardDetail['estimates']>[number]['lines'];
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -694,6 +697,17 @@ function CreateEstimateModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<EstimateLineDraft[]>([emptyLine()]);
+  useEffect(() => {
+    if (!open) return;
+    setLines(initialLines.length ? initialLines.map((line) => ({
+      type: line.type === 'PART' ? 'PART' : 'SERVICE',
+      productId: line.productId ?? '',
+      description: line.description,
+      quantity: String(line.quantity / 10000),
+      unitPrice: minorToInput(line.unitPriceMinor),
+      taxRate: String(line.taxPercentBp / 100),
+    })) : [emptyLine()]);
+  }, [open, initialLines]);
 
   const patch = (index: number, next: Partial<EstimateLineDraft>) =>
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...next } : l)));
@@ -704,7 +718,7 @@ function CreateEstimateModal({
     setBusy(true);
     setError(null);
     try {
-      await api.createEstimate(jobId, {
+      await api.saveWorkItems(jobId, {
         lines: lines.map((l) => ({
           type: l.type,
           productId: l.productId || undefined,
