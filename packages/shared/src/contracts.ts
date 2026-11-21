@@ -2043,6 +2043,8 @@ export interface InspectionBookingDto {
   plateNumber: string | null;
   customerId: string;
   serviceId: string;
+  /** Every inspection service in one booking; legacy bookings contain only serviceId. */
+  serviceIds?: string[];
   serviceNameEn: string | null;
   serviceNameAr: string | null;
   status: string;
