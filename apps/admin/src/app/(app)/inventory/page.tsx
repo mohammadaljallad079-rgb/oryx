@@ -24,6 +24,7 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
+import { PART_CATEGORIES } from '@oryx/shared';
 import type {
   ProductDto,
   ProductImageDto,
@@ -563,7 +564,7 @@ function EditProductModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<File[]>([]);
@@ -571,6 +572,7 @@ function EditProductModal({
   const [form, setForm] = useState({
     nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15', isActive: true,
     barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
+    partCategoryKey: '', isPublished: false, isFeatured: false,
   });
 
   useEffect(() => {
@@ -591,6 +593,9 @@ function EditProductModal({
       reorderLevel: String(product.reorderLevel / 10_000),
       reorderQuantity: String(product.reorderQuantity / 10_000),
       trackStock: product.trackStock,
+      partCategoryKey: product.partCategoryKey ?? '',
+      isPublished: product.isPublished ?? false,
+      isFeatured: product.isFeatured ?? false,
     });
   }, [product]);
 
@@ -599,6 +604,10 @@ function EditProductModal({
     setBusy(true);
     setError(null);
     try {
+      if (form.isPublished && !form.partCategoryKey) {
+        setError(locale === 'ar' ? 'اختر تصنيف الموقع قبل النشر.' : 'Select a storefront category before publishing.');
+        return;
+      }
       await api.updateProduct(product.id, {
         nameEn: form.nameEn,
         nameAr: form.nameAr,
@@ -612,6 +621,9 @@ function EditProductModal({
         reorderLevel: toQuantityInput(form.reorderLevel),
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
+        partCategoryKey: form.partCategoryKey,
+        isPublished: form.isPublished,
+        isFeatured: form.isFeatured,
       });
       for (const image of productImages) {
         const imageData = new FormData();
@@ -681,6 +693,32 @@ function EditProductModal({
         <Field label={t('erp.inventory.reorderQuantity')}>
           <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm({ ...form, reorderQuantity: e.target.value })} />
         </Field>
+      </div>
+      <div className="mt-4 grid gap-3 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-2">
+        <Field label={locale === 'ar' ? 'تصنيف العرض بالموقع' : 'Storefront category'}>
+          <select className="oryx-select" value={form.partCategoryKey}
+            onChange={(e) => setForm({ ...form, partCategoryKey: e.target.value })}
+            data-testid="edit-product-storefront-category">
+            <option value="">{locale === 'ar' ? 'اختر التصنيف' : 'Select category'}</option>
+            {PART_CATEGORIES.map((category) => (
+              <option key={category.key} value={category.key}>
+                {locale === 'ar' ? category.nameAr : category.nameEn}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <label className="flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" className="oryx-checkbox" checked={form.isPublished}
+            onChange={(e) => setForm({ ...form, isPublished: e.target.checked })}
+            data-testid="edit-product-publish-website" />
+          {locale === 'ar' ? 'نشر المنتج على الموقع' : 'Publish to website'}
+        </label>
+        <label className="flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" className="oryx-checkbox" checked={form.isFeatured}
+            onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
+            data-testid="edit-product-feature-website" />
+          {locale === 'ar' ? 'منتج مميز بالموقع' : 'Featured on website'}
+        </label>
       </div>
       <div className="mt-4 rounded-xl border border-[var(--border)] p-3" data-testid="edit-product-inline-image">
         <Field label={t('erp.inventory.images')}>
