@@ -40,7 +40,7 @@ export default function RolesPage() {
 
 function RolesInner() {
   const { t, locale } = useUi();
-  const { companyId, can } = useAuth();
+  const { companyId, can, isPlatform } = useAuth();
   const params = useSearchParams();
   const scopeCompanyId = params.get('companyId') ?? companyId;
 
@@ -157,7 +157,7 @@ function RolesInner() {
                   <Badge tone="neutral">
                     {r.permissions.length} {t('roles.permissionCount')}
                   </Badge>
-                  {!r.isSystem && can('company.role.update') ? (
+                  {(isPlatform || !r.isSystem) && (isPlatform || can('company.role.update')) ? (
                     <Button size="sm" onClick={() => setEditing(r)} data-testid={`edit-role-${r.code}`}>
                       {t('common.edit')}
                     </Button>
