@@ -12,6 +12,7 @@ import { CustomerModal } from '@/components/customer-modal';
 import { VehicleModal } from '@/components/entity-modals';
 import { JobCardPrintActions } from '@/components/job-card-print';
 import { DocumentPrintActions } from '@/components/document-print';
+import { renderPrintDocument } from '@/lib/print-document';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -44,6 +45,31 @@ import type { JobCardDto, MarketplaceProviderDto, ServiceRequestDto } from '@ory
  * Each operation calls the existing tenant-scoped API and financial ledger
  * holds no matter which control the operator uses.
  */
+
+/**
+ * Open a window in the user gesture (before the network request), create or
+ * reuse the financial invoice and render it through the exact shared approved
+ * ORYX sales invoice template. The print toolbar lets the user save a PDF.
+ */
+async function issueAndPreviewJobInvoice(jobId: string, locale: string): Promise<void> {
+  const win = window.open('', '_blank', 'width=920,height=1040');
+  if (!win) throw new Error('Allow popups to preview the invoice.');
+  win.document.write('<!doctype html><html><head><title>Invoice</title></head><body>Preparing invoice…</body></html>');
+  try {
+    const result = await api.invoiceJobCard(jobId);
+    if (!result.id) throw new Error('The invoice was issued but its document ID was not returned.');
+    const document = await api.printDocument('SALES_INVOICE', result.id);
+    const toolbar = '<div class="oryx-print-toolbar" style="position:fixed;top:0;left:0;right:0;z-index:10;padding:8px;background:#0a4175;text-align:end"><button onclick="window.print()" style="padding:8px 16px;background:white;color:#0a4175;border:0;cursor:pointer">Print / طباعة</button></div><style>@media screen{body{padding-top:44px}}@media print{.oryx-print-toolbar{display:none}}</style>';
+    const html = renderPrintDocument(document, locale).replace('</body>', toolbar + '</body>');
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+  } catch (error) {
+    win.document.body.textContent = error instanceof Error ? error.message : 'Could not issue invoice.';
+    throw error;
+  }
+}
 
 type Tab = 'job-cards' | 'providers' | 'requests';
 
@@ -161,7 +187,7 @@ function JobCardsTab({
   canReserve: boolean;
   canIssue: boolean;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const list = useAsync(
@@ -312,7 +338,7 @@ function JobCardsTab({
                         variant="primary"
                         data-testid={`invoice-job-${j.jobNumber}`}
                         onClick={async () => {
-                          await api.invoiceJobCard(j.id);
+                          await issueAndPreviewJobInvoice(j.id, locale);
                           await list.reload();
                         }}
                       >
@@ -653,7 +679,7 @@ function JobCardDetailModal({
                 variant="primary"
                 disabled={busy}
                 data-testid="invoice-job"
-                onClick={() => act(() => api.invoiceJobCard(job.id))}
+                onClick={() => act(() => issueAndPreviewJobInvoice(job.id, locale))}
               >
                 {t('erp.automotive.ws.invoiceJob')}
               </Button>
