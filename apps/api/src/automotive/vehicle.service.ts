@@ -1,6 +1,6 @@
 import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
-import { sumMinor } from '@oryx/shared';
+import { sumMinor, INSPECTION_SECTION_SPECS } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService } from '../common/accounting-posting.service';
@@ -17,6 +17,7 @@ import type {
   CreateChecklistItemDto,
   CreateInspectionBookingDto,
   CreateInspectionServiceDto,
+  ReplaceInspectionServicesDto,
   CreateVehicleDto,
   DecideReportDto,
   InvoiceInspectionDto,
@@ -32,6 +33,18 @@ import type {
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+
+/** Canonical, approved inspection products; their prices come from the operator. */
+const APPROVED_INSPECTION_CODES: Readonly<Record<string, string>> = {
+  PAINT_BODY: 'INS-PAINT',
+  CHASSIS_UNDERCARRIAGE: 'INS-CHASSIS',
+  INTERIOR: 'INS-INTERIOR',
+  EXTERIOR: 'INS-EXTERIOR',
+  ENGINE_COMPARTMENT: 'INS-ENGINE',
+  ROAD_TEST: 'INS-ROAD',
+  COMPUTER_UNIT: 'INS-COMPUTER',
+};
+
 
 /**
  * VIN validation.
@@ -344,10 +357,84 @@ export class VehicleService {
 
   // -------------------------------------------------------------- inspections
 
+  /**
+   * Replace the bookable inspection catalogue with the seven approved services.
+   * Prices and taxes MUST be explicitly supplied; nothing is silently set to zero.
+   * Historical services with bookings/checklist records are archived, not deleted.
+   */
+  async replaceInspectionServices(dto: ReplaceInspectionServicesDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const approved = INSPECTION_SECTION_SPECS.filter((section) => APPROVED_INSPECTION_CODES[section.key]);
+    const byArea = new Map(dto.services.map((service) => [service.area, service]));
+    if (approved.length !== 7 || byArea.size !== 7 || approved.some((section) => !byArea.has(section.key))) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Specify prices, tax rates and durations for exactly seven approved inspection services.');
+    }
+    const codes = approved.map((section) => APPROVED_INSPECTION_CODES[section.key]);
+    const result = await this.posting.withTransaction(async (tx) => {
+      const previous = await tx.inspectionService.findMany({
+        where: { companyId, code: { notIn: codes } },
+        select: { id: true },
+      });
+      const current = [];
+      for (const section of approved) {
+        const row = byArea.get(section.key)!;
+        const code = APPROVED_INSPECTION_CODES[section.key];
+        current.push(await tx.inspectionService.upsert({
+          where: { companyId_code: { companyId, code } },
+          update: {
+            nameEn: section.labelEn,
+            nameAr: section.labelAr,
+            priceMinor: row.priceMinor,
+            taxPercentBp: row.taxPercentBp,
+            durationMinutes: row.durationMinutes,
+            isActive: true,
+          },
+          create: {
+            companyId,
+            code,
+            nameEn: section.labelEn,
+            nameAr: section.labelAr,
+            priceMinor: row.priceMinor,
+            taxPercentBp: row.taxPercentBp,
+            durationMinutes: row.durationMinutes,
+            isActive: true,
+          },
+        }));
+      }
+      let deleted = 0;
+      let archived = 0;
+      for (const old of previous) {
+        const [bookings, checklistItems] = await Promise.all([
+          tx.inspectionBooking.count({
+            where: { companyId, OR: [{ serviceId: old.id }, { serviceIds: { has: old.id } }] },
+          }),
+          tx.inspectionChecklistItem.count({ where: { companyId, serviceId: old.id } }),
+        ]);
+        if (bookings === 0 && checklistItems === 0) {
+          await tx.inspectionService.delete({ where: { id: old.id } });
+          deleted++;
+        } else {
+          await tx.inspectionService.update({ where: { id: old.id }, data: { isActive: false } });
+          archived++;
+        }
+      }
+      return { items: current.map(toInspectionServiceDto), deleted, archived };
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'automotive.inspection_services_replaced',
+      targetType: 'INSPECTION_SERVICE',
+      targetId: companyId,
+      summary: `Approved seven inspection services; removed ${result.deleted} unused old entries and archived ${result.archived} historical entries.`,
+    });
+    return result;
+  }
+
   async listInspectionServices(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.inspectionService.findMany({
-      where: { companyId },
+      where: { companyId, isActive: true },
       include: { items: { orderBy: { sortOrder: 'asc' } }, imageAsset: { select: { id: true } } },
       orderBy: { code: 'asc' },
     });
