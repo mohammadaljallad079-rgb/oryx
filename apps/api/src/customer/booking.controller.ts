@@ -17,7 +17,7 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { CurrentPrincipal, type RequestPrincipal } from '../auth/auth.decorators';
 import { PrismaService } from '../common/prisma.service';
 import { TenantCompanyService } from '../common/tenant-company.service';
-import { ERROR_CODES, forbidden } from '../common/errors';
+import { ERROR_CODES, badRequest, forbidden } from '../common/errors';
 import { BookingService } from './booking.service';
 import { CustomerAuthGuard, CurrentCustomer, type CustomerPrincipal } from './customer-auth.guard';
 import {
@@ -97,7 +97,8 @@ export class BookingController {
       branchId: dto.branchId ?? null,
       resourceId,
       bookingType: dto.bookingType,
-      serviceRef: dto.serviceRef ?? null,
+      serviceRef: serviceRefs[0],
+      serviceRefs,
       startsAt,
       durationMinutes: dto.durationMinutes,
       vehicleId: dto.vehicleId ?? null,
@@ -358,6 +359,35 @@ export class CustomerBookingController {
       dto.companyId ?? customer.defaultCompanyId,
     );
     const startsAt = new Date(dto.startsAt);
+    const serviceRefs = [...new Set(dto.serviceRefs?.length ? dto.serviceRefs : dto.serviceRef ? [dto.serviceRef] : [])];
+    if (!serviceRefs.length || serviceRefs.length > 10) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Choose between one and ten services.');
+    }
+    // Never trust a client-supplied total duration or let IDs from another
+    // company be attached to a booking. Every choice is validated server-side.
+    let requiredMinutes: number;
+    if (dto.bookingType === 'INSPECTION') {
+      const services = await this.prisma.inspectionService.findMany({
+        where: { companyId, id: { in: serviceRefs }, isActive: true },
+        select: { id: true, durationMinutes: true },
+      });
+      if (services.length !== serviceRefs.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'One or more inspection services are unavailable for this company.');
+      }
+      requiredMinutes = services.reduce((minutes, service) => minutes + Math.max(15, service.durationMinutes), 0);
+    } else {
+      const categories = await this.prisma.serviceCategory.findMany({
+        where: { key: { in: serviceRefs }, isActive: true },
+        select: { key: true },
+      });
+      if (categories.length !== serviceRefs.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'One or more services are unavailable.');
+      }
+      requiredMinutes = serviceRefs.length * (dto.bookingType === 'MAINTENANCE' ? 120 : 90);
+    }
+    if (requiredMinutes > 1440 || dto.durationMinutes < requiredMinutes) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, `Selected services require at least ${requiredMinutes} minutes in one booking.`);
+    }
 
     // A booking names a vehicle; it must be one this account owns, or the
     // booking would attach another customer's car to this account's history.
@@ -375,7 +405,7 @@ export class CustomerBookingController {
       companyId,
       branchId: dto.branchId ?? null,
       resourceId: dto.resourceId ?? null,
-      serviceRef: dto.serviceRef ?? null,
+      serviceRef: serviceRefs[0],
       startsAt,
       durationMinutes: dto.durationMinutes,
     });
