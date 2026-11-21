@@ -5389,3 +5389,165 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
 @media (prefers-reduced-motion: reduce) {
   .oryx-pos--cashier-v5 .oryx-pos-tile { transition: none; }
 }
+
+/* ORYX POS v6 — clean top-to-bottom cashier workspace.
+   Products fill the main view; the selected-items basket is ALWAYS below them.
+   Payment remains available beneath the basket without floating over products.
+   Scoped to v6: other accounting dialogs and existing invoice screens are unchanged. */
+.oryx-modal--pos .oryx-pos--cashier-v6 {
+  --pos-v6-border: color-mix(in srgb, var(--border) 82%, transparent);
+  display: grid !important;
+  grid-template-areas: "quickbar" "categories" "catalog" "cart" !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto auto minmax(250px, 1fr) minmax(230px, 38%) !important;
+  gap: 10px !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  padding: 12px !important;
+  overflow: hidden !important;
+  background: var(--surface, #fff);
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 > .oryx-pos__quickbar {
+  grid-area: quickbar !important;
+  height: auto !important;
+  max-height: none !important;
+  min-height: 48px !important;
+  border: 1px solid var(--pos-v6-border);
+  border-radius: 12px;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 > .oryx-pos__categories {
+  grid-area: categories !important;
+  position: relative;
+  display: flex !important;
+  flex-flow: row nowrap !important;
+  align-items: center;
+  min-width: 0;
+  width: 100% !important;
+  min-height: 44px !important;
+  max-height: 64px !important;
+  padding: 6px 10px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: thin;
+  border: 1px solid var(--pos-v6-border);
+  border-radius: 12px;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 > .oryx-pos__categories > * {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  margin: 0 !important;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 > .oryx-pos__catalog {
+  grid-area: catalog !important;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: hidden !important;
+  padding: 12px !important;
+  border: 1px solid var(--pos-v6-border);
+  border-radius: 12px;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 12px !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  padding: 4px 4px 14px;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos__grid--list {
+  grid-template-columns: 1fr !important;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos-tile {
+  width: 100%;
+  min-height: 185px;
+  border: 1px solid var(--pos-v6-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 > .oryx-pos__rail {
+  grid-area: cart !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.55fr) minmax(310px, 1fr);
+  grid-template-areas: "carthead tender" "lines tender" "customer tender";
+  grid-template-rows: auto minmax(75px, 1fr) auto;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  gap: 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--pos-v6-border);
+  border-radius: 12px;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos__rail-head {
+  grid-area: carthead;
+  min-height: 42px;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos__lines,
+.oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos__empty {
+  grid-area: lines;
+  min-height: 0 !important;
+  max-height: none !important;
+  height: 100%;
+  overflow-y: auto !important;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos__customer-warehouse {
+  grid-area: customer;
+  min-width: 0;
+  padding: 5px 0 !important;
+}
+.oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos__tender {
+  grid-area: tender !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  height: 100%;
+  overflow-y: auto !important;
+  border-inline-start: 1px solid var(--pos-v6-border);
+  padding: 4px 8px 8px 14px;
+}
+@media (max-width: 900px) {
+  .oryx-modal--pos .oryx-pos--cashier-v6 {
+    grid-template-rows: auto auto minmax(240px, 1fr) minmax(250px, 42%) !important;
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v6 > .oryx-pos__rail {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "carthead" "lines" "customer" "tender";
+    grid-template-rows: auto minmax(70px, 1fr) auto auto;
+    overflow-y: auto !important;
+    gap: 4px;
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos__tender {
+    border-inline-start: 0;
+    border-top: 1px solid var(--pos-v6-border);
+    padding: 8px 0;
+    height: auto;
+    overflow: visible !important;
+  }
+}
+@media (max-width: 560px) {
+  .oryx-modal--pos .oryx-pos--cashier-v6 {
+    grid-template-rows: auto auto minmax(235px, 1fr) minmax(210px, 37%) !important;
+    gap: 6px !important;
+    padding: 6px !important;
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v6 .oryx-pos-tile {
+    min-height: 155px;
+  }
+  .oryx-modal--pos .oryx-pos--cashier-v6 > .oryx-pos__catalog {
+    padding: 6px !important;
+  }
+}

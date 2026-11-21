@@ -126,7 +126,8 @@ test.describe('Point of sale — card terminal', () => {
     await expect(page.getByTestId(`pos-cart-line-${setup.product.sku}`)).toBeVisible();
     await expect(page.getByTestId('pos-premium-workstation')).toBeVisible();
     await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toBeVisible();
-    await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toHaveCSS('max-height', '38px');
+    // POS v6 expands the command bar for readability; it is no longer limited to 38px.
+    await expect(page.locator('.oryx-pos--cashier-v6 .oryx-pos__quickbar')).toHaveCSS('grid-area', 'quickbar');
     const closeButton = page.getByRole('dialog').getByRole('button', { name: /close/i }).first();
     const closeBox = await closeButton.boundingBox();
     expect(closeBox).not.toBeNull();
@@ -135,18 +136,18 @@ test.describe('Point of sale — card terminal', () => {
     expect(closeBox!.x).toBeGreaterThanOrEqual(0);
     expect(closeBox!.x + closeBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
 
-    // The POS status and category filters must occupy the SAME top row,
-    // rather than stacking three bands above the cart.
-    const firstRow = await page.evaluate(() => {
-      const quick = document.querySelector('.oryx-pos--new-cashier > .oryx-pos__quickbar');
-      const categories = document.querySelector('.oryx-pos--new-cashier > .oryx-pos__categories');
+    // POS v6 deliberately puts filters on their own horizontal band beneath
+    // the command bar, keeping the complete catalogue visible above the cart.
+    const headerLayout = await page.evaluate(() => {
+      const quick = document.querySelector('.oryx-pos--cashier-v6 > .oryx-pos__quickbar');
+      const categories = document.querySelector('.oryx-pos--cashier-v6 > .oryx-pos__categories');
       if (!quick || !categories) return null;
       const q = quick.getBoundingClientRect();
       const c = categories.getBoundingClientRect();
-      return { aligned: Math.abs(q.top - c.top) < 2, compact: q.height <= 39 };
+      return { categoriesBelowHeader: c.top >= q.bottom - 1, headerVisible: q.height >= 40 };
     });
-    expect(firstRow?.aligned).toBe(true);
-    expect(firstRow?.compact).toBe(true);
+    expect(headerLayout?.categoriesBelowHeader).toBe(true);
+    expect(headerLayout?.headerVisible).toBe(true);
 
     await expect(page.getByTestId('pos-checkout-cart')).toBeVisible();
     // V4 acceptance: products and the selected-cart rail occupy independent
@@ -161,7 +162,8 @@ test.describe('Point of sale — card terminal', () => {
       const a = catalog.getBoundingClientRect();
       const b = cart.getBoundingClientRect();
       return {
-        overlap: Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)),
+        verticalGap: b.top - a.bottom,
+        catalogAboveCart: a.bottom <= b.top + 1,
         categoriesAboveCatalog: categories.getBoundingClientRect().bottom <= a.top + 1,
         catalogWidth: a.width,
         cartWidth: b.width,
@@ -172,11 +174,11 @@ test.describe('Point of sale — card terminal', () => {
     });
     expect(layout).not.toBeNull();
     if (viewport!.width >= 901) {
-      expect(layout!.overlap).toBeLessThanOrEqual(1);
-      expect(layout!.catalogWidth).toBeGreaterThan(250);
-      expect(layout!.cartWidth).toBeGreaterThanOrEqual(310);
+      expect(layout!.catalogAboveCart).toBe(true);
+      expect(layout!.verticalGap).toBeGreaterThanOrEqual(-1);
+      expect(layout!.catalogWidth).toBeGreaterThan(650);
+      expect(layout!.cartWidth).toBeGreaterThan(650);
       expect(layout!.categoriesAboveCatalog).toBe(true);
-      if (viewport!.width >= 1200) expect(layout!.catalogWidth).toBeGreaterThan(650);
     }
     expect(layout!.productsScroll).toBe('auto');
     expect(layout!.cartScroll).toBe('auto');
