@@ -1685,6 +1685,18 @@ export const api = {
       activeWarranties: number;
     }>(`/automotive/workshop/dashboard?${toQuery(params)}`),
   createWorkshopBay: (body: Record<string, unknown>) => request<Record<string, unknown>>('/automotive/bays', { method: 'POST', body }),
+  maintenanceServices: () => request<Array<{
+    id: string; code: string; nameEn: string; nameAr: string;
+    descriptionEn: string | null; descriptionAr: string | null;
+    priceMinor: number; durationMinutes: number; imageUrl: string | null;
+    branchIds: string[]; isActive: boolean; isPublished: boolean; sortOrder: number;
+  }>>('/automotive/maintenance-services'),
+  createMaintenanceService: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/automotive/maintenance-services', { method: 'POST', body }),
+  updateMaintenanceService: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/automotive/maintenance-services/${id}`, { method: 'PATCH', body }),
+  deleteMaintenanceService: (id: string) =>
+    request<{ deleted: boolean }>(`/automotive/maintenance-services/${id}`, { method: 'DELETE' }),
   maintenanceBookings: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/maintenance-bookings?${toQuery(params)}`),
   createMaintenanceBooking: (body: Record<string, unknown>) =>
