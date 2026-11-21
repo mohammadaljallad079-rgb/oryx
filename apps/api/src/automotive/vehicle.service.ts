@@ -501,10 +501,27 @@ export class VehicleService {
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const where = { companyId, ...(query.status ? { status: query.status as never } : {}), ...(query.vehicleId ? { vehicleId: query.vehicleId } : {}) };
     const [rows, total] = await Promise.all([
-      this.prisma.inspectionBooking.findMany({ where, orderBy: { scheduledAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize, include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true } }, service: { select: { nameEn: true, nameAr: true } }, report: true, _count: { select: { findings: true } } } }),
+      this.prisma.inspectionBooking.findMany({ where, orderBy: { scheduledAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize, include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true, modelYear: true, color: true, mileage: true } }, service: { select: { nameEn: true, nameAr: true } }, report: true, _count: { select: { findings: true } } } }),
       this.prisma.inspectionBooking.count({ where }),
     ]);
-    return { items: rows.map(toInspectionBookingDto), total, page, pageSize };
+    const customerIds = [...new Set(rows.map((row) => row.customerId))];
+    const customers = await this.prisma.customer.findMany({
+      where: { companyId, id: { in: customerIds } },
+      select: { id: true, nameEn: true, nameAr: true, phone: true, email: true },
+    });
+    const byId = new Map(customers.map((row) => [row.id, row]));
+    return {
+      items: rows.map((row) => ({
+        ...toInspectionBookingDto(row),
+        customerNameEn: byId.get(row.customerId)?.nameEn ?? null,
+        customerNameAr: byId.get(row.customerId)?.nameAr ?? null,
+        customerPhone: byId.get(row.customerId)?.phone ?? null,
+        customerEmail: byId.get(row.customerId)?.email ?? null,
+      })),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async createInspectionBooking(dto: CreateInspectionBookingDto, principal: RequestPrincipal, actor: ActorContext) {
@@ -887,7 +904,7 @@ function toInspectionBookingDto(b: {
   inspectorUserId: string | null;
   odometer: number | null;
   notes: string | null;
-  vehicle?: { vin: string; make: string; model: string; plateNumber: string | null } | null;
+  vehicle?: { vin: string; make: string; model: string; plateNumber: string | null; modelYear?: number; color?: string | null; mileage?: number } | null;
   service?: { nameEn: string; nameAr: string } | null;
   report?: { status: string; invoiceId: string | null } | null;
   _count?: { findings: number };
@@ -900,6 +917,9 @@ function toInspectionBookingDto(b: {
     make: b.vehicle?.make ?? null,
     model: b.vehicle?.model ?? null,
     plateNumber: b.vehicle?.plateNumber ?? null,
+    modelYear: b.vehicle?.modelYear ?? null,
+    color: b.vehicle?.color ?? null,
+    mileage: b.vehicle?.mileage ?? null,
     customerId: b.customerId,
     serviceId: b.serviceId,
     serviceIds: b.serviceIds.length ? b.serviceIds : [b.serviceId],
