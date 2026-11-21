@@ -28,6 +28,15 @@ export const PLATFORM_SETTING_KEYS = {
   marketCurrency: 'market.currency',
   marketTimezone: 'market.timezone',
   defaultVatRateBp: 'finance.default_vat_rate_bp',
+  /**
+   * The one company the public website trades for.
+   *
+   * Every public surface (storefront context, parts catalogue, service list and
+   * the product catalogue the site requests) is scoped to this company, so a
+   * visitor never sees another tenant's stock. Empty means "not chosen yet", and
+   * the storefront then falls back to `STOREFRONT_COMPANY_CODE`.
+   */
+  storefrontCompanyId: 'storefront.company_id',
 } as const;
 
 export type PlatformSettingKey =
@@ -43,6 +52,8 @@ const SETTING_DEFAULTS: Record<PlatformSettingKey, unknown> = {
    * platform cannot support.
    */
   [PLATFORM_SETTING_KEYS.defaultVatRateBp]: 0,
+  /** Empty until a Super Admin names the trading company. */
+  [PLATFORM_SETTING_KEYS.storefrontCompanyId]: '',
 };
 
 export interface ServiceAreaRecord {

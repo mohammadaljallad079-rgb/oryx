@@ -15,6 +15,7 @@ import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { ERROR_CODES, badRequest, conflict, notFound } from '../common/errors';
 import { computeDocumentTotals } from '../common/document-totals';
+import { PlatformSettingsService, PLATFORM_SETTING_KEYS } from '../platform/platform-settings.service';
 
 /** Only this many products are ever scanned to build the filter facets. */
 const FACET_SAMPLE_LIMIT = 2000;
@@ -53,6 +54,7 @@ export class StorefrontService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly platform: PlatformSettingsService,
   ) {}
 
   // ------------------------------------------------------------ presentation
@@ -92,21 +94,56 @@ export class StorefrontService {
 
   /**
    * The public ORYX storefront is strictly company-scoped.
-   * Never fall back to another tenant: an absent or suspended ORYX-AUTO
-   * company must fail closed rather than exposing unrelated stock, customers,
-   * branches or bookings through the public website.
+   *
+   * A Super Admin names the trading company in the platform settings
+   * (`storefront.company_id`), so the owner can move the storefront from the
+   * control panel. Until that choice exists the canonical ORYX-AUTO company
+   * applies. Neither path falls back to another tenant: an absent, suspended or
+   * mis-selected company fails closed rather than exposing unrelated stock,
+   * customers, branches or bookings through the public website.
    */
   private async companyId(): Promise<string> {
-    const code = 'ORYX-AUTO';
+    const configured = await this.platform.getSetting<string>(
+      PLATFORM_SETTING_KEYS.storefrontCompanyId,
+    );
+    if (configured) {
+      const chosen = await this.prisma.company.findFirst({
+        where: { id: configured, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (chosen) return chosen.id;
+      this.logger.error(
+        `Public storefront unavailable: the selected company ${configured} is missing or suspended.`,
+      );
+      throw notFound(
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        'The selected storefront company is not active.',
+      );
+    }
+
     const company = await this.prisma.company.findFirst({
-      where: { code, status: 'ACTIVE' },
+      where: { code: 'ORYX-AUTO', status: 'ACTIVE' },
       select: { id: true },
     });
     if (!company) {
       this.logger.error('Public storefront unavailable: active ORYX-AUTO company is missing.');
-      throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'ORYX Auto Services storefront company is not configured.');
+      throw notFound(
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        'ORYX Auto Services storefront company is not configured.',
+      );
     }
     return company.id;
+  }
+
+  /**
+   * The storefront tenant, for callers outside this service.
+   *
+   * The consumer catalogue accepts `storefront=true` and resolves the company
+   * here rather than trusting a client-supplied id, so the public site and the
+   * parts storefront can never disagree about whose stock they list.
+   */
+  storefrontCompanyId(): Promise<string> {
+    return this.companyId();
   }
 
   /** Category metadata joined with the live product count per aisle. */

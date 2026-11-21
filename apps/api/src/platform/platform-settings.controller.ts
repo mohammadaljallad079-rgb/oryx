@@ -11,6 +11,7 @@ import {
 } from '../auth/auth.decorators';
 import { AuditService } from '../common/audit.service';
 import { badRequest, ERROR_CODES, notFound } from '../common/errors';
+import { PrismaService } from '../common/prisma.service';
 import { PlatformSettingsService, PLATFORM_SETTING_KEYS } from './platform-settings.service';
 import { EcosystemService } from './ecosystem.service';
 
@@ -43,6 +44,15 @@ export class UpdatePlatformSettingsDto {
   @IsInt()
   @Min(0)
   defaultVatRateBp?: number;
+
+  /**
+   * The company the public website trades for. `null` or an empty string clears
+   * the choice and hands the decision back to `STOREFRONT_COMPANY_CODE`.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  storefrontCompanyId?: string | null;
 }
 
 export class CreateServiceAreaDto {
@@ -95,6 +105,7 @@ export class PlatformSettingsController {
     private readonly settings: PlatformSettingsService,
     private readonly ecosystem: EcosystemService,
     private readonly audit: AuditService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get('ecosystem')
@@ -110,7 +121,26 @@ export class PlatformSettingsController {
   @RequireAnyPermission('platform.settings.read', 'platform.settings.manage')
   @ApiOperation({ summary: 'Effective platform market settings' })
   async readSettings() {
-    return { settings: await this.settings.effectiveSettings() };
+    return {
+      settings: await this.settings.effectiveSettings(),
+      storefrontCompany: await this.storefrontCompany(),
+    };
+  }
+
+  /**
+   * The company the `storefront.company_id` setting names, or `null` when the
+   * choice has not been made. Reads only: the effective tenant the site serves
+   * is published by `GET /storefront/context`, so this cannot disagree with it.
+   */
+  private async storefrontCompany() {
+    const companyId = await this.settings.getSetting<string>(
+      PLATFORM_SETTING_KEYS.storefrontCompanyId,
+    );
+    if (!companyId) return null;
+    return this.prisma.company.findFirst({
+      where: { id: companyId },
+      select: { id: true, code: true, nameEn: true, nameAr: true, status: true },
+    });
   }
 
   @Patch('settings')
@@ -127,6 +157,23 @@ export class PlatformSettingsController {
     if (dto.currency !== undefined) updates.push([PLATFORM_SETTING_KEYS.marketCurrency, dto.currency.toUpperCase()]);
     if (dto.timezone !== undefined) updates.push([PLATFORM_SETTING_KEYS.marketTimezone, dto.timezone]);
     if (dto.defaultVatRateBp !== undefined) updates.push([PLATFORM_SETTING_KEYS.defaultVatRateBp, dto.defaultVatRateBp]);
+
+    if (dto.storefrontCompanyId !== undefined) {
+      const companyId = dto.storefrontCompanyId?.trim() ?? '';
+      if (companyId) {
+        const company = await this.prisma.company.findFirst({
+          where: { id: companyId, status: 'ACTIVE' },
+          select: { id: true },
+        });
+        if (!company) {
+          throw badRequest(
+            ERROR_CODES.VALIDATION_FAILED,
+            'The storefront company must be an active company.',
+          );
+        }
+      }
+      updates.push([PLATFORM_SETTING_KEYS.storefrontCompanyId, companyId]);
+    }
 
     if (updates.length === 0) {
       throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'No settings were supplied.');

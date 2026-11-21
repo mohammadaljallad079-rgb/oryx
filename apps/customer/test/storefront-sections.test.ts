@@ -29,6 +29,21 @@ describe('storefront sections', () => {
     ]);
   });
 
+  it('asks the API for the storefront tenant, not for every tenant', () => {
+    // The website is one company's storefront: a catalogue request must carry
+    // `storefront=true` so the API resolves the tenant server-side. A page that
+    // hard-codes a company id would silently keep pointing at a company the
+    // owner has since replaced.
+    const api = src('lib/api.ts');
+    expect(api).toContain("qs.set('storefront', 'true')");
+
+    for (const page of ['app/page.tsx', 'app/products/(list)/page.tsx', 'app/spare-parts/page.tsx']) {
+      if (!existsSync(join(ROOT, 'src', page))) continue;
+      const source = src(page);
+      expect(source).not.toMatch(/companyId:\s*['"]/);
+    }
+  });
+
   it('gives every section a served route, a nav key and bilingual copy', () => {
     for (const section of STOREFRONT_SECTIONS) {
       expect(section.href.startsWith('/')).toBe(true);
@@ -58,7 +73,11 @@ describe('storefront sections', () => {
 
   it('drives the navigation and the footer from the shared catalogue', () => {
     const chrome = src('components/site-chrome.tsx');
-    expect(chrome).toContain('STOREFRONT_SECTIONS.map');
+    // The CMS can hide a section, so the chain is `filter(visibility).map(…)`;
+    // what matters is that both the header and the footer read the shared
+    // catalogue rather than carrying a second hard-coded list.
+    expect(chrome).toMatch(/STOREFRONT_SECTIONS\.filter\([\s\S]*?\)\.map\(/);
+    expect(chrome).toContain('sectionVisibility');
     expect(chrome).not.toContain("key: 'nav.categories'");
   });
 

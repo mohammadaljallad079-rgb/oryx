@@ -1097,7 +1097,13 @@ export const publicApi = {
       return { items, total: items.length, page: 1, pageSize: items.length };
     }
     const qs = new URLSearchParams({ locale: params.locale });
+    /**
+     * The website is the storefront of one company, so every catalogue request
+     * asks for that tenant and the API resolves it from the platform setting.
+     * An explicit company (the marketplace store filter) still wins.
+     */
     if (params.companyId) qs.set('companyId', params.companyId);
+    else qs.set('storefront', 'true');
     if (params.query) qs.set('query', params.query);
     if (params.sort) qs.set('sort', params.sort);
     if (params.spareParts) qs.set('spareParts', params.spareParts);
