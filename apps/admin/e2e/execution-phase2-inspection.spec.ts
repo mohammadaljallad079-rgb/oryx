@@ -71,10 +71,15 @@ async function seedJob(page: Page, areas: string[]): Promise<string> {
           break;
         }
       }
+      const billing = await fetch(`${api}/automotive/inspection-services?pageSize=50`, { headers });
+      if (!billing.ok) throw new Error(`Service catalog unavailable: ${billing.status}`);
+      const catalog = (await billing.json()) as { items: Array<{ id: string; priceMinor: number; isActive: boolean }> };
+      const service = catalog.items.find(row => row.isActive && row.priceMinor > 0);
+      if (!service) throw new Error('No active priced inspection service in the seeded catalog');
       const created = await fetch(`${api}/automotive/inspections`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ customerId, vehicleId, selectedAreas: areas }),
+        body: JSON.stringify({ customerId, vehicleId, selectedAreas: areas, billingServiceIds: [service.id] }),
       });
       if (!created.ok) throw new Error(`Job creation failed: ${created.status} ${await created.text()}`);
       return ((await created.json()) as { id: string }).id;
@@ -130,6 +135,9 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     // The cabin type is one selectable type that expands to the interior,
     // exterior, engine-compartment and road-test sections server-side.
     await page.getByTestId('job-type-CABIN_AND_MECHANICAL').click();
+    const pricedService = page.getByTestId('job-billing-services').locator('input[type="checkbox"]').first();
+    await expect(pricedService).toBeVisible();
+    await pricedService.check();
     await page.getByTestId('create-inspection-job').click();
 
     // Creating a job now opens its workspace immediately. The previous test
