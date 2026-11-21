@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
@@ -136,6 +136,14 @@ export class WorkshopController {
   @ApiOperation({ summary: 'Add labour operations' })
   addLabour(@Param('id') id: string, @Body() dto: AddLabourDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.workshop.addLabour(id, dto, p, actorFrom(p, req));
+  }
+
+  @Put('job-cards/:id/work-items')
+  @RequireModule('automotive_maintenance')
+  @RequirePermissions('erp.maintenance.estimate.manage')
+  @ApiOperation({ summary: 'Save editable service and part job-card lines without estimate approval' })
+  saveWorkItems(@Param('id') id: string, @Body() dto: CreateEstimateDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.workshop.saveWorkItems(id, dto, p, actorFrom(p, req));
   }
 
   @Post('job-cards/:id/estimates')
