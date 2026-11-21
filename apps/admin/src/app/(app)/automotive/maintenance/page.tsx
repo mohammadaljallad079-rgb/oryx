@@ -1123,7 +1123,6 @@ function CreateJobCardModal({
     vehicleId: '',
     complaint: '',
     diagnosis: '',
-    odometer: '',
     technicianUserId: '',
     branchId: '',
   });
@@ -1161,8 +1160,7 @@ function CreateJobCardModal({
       vehicleId: '',
       complaint: '',
       diagnosis: '',
-      odometer: '',
-      technicianUserId: '',
+        technicianUserId: '',
       branchId: '',
     });
   };
@@ -1175,7 +1173,6 @@ function CreateJobCardModal({
         vehicleId: form.vehicleId,
         complaint: form.complaint || undefined,
         diagnosis: form.diagnosis || undefined,
-        odometer: form.odometer ? Number(form.odometer) : undefined,
         technicianUserId: form.technicianUserId || undefined,
         branchId: form.branchId || undefined,
       });
@@ -1295,15 +1292,6 @@ function CreateJobCardModal({
               </option>
             ))}
           </select>
-        </Field>
-        <Field label={t('erp.automotive.odometer')}>
-          <input
-            className="oryx-input"
-            inputMode="numeric"
-            value={form.odometer}
-            onChange={(e) => setForm({ ...form, odometer: e.target.value })}
-            data-testid="job-odometer"
-          />
         </Field>
         <Field label={t('erp.automotive.complaint')}>
           <textarea
