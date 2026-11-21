@@ -876,11 +876,11 @@ export class MarketplaceService {
   }) {
     // Maintenance requests must route to the company that actually publishes the
     // service. A client-supplied tenant header cannot redirect them elsewhere.
-    const maintenance = await this.prisma.maintenanceService.findFirst({
+    const maintenanceServices = await this.prisma.maintenanceService.findMany({
       where: { code: input.categoryKey, isActive: true, isPublished: true },
       select: { companyId: true },
     });
-    if (maintenance && maintenance.companyId !== input.companyId) {
+    if (maintenanceServices.length && !maintenanceServices.some((service) => service.companyId === input.companyId)) {
       throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'The maintenance service is not published by the selected company.');
     }
     if (input.vehicleId) {
