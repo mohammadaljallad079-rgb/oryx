@@ -72,7 +72,7 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
   }, [load]);
 
   const content = useMemo<SiteContent>(
-    () => documents[locale] ?? resolveSiteContent(locale, null),
+    () => resolveSiteContent(locale, documents[locale] ?? null),
     [documents, locale],
   );
 
