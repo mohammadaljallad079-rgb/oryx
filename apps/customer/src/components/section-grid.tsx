@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { STOREFRONT_SECTIONS, type StorefrontSectionKey } from '@oryx/shared';
 import { useUi } from '@/lib/ui-context';
+import { useSiteContent } from '@/lib/site-content-context';
 import { Icon } from '@/components/icons';
 
 export type SectionCounts = Partial<Record<StorefrontSectionKey, number>>;
@@ -19,9 +20,10 @@ export type SectionCounts = Partial<Record<StorefrontSectionKey, number>>;
  */
 export function SectionGrid({ counts }: { counts?: SectionCounts }) {
   const { t, locale } = useUi();
+  const { content } = useSiteContent();
   return (
     <div className="oryx-grid oryx-grid--cards" data-testid="section-grid">
-      {STOREFRONT_SECTIONS.map((section) => {
+      {STOREFRONT_SECTIONS.filter((section) => content.sectionVisibility[section.key] !== false).map((section) => {
         const count = counts?.[section.key];
         const title = locale === 'ar' ? section.titleAr : section.titleEn;
         return (
