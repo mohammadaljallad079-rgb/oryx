@@ -7,7 +7,7 @@ import {
   CHASSIS_DIAGRAM_DATA_URI,
   INTERIOR_DIAGRAM_DATA_URI,
 } from './inspection-artwork.assets';
-import { signatureBlock, type DocumentChrome } from './chrome';
+import { documentQualityBadge, signatureBlock, type DocumentChrome } from './chrome';
 import { docStamp, esc, escMultiline, grouped, orDash } from './html.util';
 import { oryxLogoMark } from './oryx-logo.asset';
 import type {
@@ -119,25 +119,8 @@ function reportHeader(issuer: DocumentIssuer): string {
       <span class="rh-tag-ar">خبراء فحص المركبات</span>
       <span class="rh-tag-en">VEHICLE INSPECTION EXPERTS</span>
     </div>
-    ${qualityBadge()}
+    ${documentQualityBadge('rh-badge')}
   </header>`;
-}
-
-/**
- * The "quality assured" mark the approved sheet prints at the head of every page.
- *
- * Measured from the reference: a solid navy disc, 22pt across (identity blue
- * rgb 14,68,119), holding a white tick. Drawn as one vector so it needs no font
- * and scales cleanly.
- */
-function qualityBadge(): string {
-  return (
-    '<svg class="rh-badge" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">' +
-    '<circle cx="12" cy="12" r="11" fill="#0e4477"/>' +
-    '<path d="M6.9 12.5 10.4 16 17.2 7.8" fill="none" stroke="#ffffff" stroke-width="2" ' +
-    'stroke-linecap="round" stroke-linejoin="round"/>' +
-    '</svg>'
-  );
 }
 
 /**
@@ -454,7 +437,7 @@ export function inspectionGroupPage(
     ${pair(cell(engine, 'مقصورة المحرك', 'Engine Compartment', false), cell(road, 'تجربة القيادة', 'Road Test', false))}
     <table class="grid"><tr>
       <td>${cell(interior, 'داخلية السيارة', 'Interior Car', true)}</td>
-      <td>${cell(exterior, 'خارجية السيارة', 'Exterior Car', true)}${remarks}</td>
+      <td class="exterior-column">${cell(exterior, 'خارجية السيارة', 'Exterior Car', true)}${remarks}</td>
     </tr></table>
   </div>`;
 
@@ -905,6 +888,16 @@ export const INSPECTION_REPORT_CSS = `
   .cabin .grid{ border-collapse:separate; page-break-inside:auto; }
   .cabin .grid > tbody > tr{ page-break-inside:avoid; break-inside:avoid; }
   .cabin .grid > tbody > tr > td{ width:50%; max-width:50%; overflow:hidden; }
+  /* Keep the exterior checklist and its optional remarks in a separate, bounded
+   * table column. The illustrated lower sheet must not clip bilingual rows or
+   * let long notes paint over the neighbouring interior checklist. */
+  .cabin .exterior-column{ position:relative; isolation:isolate; }
+  .cabin .exterior-column .itable{ width:100%; max-width:100%; }
+  .cabin .exterior-column .items{ table-layout:fixed; }
+  .cabin .exterior-column .item-ar,
+  .cabin .exterior-column .item-en{ max-width:100%; overflow-wrap:break-word; word-break:normal; }
+  .cabin .exterior-column .remark-block{ position:relative; z-index:1; overflow-wrap:anywhere; }
+
   /* The approved form paints the interior fittings drawing as a faint
    * background behind the lower-left (exterior) checklist, at 250x163pt (333px
    * at Chromium's 96dpi/72pt ratio). It is out of flow, so it neither adds page
