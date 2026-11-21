@@ -590,7 +590,7 @@ export class VehicleService {
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const where = { companyId, ...(query.status ? { status: query.status as never } : {}), ...(query.vehicleId ? { vehicleId: query.vehicleId } : {}) };
     const [rows, total] = await Promise.all([
-      this.prisma.inspectionBooking.findMany({ where, orderBy: { scheduledAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize, include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true, modelYear: true, color: true, mileage: true } }, service: { select: { nameEn: true, nameAr: true } }, report: true, _count: { select: { findings: true } } } }),
+      this.prisma.inspectionBooking.findMany({ where, orderBy: { scheduledAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize, include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true, modelYear: true, color: true, mileage: true } }, service: { select: { nameEn: true, nameAr: true } }, session: { select: { id: true } }, report: true, _count: { select: { findings: true } } } }),
       this.prisma.inspectionBooking.count({ where }),
     ]);
     const customerIds = [...new Set(rows.map((row) => row.customerId))];
@@ -996,6 +996,7 @@ function toInspectionBookingDto(b: {
   vehicle?: { vin: string; make: string; model: string; plateNumber: string | null; modelYear?: number; color?: string | null; mileage?: number } | null;
   service?: { nameEn: string; nameAr: string } | null;
   report?: { status: string; invoiceId: string | null } | null;
+  session?: { id: string } | null;
   _count?: { findings: number };
 }) {
   return {
@@ -1021,6 +1022,7 @@ function toInspectionBookingDto(b: {
     notes: b.notes,
     reportStatus: b.report?.status ?? null,
     invoiceId: b.report?.invoiceId ?? null,
+    sessionId: b.session?.id ?? null,
     findingCount: b._count?.findings,
   };
 }
