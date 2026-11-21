@@ -1555,6 +1555,25 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, 'document_download_failed', 'The document could not be opened.');
     return URL.createObjectURL(await res.blob());
   },
+  /** Download an authenticated PDF bundle: invoice, report, then vendor scans. */
+  inspectionBundleBlobUrl: async (sessionId: string): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(
+      `${API_BASE}/v1/documents/inspections/${encodeURIComponent(sessionId)}/bundle`,
+      { headers, credentials: 'include' },
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError(res.status, 'inspection_bundle_failed',
+        typeof body?.message === 'string' ? body.message : 'The invoice and report could not be downloaded.');
+    }
+    return URL.createObjectURL(await res.blob());
+  },
+
 
 
   // ---- document attachment actions ----
