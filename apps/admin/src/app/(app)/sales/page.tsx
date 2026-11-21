@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -194,7 +196,7 @@ export default function SalesPage() {
 }
 
 function SalesInner() {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('invoices');
 
@@ -212,7 +214,14 @@ function SalesInner() {
       <SectionHeader
         title={t('nav.sales_pos')}
         subtitle={t('erp.sales.subtitle')}
-        actions={<Badge tone="gold">{t('modules.available')}</Badge>}
+        actions={<>
+          {can('erp.sales.read') ? (
+            <Link href="/web-orders" className="oryx-btn oryx-btn--sm">
+              {locale === 'ar' ? 'طلبات الموقع الإلكتروني' : 'Website orders'}
+            </Link>
+          ) : null}
+          <Badge tone="gold">{t('modules.available')}</Badge>
+        </>}
       />
 
       <div className="flex flex-wrap gap-2" role="tablist">
