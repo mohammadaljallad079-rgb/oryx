@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { customerApi, publicApi, resolveImage, type StorefrontProduct } from '@/lib/api';
@@ -82,7 +83,7 @@ export default function SparePartDetailPage() {
         <div className="oryx-product-detail">
           <div className="oryx-product-detail__gallery">
             {product.image ? (
-              <img src={resolveImage(product.image) ?? product.image} alt={name} />
+              <Image src={resolveImage(product.image) ?? product.image} alt={name} width={960} height={720} unoptimized />
             ) : null}
           </div>
           <div className="oryx-product-detail__info">
