@@ -1700,6 +1700,8 @@ export const api = {
     request<Record<string, unknown>>(`/automotive/job-cards/${id}/labour`, { method: 'POST', body: { operations } }),
   createEstimate: (id: string, body: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/automotive/job-cards/${id}/estimates`, { method: 'POST', body }),
+  saveWorkItems: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/automotive/job-cards/${id}/work-items`, { method: 'PUT', body }),
   approveEstimate: (id: string) => request<Record<string, unknown>>(`/automotive/estimates/${id}/approve`, { method: 'POST', body: {} }),
   rejectEstimate: (id: string) => request<Record<string, unknown>>(`/automotive/estimates/${id}/reject`, { method: 'POST', body: {} }),
   invoiceJobCard: (id: string, body: Record<string, unknown> = {}) =>
