@@ -78,7 +78,7 @@ test.describe('Execution 20 — inspection form and print capture', () => {
         // The customer field is a searchable picker with an inline create action;
         // open it so the search box and the "+ add" affordance are visible.
         await page.getByTestId('job-customer').locator('button').first().click();
-        await expect(page.getByTestId('job-customer').locator('[role="option"]').first()).toBeVisible();
+        await expect(page.getByRole('listbox').locator('[role="option"]').first()).toBeVisible();
         await page.waitForTimeout(300);
         await shot(page, `03-customer-picker-search-${tag}`);
 
