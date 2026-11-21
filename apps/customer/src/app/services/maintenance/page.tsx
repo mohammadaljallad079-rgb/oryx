@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { isMaintenanceServiceCategory } from '@oryx/shared';
 import { useUi } from '@/lib/ui-context';
 import { publicApi, resolveImage, type StorefrontService } from '@/lib/api';
 import { Card, Money } from '@/components/ui';
@@ -30,9 +29,9 @@ export default function MaintenancePage() {
     setLoading(true);
     setError(false);
     publicApi
-      .storefrontServices()
+      .storefrontMaintenanceServices()
       .then((data) => {
-        if (active) setServices(data.filter((service) => isMaintenanceServiceCategory(service.key)));
+        if (active) setServices(data);
       })
       .catch(() => {
         if (active) {
