@@ -360,6 +360,7 @@ function NewJobModal({ onClose, onCreated, initialBooking }: {
         customerId,
         vehicleId,
         selectedTypes: types,
+        ...(initialBooking?.id ? { bookingId: initialBooking.id } : {}),
         ...(identity.customerName.trim() ? { customerName: identity.customerName.trim() } : {}),
         ...(identity.contactNumber.trim() ? { contactNumber: identity.contactNumber.trim() } : {}),
         ...(identity.plateNumber.trim() ? { plateNumber: identity.plateNumber.trim() } : {}),
