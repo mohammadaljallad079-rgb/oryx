@@ -1848,6 +1848,43 @@ export const api = {
 
   // ------------------------------------- Execution 12: platform control panel
   ecosystem: () => request<EcosystemOverviewResponse>('/platform/ecosystem'),
+  platformSettings: () =>
+    request<{
+      settings: Record<string, unknown>;
+      storefrontCompany: {
+        id: string;
+        code: string;
+        nameEn: string;
+        nameAr: string;
+        status: string;
+      } | null;
+    }>('/platform/settings'),
+  /**
+   * Update platform settings. `storefrontCompanyId` names the company the public
+   * website trades for; `null` clears the choice and hands it back to the
+   * environment's `STOREFRONT_COMPANY_CODE`.
+   */
+  updatePlatformSettings: (body: {
+    storefrontCompanyId?: string | null;
+    countryCode?: string;
+    currency?: string;
+    timezone?: string;
+    defaultVatRateBp?: number;
+  }) => request<{ settings: Record<string, unknown> }>('/platform/settings', { method: 'PATCH', body }),
+  /**
+   * The tenant the public website is actually serving. Public on purpose: it is
+   * the same answer a visitor's browser gets, so the settings screen can show
+   * the effective company rather than only the stored choice.
+   */
+  storefrontContext: () =>
+    request<{
+      companyId: string;
+      nameEn: string;
+      nameAr: string;
+      currency: string;
+      currencyScale: number;
+      countryCode: string;
+    }>('/storefront/context'),
 
   // --------------------------- Execution 20: planned ecosystem operations
   /**

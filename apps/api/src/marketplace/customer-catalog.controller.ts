@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/auth.decorators';
+import { StorefrontService } from '../storefront/storefront.service';
 import { CustomerCatalogService } from './customer-catalog.service';
 import { MarketplaceService } from './marketplace.service';
 
@@ -18,6 +19,7 @@ export class CustomerCatalogController {
   constructor(
     private readonly catalog: CustomerCatalogService,
     private readonly marketplace: MarketplaceService,
+    private readonly storefront: StorefrontService,
   ) {}
 
   private static localeOf(value?: string): 'ar' | 'en' {
@@ -27,18 +29,30 @@ export class CustomerCatalogController {
   @Public()
   @Get('products')
   @ApiOperation({ summary: 'Browse the published product catalogue' })
-  listProducts(
+  async listProducts(
     @Query('locale') locale?: string,
     @Query('companyId') companyId?: string,
+    @Query('storefront') storefront?: string,
     @Query('query') query?: string,
     @Query('sort') sort?: string,
     @Query('spareParts') spareParts?: string,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '20',
   ) {
+    /**
+     * `storefront=true` is the public website asking for *its* company's
+     * catalogue. The tenant is resolved server-side from the platform setting,
+     * so the site cannot list another tenant's stock and an older link cannot
+     * pin a company the owner has since replaced. An explicit `companyId` still
+     * wins, which is what the marketplace store filter uses.
+     */
+    const scopedCompanyId =
+      companyId ||
+      (storefront === 'true' ? await this.storefront.storefrontCompanyId() : undefined);
+
     return this.catalog.listProducts({
       locale: CustomerCatalogController.localeOf(locale),
-      companyId: companyId || undefined,
+      companyId: scopedCompanyId,
       query: query?.trim() || undefined,
       spareParts: spareParts === 'only' || spareParts === 'exclude' ? spareParts : undefined,
       sort: (sort as 'relevance' | 'price_asc' | 'price_desc' | 'name') || undefined,

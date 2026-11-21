@@ -1597,6 +1597,29 @@ async function seedPlatformSettings(): Promise<void> {
       create: { key, value: value as never },
     });
   }
+
+  /**
+   * Name ORYX Auto Services as the storefront company — but only when nobody
+   * has chosen one yet. A re-seed must never overwrite the tenant a Super Admin
+   * selected in the control panel, and the site falls back to
+   * `STOREFRONT_COMPANY_CODE` while this is empty.
+   */
+  const storefront = await prisma.company.findFirst({
+    where: { code: 'ORYX-AUTO', status: 'ACTIVE' },
+    select: { id: true },
+  });
+  if (storefront) {
+    const existing = await prisma.platformSetting.findUnique({
+      where: { key: 'storefront.company_id' },
+    });
+    if (!existing || !existing.value) {
+      await prisma.platformSetting.upsert({
+        where: { key: 'storefront.company_id' },
+        update: { value: storefront.id },
+        create: { key: 'storefront.company_id', value: storefront.id },
+      });
+    }
+  }
 }
 
 async function seedCoupons(actorId: string): Promise<number> {

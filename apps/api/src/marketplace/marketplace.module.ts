@@ -21,6 +21,7 @@ import { CustomerModule } from '../customer/customer.module';
 import { ErpCommonModule } from '../common/erp-common.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { DocumentsModule } from '../documents/documents.module';
+import { StorefrontModule } from '../storefront/storefront.module';
 
 /**
  * The automotive marketplace and provider portal.
@@ -37,6 +38,7 @@ import { DocumentsModule } from '../documents/documents.module';
     ErpCommonModule,
     InventoryModule,
     DocumentsModule,
+    StorefrontModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
