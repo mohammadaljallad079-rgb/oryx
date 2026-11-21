@@ -1336,7 +1336,7 @@ function PosSaleModal({
         </p>
       ) : null}
 
-      <div className="oryx-pos oryx-pos--premium oryx-pos--workspace-v4 oryx-pos--new-cashier oryx-pos--cashier-v5" data-testid="pos-premium-workstation">
+      <div className="oryx-pos oryx-pos--premium oryx-pos--workspace-v4 oryx-pos--new-cashier oryx-pos--cashier-v5 oryx-pos--cashier-v6" data-testid="pos-premium-workstation">
         <header className="oryx-pos__quickbar" data-testid="pos-command-bar">
           <div className="oryx-pos__quickbar-heading">
             <span className="oryx-pos__quickbar-mark"><Icon name="cart" size={19} /></span>
@@ -1355,7 +1355,9 @@ function PosSaleModal({
             <strong dir="ltr">{money(totals.totalMinor)}</strong>
           </div>
         </header>
-        {/* ---------------------------------------------------- product grid */}
+        {/* POS v6 keeps every available product in a large scrollable catalogue
+            above a permanently visible selected-items cart and checkout. */}
+                {/* ---------------------------------------------------- product grid */}
         <div className="oryx-pos__catalog flex min-h-0 min-w-0 flex-col gap-3">
           <div className="oryx-pos__section-heading">
             <div>
