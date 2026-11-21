@@ -45,9 +45,8 @@ function PreviewStrip() {
  * so the menu can never present a section the site does not serve or order
  * them differently from the homepage.
  */
-const PUBLIC_LINKS = [
+const fixedPublicLinks = [
   { href: '/', key: 'nav.home' },
-  ...STOREFRONT_SECTIONS.map((section) => ({ href: section.href, key: section.navKey })),
   { href: '/about', key: 'nav.about' },
   { href: '/contact', key: 'nav.contact' },
 ];
@@ -87,6 +86,13 @@ const ACCOUNT_LINKS = [
  */
 export function SiteHeader() {
   const { t, locale, toggleLocale, theme, toggleTheme } = useUi();
+  const { content: websiteContent } = useSiteContent();
+  const PUBLIC_LINKS = [
+    fixedPublicLinks[0],
+    ...STOREFRONT_SECTIONS.filter((section) => websiteContent.sectionVisibility[section.key] !== false)
+      .map((section) => ({ href: section.href, key: section.navKey })),
+    ...fixedPublicLinks.slice(1),
+  ];
   const { isAuthenticated, profile, signOut } = useCustomerAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -329,7 +335,7 @@ export function SiteFooter() {
   const columns = [
     {
       title: t('footer.services'),
-      links: STOREFRONT_SECTIONS.map((section) => ({
+      links: STOREFRONT_SECTIONS.filter((section) => content.sectionVisibility[section.key] !== false).map((section) => ({
         href: section.href,
         label: t(section.navKey),
       })),
